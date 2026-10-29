@@ -143,7 +143,7 @@ ADMIN_EMAILS = [e.lower() for e in env_list("ADMIN_EMAILS")]
 APPROVAL_LINK_MAX_AGE = 7 * 24 * 3600
 
 # ---------- Email ----------
-if env("EMAIL_HOST_USER"):
+if env("EMAIL_HOST_USER") and env("EMAIL_HOST_PASSWORD"):   # Gmail needs both; until then emails print in the terminal
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
     EMAIL_HOST = "smtp.gmail.com"
     EMAIL_PORT = 587

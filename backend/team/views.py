@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -148,6 +149,7 @@ class SheetViewSet(viewsets.ModelViewSet):
 class TodayView(APIView):
     """What 'today' is for the team, how long until it locks, and whether my sheets are filled in."""
 
+    @extend_schema(responses=OpenApiTypes.OBJECT)
     def get(self, request):
         st = TeamSettings.load()
         cfg, t = services.cfg_of(st), services.today(st)
@@ -161,7 +163,7 @@ class TodayView(APIView):
 
 
 class DashboardView(APIView):
-    @extend_schema(parameters=[OpenApiParameter("date", str)])
+    @extend_schema(parameters=[OpenApiParameter("date", str)], responses=OpenApiTypes.OBJECT)
     def get(self, request):
         try:
             on = services.parse_day(request.query_params.get("date"))
@@ -172,7 +174,7 @@ class DashboardView(APIView):
 
 
 class PerformanceView(APIView):
-    @extend_schema(parameters=[OpenApiParameter("year", int)])
+    @extend_schema(parameters=[OpenApiParameter("year", int)], responses=OpenApiTypes.OBJECT)
     def get(self, request):
         t = services.today()
         year = int(request.query_params.get("year") or t.year)
@@ -183,5 +185,6 @@ class PerformanceView(APIView):
 class WarningsView(APIView):
     permission_classes = [IsTeamAdmin]
 
+    @extend_schema(responses=OpenApiTypes.OBJECT)
     def get(self, request):
         return Response({"warnings": services.setup_warnings()})

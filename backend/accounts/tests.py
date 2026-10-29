@@ -85,6 +85,18 @@ class SignInAndApprovalTests(TestCase):
         self.assertContains(again, "Already decided")
         self.assertEqual(User.objects.get(email="new@example.com").role, "viewer")
 
+    def test_admin_approves_someone_as_admin_who_can_then_approve_others(self):
+        self.make_admin()
+        self.sign_in("colleague@example.com")
+        link = re.search(r"Approve: \S+(/api/auth/approval/\S+/)", mail.outbox[-1].body).group(1)
+        self.assertContains(self.client.get(link), '<option value="admin"')
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(link, {"role": "admin"})
+        self.assertEqual(User.objects.get(email="colleague@example.com").role, "admin")
+        mail.outbox.clear()
+        self.sign_in("third@example.com")
+        self.assertEqual(sorted(m.to[0] for m in mail.outbox), ["boss@example.com", "colleague@example.com"])  # both admins asked
+
     def test_reject_link(self):
         self.make_admin()
         self.sign_in("new@example.com")

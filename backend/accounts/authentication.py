@@ -15,3 +15,13 @@ class ApprovedJWTAuthentication(JWTAuthentication):
         if not user_can_sign_in(user):
             raise AuthenticationFailed("Your access has been removed. Contact an admin.", code="not_approved")
         return user
+
+
+try:  # describe the JWT login in the API docs (/api/docs/)
+    from drf_spectacular.contrib.rest_framework_simplejwt import SimpleJWTScheme
+
+    class ApprovedJWTScheme(SimpleJWTScheme):
+        target_class = "accounts.authentication.ApprovedJWTAuthentication"
+        name = "jwtAuth"
+except ImportError:  # pragma: no cover
+    pass

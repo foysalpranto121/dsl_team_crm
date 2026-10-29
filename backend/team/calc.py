@@ -226,11 +226,11 @@ def performance(targets, entries, kpis, cfg, pts, weights, year, today):
         covered = (me - frm).days + 1
         frac = covered / dim
         h, p = totals(entries, frm, me, cfg, pts)
-        actual = {"hours": r2(h / (covered / 7)), "points": p, **{x: k[x] for x in KPI_KEYS}}
+        actual = {"hours": h / (covered / 7), "points": p, **{x: k[x] for x in KPI_KEYS}}   # exact; rounded only for display
         target = {"hours": T["hours"], **{x: T[x] * frac for x in ("points",) + KPI_KEYS}}
         ratio = {x: (actual[x] / target[x] if target[x] > 0 else 0.0) for x in METRICS}
         score = sum(W[x] / 100 * ratio[x] for x in METRICS)
-        months.append({"m": m, "state": "current" if today <= me else "done", "from": frm, "hours": h, "avg_weekly": actual["hours"],
+        months.append({"m": m, "state": "current" if today <= me else "done", "from": frm, "hours": h, "avg_weekly": r2(actual["hours"]),
                        "points": p, **{x: k[x] for x in KPI_KEYS}, "target": target, "ratio": ratio, "score": score})
 
     def roll(lst):

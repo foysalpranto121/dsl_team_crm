@@ -161,6 +161,8 @@ Design: navy and gold brand colours from the current app, light and dark mode, s
 
 Each step ends with a check before the next one starts.
 
+**Progress:** steps 0–5 are done (backend sign-in, approval, profiles, team sheets with the midnight lock, KPIs, dashboard and performance numbers; 33 tests pass). Next: step 6.
+
 | # | Step | Done when |
 |---|---|---|
 | 0 | Folder layout, `.gitignore`, `backend/.env`, Python virtual environment, requirements | `pip install` works; `.env` is git-ignored |

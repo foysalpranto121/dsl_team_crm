@@ -162,11 +162,12 @@ function performance(sheet, entries, kpis, st, year, today){
     if(start > me){ const t = totals(entries, ms, me, st, tm); months.push({m, state:"before", hours:t.hours, points:t.points, ...k}); continue; }
     const from = maxD(ms, start), covered = diffDays(from, me) + 1, frac = covered/dim;
     const t = totals(entries, from, me, st, tm);
-    const actual = {hours:r2(t.hours/(covered/7)), points:t.points, leads:k.leads, opps:k.opps, clients:k.clients, revenue:k.revenue};
+    // hours stay exact here; they are rounded only for display
+    const actual = {hours:t.hours/(covered/7), points:t.points, leads:k.leads, opps:k.opps, clients:k.clients, revenue:k.revenue};
     const target = {hours:num(T.hours), points:num(T.points)*frac, leads:num(T.leads)*frac, opps:num(T.opps)*frac, clients:num(T.clients)*frac, revenue:num(T.revenue)*frac};
     const ratio = {}; let score = 0;
     METRICS.forEach(x => { ratio[x] = target[x] > 0 ? actual[x]/target[x] : 0; score += (W[x]/100) * ratio[x]; });
-    months.push({m, state: today <= me ? "current" : "done", from, hours:t.hours, avgWeekly:actual.hours, points:t.points,
+    months.push({m, state: today <= me ? "current" : "done", from, hours:t.hours, avgWeekly:r2(actual.hours), points:t.points,
       leads:k.leads, opps:k.opps, clients:k.clients, revenue:k.revenue, target, ratio, score});
   }
   const sum = (list, key) => r2(list.reduce((s,x) => s + (num(x[key])), 0));
