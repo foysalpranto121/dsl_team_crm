@@ -171,7 +171,10 @@ an Excel-style Sheets grid (Date, Day, H-1…H-10, Remarks, Work hours, Earned p
 automatic day / month rollover, and the Performance page (months, quarters, year). 40 tests pass.
 Then: Weekly KPI screen, task and job-role editor in Team setup, and Excel download (whole team or one sheet, laid out like
 the Team Operation Sheet, numbers from calc.py). 42 tests pass.
-Next: step 6 (personal tracker: pipeline, daily plan, activity log), then the activity log screen and daily reminder emails.
+Then step 6: the personal tracker (overview with pace, funnel, follow-ups and weekly report; pipeline with CSV import/export;
+daily plan with the Central AI 30-day template; activity log with point rules; own product, period, targets and lists; import of the
+old single-page tracker's backup). Private to each person. 50 tests pass.
+Next: the activity log screen (audit trail), the 9 pm "not filled in today" reminder email (needs the Gmail App Password), then deployment (step 13).
 
 | # | Step | Done when |
 |---|---|---|

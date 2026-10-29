@@ -13,6 +13,7 @@ import Performance from "./pages/Performance";
 import Sheets from "./pages/Sheets";
 import Soon from "./pages/Soon";
 import TeamSetup from "./pages/TeamSetup";
+import Tracker from "./pages/Tracker";
 import Waiting from "./pages/Waiting";
 import Welcome from "./pages/Welcome";
 
@@ -59,7 +60,7 @@ export default function App() {
           <Route path="/kpi" element={<KpiPage />} />
           <Route path="/performance" element={<Performance />} />
           <Route path="/team" element={<People />} />
-          <Route path="/tracker" element={<Soon title="My pipeline & plan" text="Your private prospects, follow-ups, daily plan and activity log, with your own product and targets." />} />
+          <Route path="/tracker" element={<Tracker />} />
           <Route path="/profile" element={<MyProfile />} />
           <Route element={<RequireAdmin />}>
             <Route path="/admin/approvals" element={<Approvals />} />

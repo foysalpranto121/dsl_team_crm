@@ -123,6 +123,7 @@ class PlanDayView(APIView):
         p, _ = PlanDay.objects.update_or_create(owner=request.user, date=d, defaults={"tasks": tasks, "note": ser.validated_data.get("note", "")})
         return Response({"date": p.date, "tasks": p.tasks, "note": p.note, "edited": True})
 
+    @extend_schema(responses={204: None})
     def delete(self, request, day):
         """Reset a day to the template's tasks."""
         try:
