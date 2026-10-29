@@ -166,7 +166,12 @@ Step 8 was brought forward so real sign-in can be tried: the React app has Home 
 team dashboard with charts, Approvals (approve as admin / member / viewer, switch people off), People and My profile.
 Then: DSL branding (logo, blue/red/green palette), a new Home page, the Sheets grid (server-calculated day, week and month totals,
 checked against Orin's real workbook data) and Team setup (sheets, targets, team rules). 35 tests pass.
-Next: Weekly KPI and Performance screens, a task / job-role editor, then steps 6–7.
+Then: Excel import (Team setup → Import from the Excel sheet; the real workbook is imported: 7 sheets, 360 days, 36 KPI weeks),
+an Excel-style Sheets grid (Date, Day, H-1…H-10, Remarks, Work hours, Earned points, Wk#, Mo#, weekly and monthly totals),
+automatic day / month rollover, and the Performance page (months, quarters, year). 40 tests pass.
+Then: Weekly KPI screen, task and job-role editor in Team setup, and Excel download (whole team or one sheet, laid out like
+the Team Operation Sheet, numbers from calc.py). 42 tests pass.
+Next: step 6 (personal tracker: pipeline, daily plan, activity log), then the activity log screen and daily reminder emails.
 
 | # | Step | Done when |
 |---|---|---|

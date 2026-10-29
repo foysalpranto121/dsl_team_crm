@@ -211,6 +211,41 @@ class TeamRulesTests(TestCase):
             self.assertEqual(self.put(self.member, self.work, date(2026, 10, 31), [self.calls.pk]).status_code, 403)
             self.assertEqual(self.put(self.member, self.work, date(2026, 11, 1), [self.calls.pk]).status_code, 200)
 
+    def test_kpi_week_screen(self):
+        r = self.api(self.member).get("/api/team/kpi-week/?week=2026-10-27").data      # a Tuesday: the week of Sat 24 Oct
+        self.assertEqual((str(r["week_start"]), r["week_no"], r["counts_in_month"]), ("2026-10-24", 44, "2026-10"))
+        rows = {x["name"]: x for x in r["rows"]}
+        self.assertNotIn("Planning - Member", rows)                                   # plans have no KPIs
+        self.assertTrue(rows["Member"]["editable"] and rows["Member"]["mine"])
+        self.assertFalse(rows["Team D"]["editable"])
+        last = self.api(self.member).get("/api/team/kpi-week/?week=2026-10-17").data
+        self.assertIn("Only this week", next(x for x in last["rows"] if x["name"] == "Member")["blocked"])
+        self.assertTrue(all(x["editable"] for x in self.api(self.admin).get("/api/team/kpi-week/?week=2026-10-17").data["rows"]))
+
+    def test_excel_download_matches_the_app(self):
+        from io import BytesIO
+
+        from openpyxl import load_workbook
+        SheetEntry.objects.create(sheet=self.work, day=date(2026, 10, 25), slots=[self.calls.pk, self.demo.pk], remarks="client visit")
+        SheetEntry.objects.create(sheet=self.work, day=date(2026, 10, 27), slots=[self.calls.pk] * 3)
+        KpiEntry.objects.create(sheet=self.work, week_start=WEEK, leads=4, opps=2, clients=1, revenue=25000)
+        r = self.api(self.viewer).get("/api/team/export/?year=2026")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("attachment", r["Content-Disposition"])
+        wb = load_workbook(BytesIO(r.content))
+        self.assertEqual(wb.sheetnames[:1] + wb.sheetnames[-3:], ["Dashboard", "KPI_Weekly_Input", "Monthly Performance", "CONFIG"])
+        ws = wb["Member"]
+        row = next(r for r in ws.iter_rows(min_row=5, values_only=True) if r[0] and r[0].date() == date(2026, 10, 25))
+        self.assertEqual(row[2:4], ("Make 8 Cold Calls", "Demo & Presentation Session"))
+        self.assertEqual(row[12:19], ("client visit", 2, 11, 44, 10, 5, 14))          # remarks, hours, points, wk, mo, week hrs, month pts
+        self.assertEqual(len(list(ws.iter_rows(min_row=5))), 365)                      # every day of the year, like the original
+        dash = {r[0]: r for r in wb["Dashboard"].iter_rows(min_row=5, values_only=True)}
+        self.assertEqual(dash["Member"][3:5], (5, 14))
+        kpi = list(wb["KPI_Weekly_Input"].iter_rows(min_row=4, values_only=True))[0]
+        self.assertEqual((kpi[0], kpi[2], kpi[4], kpi[7]), ("Member", 44, 4, 25000))
+        one = load_workbook(BytesIO(self.api(self.viewer).get(f"/api/team/export/?year=2026&sheet={self.work.pk}").content))
+        self.assertNotIn("Team D", one.sheetnames)
+
     def test_today_endpoint(self):
         r = self.api(self.member).get("/api/team/today/").data
         self.assertEqual((r["today"], r["week_start"], r["seconds_to_lock"]), (TODAY, WEEK, 14 * 3600))

@@ -6,6 +6,7 @@ import { Link, useSearchParams } from "react-router";
 import { api, errorText } from "../api/client";
 import type { EntriesResponse, Entry, Sheet, Slot, Task, Today, WeekTotal } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
+import DownloadExcel from "../components/DownloadExcel";
 import { Alert, Badge, Button, Card, EmptyState, PageHeader, Spinner } from "../components/ui";
 import { PACE } from "./Dashboard";
 
@@ -197,6 +198,7 @@ export default function Sheets() {
           <span className="min-w-36 text-center text-sm font-semibold">{monthLabel(month)}</span>
           <Button variant="secondary" aria-label="Next month" onClick={() => go({ month: shiftMonth(month, 1) })}><ChevronRight className="size-4" /></Button>
           {month !== today.data!.today.slice(0, 7) && <Button variant="ghost" onClick={() => go({ month: today.data!.today.slice(0, 7) })}>This month</Button>}
+          {sheetId && <span className="ml-2"><DownloadExcel year={+month.slice(0, 4)} sheet={sheetId} /></span>}
         </div>} />
 
       <div className="mb-5 flex flex-wrap gap-2" role="tablist" aria-label="Choose a sheet">

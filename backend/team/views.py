@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 
+from django.http import HttpResponse
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status, viewsets
@@ -13,8 +14,9 @@ from accounts.permissions import IsAdminOrReadOnly, IsApproved, IsTeamAdmin
 from core import audit
 
 from . import calc, services
+from .exporter import build_workbook
 from .importer import WorkbookError, import_workbook
-from .models import JobRole, Sheet, SheetEntry, Task, TeamSettings
+from .models import JobRole, KpiEntry, Sheet, SheetEntry, Task, TeamSettings
 from .serializers import (EntrySerializer, EntryWriteSerializer, JobRoleSerializer, KpiSerializer, SheetSerializer, TaskSerializer,
                           TeamSettingsSerializer)
 
@@ -186,6 +188,54 @@ class PerformanceView(APIView):
         year = int(request.query_params.get("year") or t.year)
         on, rows = services.performance_rows(year, t)
         return Response({"year": year, "date": on, "rows": rows})
+
+
+class KpiWeekView(APIView):
+    """Every work sheet's results for one week, and whether the signed-in person may change each row."""
+
+    @extend_schema(parameters=[OpenApiParameter("week", str)], responses=OpenApiTypes.OBJECT)
+    def get(self, request):
+        st = TeamSettings.load()
+        cfg, t = services.cfg_of(st), services.today(st)
+        try:
+            ws = calc.week_start_of(services.parse_day(request.query_params.get("week"), t), cfg)
+        except services.Locked as e:
+            raise ValidationError(str(e))
+        sheets = list(services.work_sheets().select_related("owner", "role"))
+        kpis = {k.sheet_id: k for k in KpiEntry.objects.filter(sheet__in=sheets, week_start=ws).select_related("updated_by")}
+        rows = []
+        for s in sheets:
+            reason = services.kpi_block(request.user, s, ws, st)
+            rows.append({"sheet": s.id, "name": s.name, "person": s.person or (s.owner.name if s.owner else s.name), "role": s.role.name if s.role else None,
+                         "mine": s.owner_id == request.user.pk, "editable": reason is None, "blocked": reason,
+                         "kpi": KpiSerializer(kpis[s.id]).data if s.id in kpis else None,
+                         "targets": {"leads": float(s.target_leads), "opps": float(s.target_opps), "clients": float(s.target_clients), "revenue": float(s.target_revenue)}})
+        year, month = calc.month_of_week(ws)
+        return Response({"week_start": ws, "week_end": ws + timedelta(days=6), "week_no": calc.week_no(ws, cfg)[0], "today": t,
+                         "current_week_start": calc.week_start_of(t, cfg), "counts_in_month": f"{year}-{month:02d}", "rows": rows})
+
+
+class ExportView(APIView):
+    """The Team Operation Sheet as an .xlsx file: every sheet for a year, or just one (?sheet=ID)."""
+
+    @extend_schema(parameters=[OpenApiParameter("year", int), OpenApiParameter("sheet", int)], responses={(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"): OpenApiTypes.BINARY})
+    def get(self, request):
+        t = services.today()
+        try:
+            year = int(request.query_params.get("year") or t.year)
+            sheet = int(request.query_params["sheet"]) if request.query_params.get("sheet") else None
+        except ValueError:
+            raise ValidationError("year and sheet must be numbers.")
+        if not 2000 <= year <= 2100:
+            raise ValidationError("Choose a year between 2000 and 2100.")
+        data = build_workbook(year, [sheet] if sheet else None)
+        name = f"DSL Team Operation Sheet {year}.xlsx"
+        if sheet:
+            s = Sheet.objects.filter(pk=sheet).first()
+            name = f"DSL {s.name if s else 'Sheet'} {year}.xlsx"
+        resp = HttpResponse(data, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        resp["Content-Disposition"] = f'attachment; filename="{name}"'
+        return resp
 
 
 class ImportView(APIView):

@@ -7,6 +7,7 @@ import { Card, PageHeader, Spinner } from "./components/ui";
 import Approvals from "./pages/Approvals";
 import Dashboard from "./pages/Dashboard";
 import Home from "./pages/Home";
+import KpiPage from "./pages/Kpi";
 import People from "./pages/People";
 import Performance from "./pages/Performance";
 import Sheets from "./pages/Sheets";
@@ -55,7 +56,7 @@ export default function App() {
         <Route element={<RequireProfile><Layout /></RequireProfile>}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/sheets" element={<Sheets />} />
-          <Route path="/kpi" element={<Soon title="Weekly KPI" text="Enter this week's leads, opportunities, clients and revenue. The API for it is ready." />} />
+          <Route path="/kpi" element={<KpiPage />} />
           <Route path="/performance" element={<Performance />} />
           <Route path="/team" element={<People />} />
           <Route path="/tracker" element={<Soon title="My pipeline & plan" text="Your private prospects, follow-ups, daily plan and activity log, with your own product and targets." />} />

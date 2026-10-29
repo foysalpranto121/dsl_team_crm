@@ -51,6 +51,19 @@ api.interceptors.response.use(undefined, async (err: AxiosError) => {
   throw err;
 });
 
+/** Download a file from the API (the access token goes in the header, so a plain link can't be used). */
+export async function downloadFile(url: string, fallbackName: string) {
+  const r = await api.get<Blob>(url, { responseType: "blob" });
+  const disposition = String(r.headers["content-disposition"] ?? "");
+  const name = disposition.match(/filename="([^"]+)"/)?.[1] ?? fallbackName;
+  const href = URL.createObjectURL(r.data);
+  const a = Object.assign(document.createElement("a"), { href, download: name });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 5000);
+}
+
 /** A short, human message for any API error. */
 export function errorText(e: unknown): string {
   if (!axios.isAxiosError(e)) return String(e);

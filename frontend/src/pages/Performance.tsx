@@ -4,6 +4,7 @@ import { BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api, errorText } from "../api/client";
+import DownloadExcel from "../components/DownloadExcel";
 import { Alert, Button, Card, EmptyState, PageHeader, Spinner } from "../components/ui";
 
 type Metrics = { hours?: number; avg_weekly?: number | null; points?: number; leads?: number; opps?: number; clients?: number; revenue?: number; score?: number | null };
@@ -65,6 +66,7 @@ export default function Performance() {
           <Button variant="secondary" aria-label="Previous year" onClick={() => setYear(y - 1)}><ChevronLeft className="size-4" /></Button>
           <span className="num min-w-16 text-center text-sm font-semibold">{y}</span>
           <Button variant="secondary" aria-label="Next year" onClick={() => setYear(y + 1)} disabled={y >= thisYear}><ChevronRight className="size-4" /></Button>
+          <span className="ml-2"><DownloadExcel year={y} label="Download team Excel" /></span>
         </div>} />
 
       {rows.length === 0 ? <Card><EmptyState icon={<BarChart3 />} title="No work sheets yet">Import the Excel sheet or create sheets in Team setup.</EmptyState></Card> : (

@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Archive, ExternalLink, Pencil, Plus } from "lucide-react";
+import { AlertTriangle, Archive, Pencil, Plus } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { api, errorText } from "../api/client";
 import type { JobRole, Sheet, TeamSettings, User } from "../api/types";
 import ImportWorkbook from "../components/ImportWorkbook";
+import TasksRoles from "../components/TasksRoles";
 import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select, Spinner } from "../components/ui";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -168,24 +169,9 @@ export default function TeamSetup() {
 
       {sheets.data!.length > 0 && <div className="mb-6"><ImportWorkbook /></div>}
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <RulesCard st={st.data!} />
-        <Card className="p-5">
-          <h2 className="text-base font-bold">Tasks, points and job roles</h2>
-          <p className="mt-1 text-sm text-slate-500">{roles.data!.length} job roles are set up. Each role has its own task list and score weightages, which must add up to 100%.</p>
-          <ul className="mt-4 space-y-2 text-sm">
-            {roles.data!.map((r) => (
-              <li key={r.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 dark:border-white/10">
-                <span className="font-medium">{r.name}</span>
-                <span className="text-xs text-slate-500">{r.tasks.length} tasks · weights {r.weights_total}%</span>
-              </li>
-            ))}
-          </ul>
-          <a href="/django-admin/team/task/" target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-700 hover:underline dark:text-brand-200">
-            Edit tasks and job roles in the admin site <ExternalLink className="size-3.5" /></a>
-          <p className="mt-1 text-xs text-slate-500">Sign in there with a Django admin account (python manage.py createsuperuser). An editor here is coming next.</p>
-        </Card>
-      </div>
+      <div className="mb-6"><RulesCard st={st.data!} /></div>
+
+      <TasksRoles />
     </>
   );
 }
