@@ -99,12 +99,16 @@ class SheetViewSet(viewsets.ModelViewSet):
         if to < frm or (to - frm).days > 400:
             raise ValidationError("Ask for up to about a year at a time.")
         rows = sheet.entries.filter(day__range=(frm, to)).select_related("updated_by")
-        editable, d = {}, frm
-        while d <= to:   # which days this person may change, by the server's clock
-            editable[d.isoformat()] = services.entry_block(request.user, sheet, d, st) is None
+        editable, blocked, d = {}, {}, frm
+        while d <= to:   # which days this person may change, by the server's clock, and why not
+            reason = services.entry_block(request.user, sheet, d, st)
+            editable[d.isoformat()] = reason is None
+            if reason:
+                blocked[d.isoformat()] = reason
             d += timedelta(days=1)
-        return Response({"from": frm, "to": to, "today": t, "editable": editable,
-                         "entries": EntrySerializer(rows, many=True, context={"pts": task_points()}).data})
+        return Response({"from": frm, "to": to, "today": t, "editable": editable, "blocked": blocked,
+                         "entries": EntrySerializer(rows, many=True, context={"pts": task_points()}).data,
+                         **services.sheet_summary(sheet, frm, to, st)})
 
     @extend_schema(request=EntryWriteSerializer, responses=EntrySerializer)
     @action(detail=True, methods=["put", "delete"], url_path=f"entries/{DAY}")

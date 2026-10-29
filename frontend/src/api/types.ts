@@ -1,0 +1,165 @@
+export type Role = "admin" | "member" | "viewer";
+export type Status = "pending" | "approved" | "rejected" | "disabled";
+
+export interface Profile {
+  photo_url: string | null;
+  position: string;
+  job_description: string;
+  official_email: string;
+  phone: string;
+  bio: string;
+  is_complete: boolean;
+  completed_at: string | null;
+  updated_at: string;
+}
+
+export interface User {
+  id: number;
+  email: string;
+  name: string;
+  status: Status;
+  role: Role;
+  requested_at: string;
+  approved_at: string | null;
+  profile: Profile;
+}
+
+export interface AdminUser extends User {
+  approved_by: string | null;
+  last_login: string | null;
+}
+
+export interface SignInResponse {
+  status: Status;
+  email?: string;
+  name?: string;
+  access?: string;
+  user?: User;
+}
+
+export interface Pace {
+  key: "met" | "onpace" | "near" | "behind" | "below" | "early" | "none";
+  pct: number | null;
+  expected?: number;
+}
+
+export interface DashboardRow {
+  id: number;
+  name: string;
+  person: string;
+  role: string | null;
+  owner_id: number | null;
+  week_hours: number;
+  last_week_hours: number;
+  avg_week_hours: number | null;
+  week_target: number;
+  week_status: Pace;
+  last_week_status: Pace;
+  month_points: number;
+  last_month_points: number;
+  avg_month_points: number | null;
+  month_target: number;
+  month_status: Pace;
+  ytd_hours: number;
+  ytd_points: number;
+  today_hours: number;
+  kpi_month: { leads: number; opps: number; clients: number; revenue: number; weeks: number };
+  kpi_targets: { leads: number; opps: number; clients: number; revenue: number };
+}
+
+export interface Task {
+  id: number;
+  type: string;
+  name: string;
+  points: string;          // decimal from the API, e.g. "1.00"
+  active: boolean;
+  position: number;
+}
+
+export interface JobRole {
+  id: number;
+  name: string;
+  tasks: number[];
+  w_hours: string; w_points: string; w_leads: string; w_opps: string; w_clients: string; w_revenue: string;
+  weights_total: number;
+}
+
+export interface Sheet {
+  id: number;
+  name: string;
+  kind: "work" | "plan";
+  owner: number | null;
+  owner_name: string | null;
+  person: string;
+  role: number | null;
+  role_name: string | null;
+  target_hours: string; target_points: string; target_leads: string; target_opps: string; target_clients: string; target_revenue: string;
+  start_date: string | null;
+  position: number;
+  archived: boolean;
+  mine: boolean;
+  updated_at: string;
+}
+
+export type Slot = number | null;
+
+export interface Entry {
+  day: string;
+  slots: Slot[];
+  remarks: string;
+  hours: number;
+  points: number;
+  updated_by: string | null;
+  updated_at: string;
+}
+
+export interface WeekTotal {
+  start: string;
+  end: string;
+  no: number;
+  year: number;
+  hours: number;
+  points: number;
+  target_hours: number;
+  status: Pace;
+}
+
+export interface EntriesResponse {
+  from: string;
+  to: string;
+  today: string;
+  editable: Record<string, boolean>;
+  blocked: Record<string, string>;
+  entries: Entry[];
+  weeks: WeekTotal[];
+  totals: { hours: number; points: number };
+  choices: number[];
+  week_start_dow: number;
+  weekend_days: number[];
+  count_weekend: boolean;
+  lock_days: boolean;
+  timezone: string;
+  seconds_to_lock: number;
+}
+
+export interface TeamSettings {
+  name: string;
+  timezone: string;
+  lock_days: boolean;
+  week_start_dow: number;
+  weekend_days: number[];
+  count_weekend: boolean;
+  currency: string;
+  today: string;
+  seconds_to_lock: number;
+}
+
+export interface Today {
+  today: string;
+  timezone: string;
+  lock_days: boolean;
+  seconds_to_lock: number;
+  week_start: string;
+  week_no: number;
+  my_sheets: { id: number; name: string; kind: "work" | "plan"; filled_today: boolean }[];
+}

@@ -161,7 +161,12 @@ Design: navy and gold brand colours from the current app, light and dark mode, s
 
 Each step ends with a check before the next one starts.
 
-**Progress:** steps 0–5 are done (backend sign-in, approval, profiles, team sheets with the midnight lock, KPIs, dashboard and performance numbers; 33 tests pass). Next: step 6.
+**Progress:** steps 0–5 are done (backend sign-in, approval, profiles, team sheets with the midnight lock, KPIs, dashboard and performance numbers; 34 tests pass).
+Step 8 was brought forward so real sign-in can be tried: the React app has Home + Google sign-in, waiting page, profile setup with photo,
+team dashboard with charts, Approvals (approve as admin / member / viewer, switch people off), People and My profile.
+Then: DSL branding (logo, blue/red/green palette), a new Home page, the Sheets grid (server-calculated day, week and month totals,
+checked against Orin's real workbook data) and Team setup (sheets, targets, team rules). 35 tests pass.
+Next: Weekly KPI and Performance screens, a task / job-role editor, then steps 6–7.
 
 | # | Step | Done when |
 |---|---|---|

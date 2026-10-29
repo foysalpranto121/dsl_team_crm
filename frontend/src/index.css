@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  /* Daffodil Software Ltd. colours, taken from the DSL logo: blue S (#034EA1), red D and L (#EC1C24), green swoosh (#00A550) */
+  --color-brand-50: #eef5fc;
+  --color-brand-100: #d6e6f7;
+  --color-brand-200: #adcbef;
+  --color-brand-300: #7aa9e2;
+  --color-brand-400: #4382cf;
+  --color-brand-500: #1c64bb;
+  --color-brand-600: #0b57ae;
+  --color-brand-700: #034ea1;
+  --color-brand-800: #053f80;
+  --color-brand-900: #072f5e;
+  --color-brand-950: #061a33;
+
+  --color-accent-300: #f7a3a6;
+  --color-accent-400: #f15a60;
+  --color-accent-500: #ec1c24;
+  --color-accent-600: #c8141b;
+
+  --color-leaf-400: #2fbf73;
+  --color-leaf-500: #00a550;
+  --color-leaf-600: #008a43;
+}
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body { @apply bg-slate-50 text-slate-900 antialiased dark:bg-brand-950 dark:text-slate-100; }
+  h1, h2, h3 { @apply font-display tracking-tight; }
+  :focus-visible { @apply outline-2 outline-offset-2 outline-brand-400; }
+}
+
+@layer components {
+  .card { @apply rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.04]; }
+  .input { @apply w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400
+                 focus:border-transparent focus:outline-2 focus:outline-brand-400 disabled:opacity-60
+                 dark:border-white/15 dark:bg-white/5 dark:text-slate-100; }
+  .label { @apply mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300; }
+  .num { @apply font-mono tabular-nums; }
+  .hero-glow {
+    background:
+      radial-gradient(60rem 30rem at 85% -10%, color-mix(in oklab, var(--color-accent-300) 35%, transparent), transparent),
+      radial-gradient(50rem 30rem at -10% 10%, color-mix(in oklab, var(--color-brand-200) 50%, transparent), transparent);
+  }
+  .dark .hero-glow {
+    background:
+      radial-gradient(60rem 30rem at 85% -10%, color-mix(in oklab, var(--color-accent-500) 12%, transparent), transparent),
+      radial-gradient(50rem 30rem at -10% 10%, color-mix(in oklab, var(--color-brand-600) 35%, transparent), transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

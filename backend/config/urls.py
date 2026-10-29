@@ -5,7 +5,7 @@ from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    path("django-admin/", admin.site.urls),   # not /admin/: the React app uses /admin/... for its own pages
     path("api/", include("accounts.urls")),
     path("api/team/", include("team.urls")),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),

@@ -167,6 +167,50 @@ class TeamRulesTests(TestCase):
         self.assertAlmostEqual(oct_["score"], expect, places=9)
         self.assertEqual(next(r for r in p["rows"] if r["id"] == self.work.pk)["months"][8]["state"], "before")
 
+    def test_sheet_totals_for_the_month_view(self):
+        half = Task.objects.create(name="Half-point task", points="0.5")
+        self.role.tasks.add(half)
+        E = lambda d, s: SheetEntry.objects.create(sheet=self.work, day=d, slots=s)
+        E(date(2026, 10, 1), [half.pk] * 3 + [self.demo.pk])            # Thu: 4 h, 11.5 pts
+        E(date(2026, 10, 30), [self.calls.pk] * 2)                       # Fri (weekend): 2 h, 2 pts
+        E(date(2026, 10, 31), [self.demo.pk])                            # Sat 31 Oct: starts the next week
+        E(date(2026, 11, 2), [self.calls.pk] * 5)                        # Mon 2 Nov: same week, next month
+        E(date(2026, 9, 27), [self.calls.pk] * 7)                        # Sun 27 Sep: same week as 1 Oct
+        Task.objects.filter(pk=half.pk).update(active=False)              # switched off later: still counts
+        r = self.api(self.member).get(f"/api/team/sheets/{self.work.pk}/entries/?from=2026-10-01&to=2026-10-31").data
+        self.assertEqual(r["totals"], {"hours": 4 + 2 + 1, "points": 11.5 + 2 + 10})          # only October days
+        weeks = {str(w["start"]): (w["hours"], w["points"]) for w in r["weeks"]}
+        self.assertEqual(weeks["2026-09-26"], (7 + 4, 7 + 11.5))          # whole week, including September
+        self.assertEqual(weeks["2026-10-31"], (1 + 5, 10 + 5))            # whole week, including November
+        self.assertEqual(len(r["weeks"]), 6)
+        self.assertNotIn(half.pk, r["choices"])                          # not offered any more…
+        self.assertIn(self.demo.pk, r["choices"])
+        self.assertNotIn(self.market.pk, r["choices"])                   # …and other roles' tasks never are
+        self.assertIn("locked", r["blocked"]["2026-10-28"])
+        self.assertNotIn("2026-10-29", r["blocked"])
+        st = TeamSettings.load()
+        st.count_weekend = False
+        st.save()
+        r = self.api(self.member).get(f"/api/team/sheets/{self.work.pk}/entries/?from=2026-10-01&to=2026-10-31").data
+        self.assertEqual(r["totals"], {"hours": 4 + 1, "points": 11.5 + 10})                  # Friday left out
+
+    def test_month_and_day_roll_over_at_midnight(self):
+        url = f"/api/team/sheets/{self.work.pk}/entries/"
+        with at(datetime(2026, 10, 31, 17, 59, tzinfo=tz.utc)):          # 23:59 on Sat 31 Oct in Dhaka
+            r = self.api(self.member).get(url).data
+            self.assertEqual((str(r["from"]), str(r["to"]), str(r["today"])), ("2026-10-01", "2026-10-31", "2026-10-31"))
+            self.assertTrue(r["editable"]["2026-10-31"])
+            self.assertEqual(r["seconds_to_lock"], 60)
+        with at(datetime(2026, 10, 31, 18, 1, tzinfo=tz.utc)):           # 00:01 on Sun 1 Nov
+            r = self.api(self.member).get(url).data                       # no dates asked for: the current month
+            self.assertEqual((str(r["from"]), str(r["to"]), str(r["today"])), ("2026-11-01", "2026-11-30", "2026-11-01"))
+            self.assertTrue(r["editable"]["2026-11-01"])
+            old = self.api(self.member).get(url + "?from=2026-10-01&to=2026-10-31").data
+            self.assertFalse(old["editable"]["2026-10-31"])              # yesterday is now locked
+            self.assertIn("locked", old["blocked"]["2026-10-31"])
+            self.assertEqual(self.put(self.member, self.work, date(2026, 10, 31), [self.calls.pk]).status_code, 403)
+            self.assertEqual(self.put(self.member, self.work, date(2026, 11, 1), [self.calls.pk]).status_code, 200)
+
     def test_today_endpoint(self):
         r = self.api(self.member).get("/api/team/today/").data
         self.assertEqual((r["today"], r["week_start"], r["seconds_to_lock"]), (TODAY, WEEK, 14 * 3600))

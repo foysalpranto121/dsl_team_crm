@@ -174,6 +174,29 @@ def setup_warnings():
     return calc.warnings(roles, sheets)
 
 
+def sheet_summary(sheet, frm, to, st=None):
+    """Totals for a sheet's view of [frm, to], all calculated here so every screen and export agrees.
+    Each week shows its full Saturday-to-Friday total, even when it runs into the next or previous month."""
+    st = st or TeamSettings.load()
+    cfg = cfg_of(st)
+    pts = {t.id: float(t.points) for t in Task.objects.all()}
+    first, last = calc.week_start_of(frm, cfg), calc.week_start_of(to, cfg) + timedelta(days=6)
+    days = [calc.Day(e.day, e.slots) for e in sheet.entries.filter(day__range=(first, last))]
+    weeks, ws = [], first
+    while ws <= to:
+        we = ws + timedelta(days=6)
+        h, p = calc.totals(days, ws, we, cfg, pts)
+        no, year = calc.week_no(ws, cfg)
+        weeks.append({"start": ws, "end": we, "no": no, "year": year, "hours": h, "points": p,
+                      "target_hours": float(sheet.target_hours), "status": calc.final_of(h, float(sheet.target_hours))})
+        ws += timedelta(days=7)
+    h, p = calc.totals(days, frm, to, cfg, pts)
+    choices = list(sheet.role.tasks.filter(active=True).values_list("id", flat=True)) if sheet.role else []
+    return {"weeks": weeks, "totals": {"hours": h, "points": p}, "choices": choices,
+            "week_start_dow": st.week_start_dow, "weekend_days": st.weekend_days, "count_weekend": st.count_weekend,
+            "lock_days": st.lock_days, "timezone": st.timezone, "seconds_to_lock": calc.seconds_to_midnight(st.timezone, now())}
+
+
 def entry_numbers(entry, pts):
     return {"hours": calc.day_hours(entry.slots), "points": calc.day_points(entry.slots, pts)}
 
