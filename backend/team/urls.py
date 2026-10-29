@@ -14,4 +14,5 @@ urlpatterns = [
     path("dashboard/", views.DashboardView.as_view(), name="team-dashboard"),
     path("performance/", views.PerformanceView.as_view(), name="team-performance"),
     path("warnings/", views.WarningsView.as_view(), name="team-warnings"),
+    path("import/", views.ImportView.as_view(), name="team-import"),
 ] + router.urls

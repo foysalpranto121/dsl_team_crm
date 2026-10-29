@@ -52,19 +52,26 @@ function SlotCell({ value, editable, tasks, groups, extra, onChange, label }: {
   );
 }
 
+const cell = "border-b border-r border-slate-200 dark:border-white/10";
+const xlDate = (s: string) => utc(s).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit", timeZone: "UTC" }).replace(/ /g, "-");
+const xlDay = (s: string) => utc(s).toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" });
+
+/** "Weekly Hrs Sum" from the workbook, as a row under each week: the whole Saturday-to-Friday week. */
 function WeekRow({ w, today }: { w: WeekTotal; today: string }) {
   const done = w.end < today;
   const st = PACE[w.status.key];
   return (
-    <tr className="bg-slate-50 text-xs dark:bg-white/[0.03]">
-      <td className="sticky left-0 z-10 bg-slate-50 px-3 py-2 font-semibold text-slate-600 dark:bg-[#0c1f3a] dark:text-slate-300">Week {w.no}</td>
-      <td colSpan={SLOTS + 1} className="px-3 py-2 text-slate-500">
-        {shortDate(w.start)} – {shortDate(w.end)} · whole week, Saturday to Friday
+    <tr className="bg-brand-50 text-xs font-semibold text-brand-900 dark:bg-brand-400/10 dark:text-brand-100">
+      <td className={clsx(cell, "sticky left-0 z-10 bg-brand-50 px-3 py-1.5 dark:bg-[#0d2747]")}>Week {w.no} total</td>
+      <td colSpan={SLOTS + 2} className={clsx(cell, "px-3 py-1.5 font-normal text-slate-600 dark:text-slate-300")}>
+        {shortDate(w.start)} – {shortDate(w.end)} (Sat–Fri)
         {w.target_hours > 0 && <> · target {nf.format(w.target_hours)} h</>}
         {w.target_hours > 0 && <span className="ml-2">{done ? <Badge tone={st.tone}>{st.label}</Badge> : <Badge>In progress</Badge>}</span>}
       </td>
-      <td className="num px-3 py-2 text-right font-semibold">{w.hours} h</td>
-      <td className="num px-3 py-2 text-right font-semibold">{nf.format(w.points)}</td>
+      <td className={clsx(cell, "num px-3 py-1.5 text-right")}>{w.hours}</td>
+      <td className={clsx(cell, "num px-3 py-1.5 text-right")}>{nf.format(w.points)}</td>
+      <td className={clsx(cell, "num px-2 py-1.5 text-center")}>{w.no}</td>
+      <td className={clsx(cell, "px-2 py-1.5")} />
     </tr>
   );
 }
@@ -228,14 +235,17 @@ export default function Sheets() {
       {d && (
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-max min-w-full border-separate border-spacing-0 text-sm">
+            <table className="w-max min-w-full border-separate border-spacing-0 border-l border-t border-slate-200 text-sm dark:border-white/10">
               <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wider text-slate-500">
-                  <th className="sticky left-0 z-20 border-b border-slate-200 bg-white px-3 py-2.5 font-semibold dark:border-white/10 dark:bg-[#0a1d36]">Day</th>
-                  {Array.from({ length: SLOTS }, (_, i) => <th key={i} className="border-b border-slate-200 px-1.5 py-2.5 font-semibold dark:border-white/10">H-{i + 1}</th>)}
-                  <th className="border-b border-slate-200 px-2 py-2.5 font-semibold dark:border-white/10">Remarks</th>
-                  <th className="border-b border-slate-200 px-3 py-2.5 text-right font-semibold dark:border-white/10">Hours</th>
-                  <th className="border-b border-slate-200 px-3 py-2.5 text-right font-semibold dark:border-white/10">Points</th>
+                <tr className="bg-brand-700 text-left text-[11px] font-semibold uppercase tracking-wider text-white dark:bg-brand-800">
+                  <th className={clsx(cell, "sticky left-0 z-20 bg-brand-700 px-3 py-2.5 dark:bg-brand-800")}>Date</th>
+                  <th className={clsx(cell, "px-2 py-2.5")}>Day</th>
+                  {Array.from({ length: SLOTS }, (_, i) => <th key={i} className={clsx(cell, "px-1.5 py-2.5 text-center")}>H-{i + 1}</th>)}
+                  <th className={clsx(cell, "px-2 py-2.5")}>Remarks</th>
+                  <th className={clsx(cell, "px-3 py-2.5 text-right")}>Work hours</th>
+                  <th className={clsx(cell, "px-3 py-2.5 text-right")}>Earned points</th>
+                  <th className={clsx(cell, "px-2 py-2.5 text-center")}>Wk#</th>
+                  <th className={clsx(cell, "px-2 py-2.5 text-center")}>Mo#</th>
                 </tr>
               </thead>
               <tbody>
@@ -252,48 +262,52 @@ export default function Sheets() {
                   const w = weekOf(day);
                   const showWeek = w && (day === w.end || day === d.to);
                   const isToday = day === d.today;
+                  // like the workbook: weekend (Friday) rows are orange; today stands out in DSL red
+                  const rowBg = isToday ? "bg-accent-500/[0.07]" : weekend ? "bg-orange-50 dark:bg-orange-400/[0.07]" : "";
+                  const stickyBg = isToday ? "bg-[#fdeff0] dark:bg-[#2a1825]" : weekend ? "bg-orange-50 dark:bg-[#21201f]" : "bg-white dark:bg-[#0a1a31]";
                   return [
-                    <tr key={day} id={`day-${day}`} title={d.blocked[day]}
-                      className={clsx("group", isToday && "bg-accent-500/[0.06]", weekend && !isToday && "bg-slate-50/70 dark:bg-white/[0.02]")}>
-                      <td className={clsx("sticky left-0 z-10 border-b border-slate-100 px-3 py-1.5 whitespace-nowrap dark:border-white/5",
-                        isToday ? "bg-[#fdf2f2] dark:bg-[#1d1a2e]" : weekend ? "bg-slate-50 dark:bg-[#0b1d37]" : "bg-white dark:bg-[#0a1a31]")}>
+                    <tr key={day} id={`day-${day}`} title={d.blocked[day]} className={rowBg}>
+                      <td className={clsx(cell, "sticky left-0 z-10 px-3 py-1 whitespace-nowrap", stickyBg)}>
                         <div className="flex items-center gap-1.5">
-                          <span className={clsx("font-semibold", isToday && "text-accent-600 dark:text-accent-400")}>{dayLabel(day)}</span>
+                          <span className={clsx("num text-xs font-medium", isToday && "font-bold text-accent-600 dark:text-accent-400")}>{xlDate(day)}</span>
                           {isToday && <Badge tone="accent">Today</Badge>}
-                          {weekend && <span className="text-[10px] uppercase text-slate-400">weekend</span>}
                           {!editable && !isAdmin && day <= d.today && <Lock className="size-3 text-slate-400" aria-label="Locked" />}
                           {saving[day] && <Loader2 className="size-3.5 animate-spin text-brand-500" aria-label="Saving" />}
                         </div>
                       </td>
+                      <td className={clsx(cell, "px-2 py-1 text-xs", weekend ? "font-semibold text-orange-700 dark:text-orange-300" : "text-slate-600 dark:text-slate-300")}>{xlDay(day)}</td>
                       {slots.map((v, i) => (
-                        <td key={i} className="border-b border-slate-100 px-1.5 py-1.5 dark:border-white/5">
+                        <td key={i} className={clsx(cell, "px-1 py-1")}>
                           <SlotCell value={v} editable={editable} tasks={taskMap} groups={groups} extra={extra} label={`${dayLabel(day)} hour ${i + 1}`}
                             onChange={(nv) => { const s = [...slots]; s[i] = nv; change(day, { ...cur, slots: s }); }} />
                         </td>
                       ))}
-                      <td className="border-b border-slate-100 px-2 py-1.5 dark:border-white/5">
+                      <td className={clsx(cell, "px-1.5 py-1")}>
                         {editable ? (
                           <input defaultValue={cur.remarks} key={`${day}-${entry?.updated_at ?? ""}`} aria-label={`Remarks for ${dayLabel(day)}`} maxLength={2000}
                             placeholder="Remarks" className="w-48 rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs focus:outline-2 focus:outline-brand-400 dark:border-white/10"
                             onBlur={(e) => { if (e.target.value.trim() !== cur.remarks.trim()) change(day, { ...cur, remarks: e.target.value }); }}
                             onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
-                        ) : <span className="block w-48 truncate text-xs text-slate-500" title={cur.remarks}>{cur.remarks}</span>}
+                        ) : <span className="block w-48 truncate px-1 text-xs text-slate-600 dark:text-slate-300" title={cur.remarks}>{cur.remarks}</span>}
                       </td>
-                      <td className="num border-b border-slate-100 px-3 py-1.5 text-right dark:border-white/5">{hours || <span className="text-slate-300 dark:text-white/20">0</span>}</td>
-                      <td className="num border-b border-slate-100 px-3 py-1.5 text-right dark:border-white/5">{points ? nf.format(points) : <span className="text-slate-300 dark:text-white/20">0</span>}</td>
+                      <td className={clsx(cell, "num px-3 py-1 text-right")}>{hours || <span className="text-slate-300 dark:text-white/20">0</span>}</td>
+                      <td className={clsx(cell, "num px-3 py-1 text-right")}>{points ? nf.format(points) : <span className="text-slate-300 dark:text-white/20">0</span>}</td>
+                      <td className={clsx(cell, "num px-2 py-1 text-center text-xs text-slate-500")}>{w?.no}</td>
+                      <td className={clsx(cell, "num px-2 py-1 text-center text-xs text-slate-500")}>{utc(day).getUTCMonth() + 1}</td>
                     </tr>,
                     showWeek ? <WeekRow key={`w-${w.start}`} w={w} today={d.today} /> : null,
                   ];
                 })}
               </tbody>
               <tfoot>
-                <tr className="bg-brand-700 text-white dark:bg-brand-800">
-                  <td className="sticky left-0 z-10 bg-brand-700 px-3 py-2.5 font-bold dark:bg-brand-800">{monthLabel(month)}</td>
-                  <td colSpan={SLOTS + 1} className="px-3 py-2.5 text-xs text-white/80">
-                    Month total{!d.count_weekend && " · weekend days are not counted"} · each filled hour counts 1 h; points come from the task list
+                <tr className="bg-brand-700 font-bold text-white dark:bg-brand-800">
+                  <td className={clsx(cell, "sticky left-0 z-10 bg-brand-700 px-3 py-2.5 dark:bg-brand-800")}>{monthLabel(month)}</td>
+                  <td colSpan={SLOTS + 2} className={clsx(cell, "px-3 py-2.5 text-xs font-normal text-white/80")}>
+                    Monthly total{!d.count_weekend && " · weekend days are not counted"} · each filled hour counts 1 hour; points come from the task list
                   </td>
-                  <td className="num px-3 py-2.5 text-right font-bold">{d.totals.hours} h</td>
-                  <td className="num px-3 py-2.5 text-right font-bold">{nf.format(d.totals.points)}</td>
+                  <td className={clsx(cell, "num px-3 py-2.5 text-right")}>{d.totals.hours}</td>
+                  <td className={clsx(cell, "num px-3 py-2.5 text-right")}>{nf.format(d.totals.points)}</td>
+                  <td colSpan={2} className={cell} />
                 </tr>
               </tfoot>
             </table>

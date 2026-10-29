@@ -5,6 +5,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -12,6 +13,7 @@ from accounts.permissions import IsAdminOrReadOnly, IsApproved, IsTeamAdmin
 from core import audit
 
 from . import calc, services
+from .importer import WorkbookError, import_workbook
 from .models import JobRole, Sheet, SheetEntry, Task, TeamSettings
 from .serializers import (EntrySerializer, EntryWriteSerializer, JobRoleSerializer, KpiSerializer, SheetSerializer, TaskSerializer,
                           TeamSettingsSerializer)
@@ -184,6 +186,26 @@ class PerformanceView(APIView):
         year = int(request.query_params.get("year") or t.year)
         on, rows = services.performance_rows(year, t)
         return Response({"year": year, "date": on, "rows": rows})
+
+
+class ImportView(APIView):
+    """Admins upload the Team Operation Sheet (.xlsx). check=1 counts everything without saving."""
+    permission_classes = [IsTeamAdmin]
+    parser_classes = [MultiPartParser]
+
+    @extend_schema(request={"multipart/form-data": {"type": "object", "properties": {"file": {"type": "string", "format": "binary"}, "check": {"type": "boolean"}}}},
+                   responses=OpenApiTypes.OBJECT)
+    def post(self, request):
+        f = request.FILES.get("file")
+        if not f or not f.name.lower().endswith(".xlsx"):
+            raise ValidationError("Choose the Team Operation Sheet as an .xlsx file.")
+        if f.size > 15 * 1024 * 1024:
+            raise ValidationError("The file is larger than 15 MB.")
+        try:
+            report = import_workbook(f, request.user, dry_run=request.data.get("check") in ("1", "true", True))
+        except WorkbookError as e:
+            raise ValidationError(str(e))
+        return Response(report)
 
 
 class WarningsView(APIView):

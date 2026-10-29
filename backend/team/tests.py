@@ -217,6 +217,111 @@ class TeamRulesTests(TestCase):
         self.assertEqual({s["name"] for s in r["my_sheets"]}, {"Member", "Planning - Member"})
 
 
+def dsl_workbook():
+    """A small workbook in the Team Operation Sheet layout."""
+    from io import BytesIO
+
+    from openpyxl import Workbook
+    from openpyxl.worksheet.datavalidation import DataValidation
+    wb = Workbook()
+    c = wb.active
+    c.title = "CONFIG"
+    c.append(["CONFIG"]); c.append(["targets"]); c.append(["Short Name"])
+    c.append(["Pranto", "Foysal Ahmed Pranto", "International Sales (AI)", datetime(2026, 10, 1), 35, 300, 30, 15, 5, 100000])
+    c.append(["Shohan", "Shohanur Rahaman", "National Sales (Tender)", datetime(2026, 6, 1), 40, 300, 15, 6, 2, 200000])
+    for col, w in zip("BCDE", ([0.2, 0.05, 0.15, 0.1, 0.1, 0.4], [0.2, 0.05, 0.1, 0.15, 0.1, 0.4], [0.2, 0.05, 0.2, 0.15, 0.1, 0.3], [0.2, 0.1, 0.7, 0, 0, 0])):
+        for i, v in enumerate(w):
+            c[f"{col}{11 + i}"] = v
+    for col, title in zip("HIJK", ["🟦 National Sales (Tender)\n(Edit)", "🟩 International Sales (Product)\n(Edit)", "🟧 International Sales (AI)\n(Edit)", "🟥 Marketing\n(Edit)"]):
+        c[f"{col}20"] = title
+    rows = [("Cold Client Calling", "Make 8 Cold Calls", 2),            # points changed from 1 to 2
+            ("Client Meeting", "Demo & Presentation Session", 10),
+            ("Product Management", "Market Research", 5)]
+    for i, (typ, name, pts) in enumerate(rows):
+        c[f"A{21 + i}"], c[f"C{21 + i}"], c[f"D{21 + i}"] = typ, name, pts
+        c[f"J{21 + i}"] = name                                           # the AI role's dropdown list
+        c[f"H{21 + i}"] = name if i < 2 else None
+    for tab, col in (("Pranto", "J"), ("Planning - Pranto", "J"), ("Shohan", "H")):
+        ws = wb.create_sheet(tab)
+        for _ in range(4):
+            ws.append([tab])
+        dv = DataValidation(type="list", formula1=f"CONFIG!${col}$21:${col}$100")
+        ws.add_data_validation(dv)
+        dv.add("C5:L369")
+    p = wb["Pranto"]
+    p.append([datetime(2026, 10, 4), "Sun", "Make 8 Cold Calls", "market research", "Demo & Presentation Session"])   # 3 h, 2+5+10 pts
+    p.append([datetime(2026, 10, 5), "Mon", "Visited the bank"])                                                      # unknown task: 1 h, 0 pts
+    p.append([datetime(2026, 10, 6), "Tue"] + [None] * 10 + ["Sick Leave"])                                           # remark only: 0 h
+    p.append([datetime(2026, 10, 7), "Wed"])                                                                          # empty: skipped
+    wb["Planning - Pranto"].append([datetime(2026, 10, 8), "Thu", "Market Research"])
+    k = wb.create_sheet("KPI_Weekly_Input")
+    k.append(["KPI"]); k.append(["help"]); k.append(["Employee"])
+    k.append(["Pranto", None, 41, 10, 3, 1, 0, 50000, "first week of October"])   # week 41 of 2026 starts Sat 3 Oct
+    k.append(["Pranto", None, 42, 10, None, None, None, None, None])               # nothing entered: skipped
+    k.append(["Nobody", None, 41, 10, 1, 0, 0, 0, None])                           # no such sheet
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+class ImportTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = User.objects.create_user("admin@x.com", name="Admin", status="approved", role="admin")
+        cls.me = User.objects.create_user("pranto@x.com", name="Foysal Ahmed Pranto", status="approved", role="member")
+
+    def upload(self, user, check=False, f=None):
+        c = APIClient()
+        c.force_authenticate(user)
+        f = f or dsl_workbook()
+        f.name = "Team Operation Sheet.xlsx"
+        return c.post("/api/team/import/", {"file": f, "check": "1" if check else "0"}, format="multipart")
+
+    def test_check_only_saves_nothing(self):
+        r = self.upload(self.admin, check=True)
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertTrue(r.data["dry_run"])
+        self.assertEqual(Sheet.objects.count(), 0)
+        self.assertEqual(Task.objects.get(name="Make 8 Cold Calls").points, 1)
+
+    def test_import_reads_the_workbook_like_the_sheet(self):
+        r = self.upload(self.admin)
+        self.assertEqual(r.status_code, 200, r.data)
+        pranto = Sheet.objects.get(name="Pranto")
+        self.assertEqual((pranto.role.name, pranto.owner, pranto.person, pranto.start_date), ("International Sales (AI)", self.me, "Foysal Ahmed Pranto", date(2026, 10, 1)))
+        self.assertEqual((float(pranto.target_hours), float(pranto.target_revenue)), (35, 100000))
+        self.assertEqual(Sheet.objects.get(name="Shohan").role.name, "National Sales (Tender)")
+        self.assertIsNone(Sheet.objects.get(name="Shohan").owner)                     # no account with that name yet
+        self.assertEqual(Sheet.objects.get(name="Planning - Pranto").kind, "plan")
+        self.assertEqual(Task.objects.get(name="Make 8 Cold Calls").points, 2)        # CONFIG points win
+        role = JobRole.objects.get(name="International Sales (AI)")
+        self.assertEqual(role.weights, {"hours": 20, "points": 5, "leads": 20, "opps": 15, "clients": 10, "revenue": 30})
+        self.assertEqual(set(role.tasks.values_list("name", flat=True)), {"Make 8 Cold Calls", "Demo & Presentation Session", "Market Research"})
+        row = next(s for s in r.data["sheets"] if s["name"] == "Pranto")
+        self.assertEqual((row["days"], row["hours"], row["points"], row["leave_only_days"]), (3, 4, 17.0, 1))
+        bank = Task.objects.get(name="Visited the bank")
+        self.assertEqual((bank.active, float(bank.points)), (False, 0))              # hour kept, no points
+        kpi = KpiEntry.objects.get(sheet=pranto)
+        self.assertEqual((kpi.week_start, kpi.leads, kpi.opps, int(kpi.revenue), kpi.notes), (date(2026, 10, 3), 3, 1, 50000, "first week of October"))
+        self.assertTrue(any("Nobody" in w for w in r.data["warnings"]))
+        totals = services.sheet_summary(pranto, date(2026, 10, 1), date(2026, 10, 31))["totals"]
+        self.assertEqual(totals, {"hours": 4, "points": 17.0})                     # same numbers on the Sheets page
+
+    def test_importing_twice_updates_instead_of_copying(self):
+        self.upload(self.admin)
+        self.upload(self.admin)
+        self.assertEqual(Sheet.objects.filter(name="Pranto").count(), 1)
+        self.assertEqual(SheetEntry.objects.filter(sheet__name="Pranto").count(), 3)
+        self.assertEqual(KpiEntry.objects.count(), 1)
+
+    def test_admins_only_and_wrong_files(self):
+        self.assertEqual(self.upload(self.me).status_code, 403)
+        from io import BytesIO
+        bad = BytesIO(b"not a workbook")
+        self.assertEqual(self.upload(self.admin, f=bad).status_code, 400)
+
+
 class CalcTests(TestCase):
     cfg = calc.Cfg()
 

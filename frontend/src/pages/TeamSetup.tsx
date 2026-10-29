@@ -3,6 +3,7 @@ import { AlertTriangle, Archive, ExternalLink, Pencil, Plus } from "lucide-react
 import { useState, type FormEvent } from "react";
 import { api, errorText } from "../api/client";
 import type { JobRole, Sheet, TeamSettings, User } from "../api/types";
+import ImportWorkbook from "../components/ImportWorkbook";
 import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select, Spinner } from "../components/ui";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -129,6 +130,8 @@ export default function TeamSetup() {
         </Alert></div>
       )}
 
+      {sheets.data!.length === 0 && <div className="mb-6"><ImportWorkbook highlight /></div>}
+
       <Card className="mb-6 overflow-hidden">
         <div className="px-5 pt-5"><h2 className="text-base font-bold">Sheets</h2>
           <p className="text-xs text-slate-500">One work log per person. Add a plan sheet if someone plans their week ahead.</p></div>
@@ -162,6 +165,8 @@ export default function TeamSetup() {
           </table>
         </div>
       </Card>
+
+      {sheets.data!.length > 0 && <div className="mb-6"><ImportWorkbook /></div>}
 
       <div className="grid gap-6 xl:grid-cols-2">
         <RulesCard st={st.data!} />

@@ -8,6 +8,7 @@ import Approvals from "./pages/Approvals";
 import Dashboard from "./pages/Dashboard";
 import Home from "./pages/Home";
 import People from "./pages/People";
+import Performance from "./pages/Performance";
 import Sheets from "./pages/Sheets";
 import Soon from "./pages/Soon";
 import TeamSetup from "./pages/TeamSetup";
@@ -55,7 +56,7 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/sheets" element={<Sheets />} />
           <Route path="/kpi" element={<Soon title="Weekly KPI" text="Enter this week's leads, opportunities, clients and revenue. The API for it is ready." />} />
-          <Route path="/performance" element={<Soon title="Performance" text="Monthly, quarterly and yearly scores per person, with charts. The numbers are already calculated by the API." />} />
+          <Route path="/performance" element={<Performance />} />
           <Route path="/team" element={<People />} />
           <Route path="/tracker" element={<Soon title="My pipeline & plan" text="Your private prospects, follow-ups, daily plan and activity log, with your own product and targets." />} />
           <Route path="/profile" element={<MyProfile />} />
