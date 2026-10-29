@@ -6,6 +6,7 @@ import { Alert, Badge, Button, Card } from "./ui";
 
 interface ImportReport {
   dry_run: boolean;
+  replaced?: { sheets: number; days: number; kpi_weeks: number };
   tasks: { created: string[]; updated: string[] };
   roles: { name: string; tasks: number; weights: number }[];
   sheets: { name: string; kind: "work" | "plan"; person: string; role: string | null; owner: string | null; created: boolean; days: number; hours: number; points: number; leave_only_days: number }[];
@@ -20,11 +21,13 @@ export default function ImportWorkbook({ highlight }: { highlight?: boolean }) {
   const qc = useQueryClient();
   const input = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [replace, setReplace] = useState(false);
   const run = useMutation({
     mutationFn: async (check: boolean) => {
       const body = new FormData();
       body.append("file", file!);
       body.append("check", check ? "1" : "0");
+      body.append("replace", replace ? "1" : "0");
       return (await api.post<ImportReport>("/team/import/", body)).data;
     },
     onSuccess: (r) => { if (!r.dry_run) qc.invalidateQueries(); },
@@ -49,6 +52,8 @@ export default function ImportWorkbook({ highlight }: { highlight?: boolean }) {
             <Button variant="secondary" onClick={() => input.current?.click()}><Upload className="size-4" /> {file ? "Choose another file" : "Choose file"}</Button>
             {file && <span className="max-w-xs truncate text-sm text-slate-600 dark:text-slate-300">{file.name}</span>}
             {file && <Button onClick={() => run.mutate(true)} busy={checking} disabled={run.isPending}>Check file</Button>}
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={replace} onChange={(e) => { setReplace(e.target.checked); run.reset(); }} />
+              <span><b>Replace everything</b>: delete all current sheets, days and KPIs first</span></label>
             {r?.dry_run && <Button variant="secondary" className="border-leaf-500 text-leaf-600" onClick={() => run.mutate(false)}
               busy={importing} disabled={run.isPending}><CheckCircle2 className="size-4" /> Import now</Button>}
           </div>
@@ -61,6 +66,7 @@ export default function ImportWorkbook({ highlight }: { highlight?: boolean }) {
           <Alert tone={r.dry_run ? "amber" : "green"}>
             {r.dry_run ? <><b>Checked, nothing saved yet.</b> This is what the import will bring in. Press <b>Import now</b> to save it.</>
               : <><b>Imported.</b> The sheets, dashboard and scores now include this data.</>}
+            {r.replaced && <> {r.dry_run ? "It will first delete" : "First deleted"} <b>{r.replaced.sheets} sheets, {r.replaced.days} days and {r.replaced.kpi_weeks} KPI weeks</b>.</>}
           </Alert>
           <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10">
             <table className="w-full min-w-[720px] text-sm">

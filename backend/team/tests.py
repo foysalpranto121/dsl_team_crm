@@ -357,6 +357,45 @@ class ImportTests(TestCase):
         self.assertEqual(self.upload(self.admin, f=bad).status_code, 400)
 
 
+class DeleteAndReplaceTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = User.objects.create_user("admin@x.com", name="Admin", status="approved", role="admin")
+        cls.member = User.objects.create_user("pranto@x.com", name="Foysal Ahmed Pranto", status="approved", role="member")
+
+    def api(self, u):
+        c = APIClient()
+        c.force_authenticate(u)
+        return c
+
+    def test_delete_one_sheet_and_everything(self):
+        s = Sheet.objects.create(name="Old")
+        SheetEntry.objects.create(sheet=s, day=date(2026, 10, 1), slots=[Task.objects.first().pk])
+        self.assertEqual(self.api(self.member).delete(f"/api/team/sheets/{s.pk}/").status_code, 403)
+        self.assertEqual(self.api(self.admin).delete(f"/api/team/sheets/{s.pk}/").status_code, 204)
+        self.assertFalse(SheetEntry.objects.exists())
+        self.assertTrue(AuditLog.objects.filter(action="sheet.delete", flagged=True).exists())
+        Sheet.objects.create(name="A")
+        self.assertEqual(self.api(self.member).post("/api/team/reset/", {"confirm": "DELETE"}, format="json").status_code, 403)
+        self.assertEqual(self.api(self.admin).post("/api/team/reset/", {"confirm": "yes"}, format="json").status_code, 400)
+        r = self.api(self.admin).post("/api/team/reset/", {"confirm": "DELETE"}, format="json")
+        self.assertEqual((r.status_code, r.data["sheets"], Sheet.objects.count()), (200, 1, 0))
+        self.assertTrue(Task.objects.exists() and JobRole.objects.exists())          # setup lists stay
+
+    def test_import_can_replace_everything(self):
+        Sheet.objects.create(name="Not in the workbook")
+        f = dsl_workbook()
+        f.name = "x.xlsx"
+        check = self.api(self.admin).post("/api/team/import/", {"file": f, "check": "1", "replace": "1"}, format="multipart")
+        self.assertEqual(check.data["replaced"]["sheets"], 1)
+        self.assertTrue(Sheet.objects.filter(name="Not in the workbook").exists())   # a check changes nothing
+        f = dsl_workbook()
+        f.name = "x.xlsx"
+        self.api(self.admin).post("/api/team/import/", {"file": f, "replace": "1"}, format="multipart")
+        self.assertFalse(Sheet.objects.filter(name="Not in the workbook").exists())
+        self.assertTrue(Sheet.objects.filter(name="Pranto").exists())
+
+
 class LinkSheetsTests(TestCase):
     """Imported sheets carry the person's name; approving that person links them automatically."""
 

@@ -15,6 +15,7 @@ urlpatterns = [
     path("performance/", views.PerformanceView.as_view(), name="team-performance"),
     path("warnings/", views.WarningsView.as_view(), name="team-warnings"),
     path("leaderboard/", views.LeaderboardView.as_view(), name="team-leaderboard"),
+    path("reset/", views.ResetView.as_view(), name="team-reset"),
     path("import/", views.ImportView.as_view(), name="team-import"),
     path("export/", views.ExportView.as_view(), name="team-export"),
     path("kpi-week/", views.KpiWeekView.as_view(), name="team-kpi-week"),

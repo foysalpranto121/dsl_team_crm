@@ -66,7 +66,7 @@ def build_workbook(year, sheet_ids=None):
     # ---------- Dashboard (first tab) ----------
     dash = wb.active
     dash.title = "Dashboard"
-    _title(dash, f"{st.name} — Team Performance {year}", f"Downloaded {today:%d %b %Y} from the Team CRM. Weeks run Saturday to Friday.")
+    _title(dash, f"{st.name} — Team Performance {year}", f"Downloaded {today:%d %b %Y} from the DSL Business Team Operation System (TOS). Weeks run Saturday to Friday.")
     _header(dash, 4, ["Sheet", "Person", "Job role", "Hours this year", "Points this year", "Weekly hours target", "Avg hours / completed week",
                       "Monthly points target", "Avg points / completed month"], [18, 24, 28, 14, 14, 14, 16, 14, 16])
     on = min(today, last)

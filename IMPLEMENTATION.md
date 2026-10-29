@@ -1,4 +1,4 @@
-# DSL Business Team CRM — Implementation Plan
+# DSL Business Team Operation System (TOS) — Implementation Plan
 
 A private CRM for the DSL Business Team. It combines two things in one system:
 
@@ -176,7 +176,9 @@ daily plan with the Central AI 30-day template; activity log with point rules; o
 old single-page tracker's backup). Private to each person. 50 tests pass.
 Then: approving someone links the sheets that carry their name; `python manage.py send_test_email` checks Gmail. 52 tests pass.
 Admin how-to: see [GUIDE.md](GUIDE.md).
-Next: the activity log screen (audit trail), the 9 pm "not filled in today" reminder email (needs the Gmail App Password), then deployment (step 13).
+Then: Activity log page (filters, admin corrections to locked days highlighted; approvals, role, task and job-role changes now recorded),
+leaderboard and announcements on the dashboard, and "share my pipeline with admins" (opt-in) with an admin Team pipelines page. 57 tests pass.
+Next: the 9 pm "not filled in today" reminder email (needs the Gmail App Password), then deployment (step 13).
 
 | # | Step | Done when |
 |---|---|---|

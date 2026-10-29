@@ -98,6 +98,10 @@ class SheetViewSet(viewsets.ModelViewSet):
             return [IsApproved()]
         return super().get_permissions()
 
+    def perform_destroy(self, sheet):
+        audit.log(self.request.user, "sheet.delete", sheet.name, flagged=True, days=sheet.entries.count(), kpi_weeks=sheet.kpis.count())
+        sheet.delete()
+
     def perform_update(self, ser):
         before = {k: str(getattr(ser.instance, k)) for k in ser.validated_data}
         obj = ser.save()
@@ -267,7 +271,8 @@ class ImportView(APIView):
         if f.size > 15 * 1024 * 1024:
             raise ValidationError("The file is larger than 15 MB.")
         try:
-            report = import_workbook(f, request.user, dry_run=request.data.get("check") in ("1", "true", True))
+            report = import_workbook(f, request.user, dry_run=request.data.get("check") in ("1", "true", True),
+                                     replace=request.data.get("replace") in ("1", "true", True))
         except WorkbookError as e:
             raise ValidationError(str(e))
         return Response(report)
@@ -285,6 +290,19 @@ class LeaderboardView(APIView):
         rows = [{"id": r["id"], "person": r["person"] or r["name"], "role": r["role"], "score": score.get(r["id"]),
                  "points": r["month_points"], "hours": r["week_hours"], "ytd_points": r["ytd_points"]} for r in dash]
         return Response({"date": t, "rows": rows})
+
+
+class ResetView(APIView):
+    """Admins: delete all team data (every sheet, day and weekly KPI). The body must be {"confirm": "DELETE"}."""
+    permission_classes = [IsTeamAdmin]
+
+    @extend_schema(request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT)
+    def post(self, request):
+        if request.data.get("confirm") != "DELETE":
+            raise ValidationError('Type DELETE to confirm.')
+        counts = services.delete_team_data()
+        audit.log(request.user, "team.reset", "all team data", flagged=True, **counts)
+        return Response(counts)
 
 
 class WarningsView(APIView):

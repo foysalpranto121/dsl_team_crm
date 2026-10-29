@@ -16,7 +16,8 @@ const hours = (v: unknown) => (Array.isArray(v) ? v.filter((x) => x != null).len
 const day = (v: unknown) => (typeof v === "string" ? new Date(v + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : "");
 const pairs = (d: Detail) => {
   const before = (d.before ?? {}) as Detail, after = (d.after ?? {}) as Detail;
-  return Object.keys(after).map((k) => `${k.replace(/^target_/, "").replace(/_/g, " ")}: ${String(before[k] ?? "—")} → ${String(after[k])}`).join(" · ");
+  const changed = Object.keys(after).filter((k) => String(before[k] ?? "") !== String(after[k] ?? ""));   // only what actually changed
+  return changed.length ? changed.map((k) => `${k.replace(/^target_/, "").replace(/_/g, " ")}: ${String(before[k] ?? "—")} → ${String(after[k])}`).join(" · ") : "no visible change";
 };
 
 /** Turns a recorded change into a plain sentence. */
@@ -27,6 +28,8 @@ function describe(i: Item): { what: string; more: string } {
     case "entry.clear": return { what: `Cleared ${day(d.day)} on "${i.target}"`, more: "" };
     case "kpi.save": return { what: `Weekly KPI for "${i.target}", week of ${day(d.week)}`, more: `leads ${d.leads ?? 0} · opps ${d.opps ?? 0} · clients ${d.clients ?? 0} · revenue ${d.revenue ?? 0}` };
     case "sheet.save": return { what: `Changed sheet "${i.target}"`, more: pairs(d) };
+    case "sheet.delete": return { what: `Deleted sheet "${i.target}"`, more: `${d.days} days · ${d.kpi_weeks} KPI weeks removed` };
+    case "team.reset": return { what: "Deleted all team data", more: `${d.sheets} sheets · ${d.days} days · ${d.kpi_weeks} KPI weeks removed` };
     case "sheet.linked": return { what: `Linked sheet "${i.target}" to its person`, more: "the name matched" };
     case "settings.save": return { what: "Changed the team rules", more: Object.entries(d).map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`).join(" · ") };
     case "task.save": return { what: `Changed task "${i.target}"`, more: d.after ? pairs(d) : `points ${d.points ?? ""}` };
@@ -36,7 +39,7 @@ function describe(i: Item): { what: string; more: string } {
     case "user.update": return { what: `Changed access for ${i.target}`, more: pairs(d) };
     case "announcement.save": return { what: `Posted an announcement: "${i.target}"`, more: "" };
     case "announcement.delete": return { what: `Removed an announcement: "${i.target}"`, more: "" };
-    case "import.workbook": return { what: "Imported the Excel workbook", more: `${d.sheets} sheets · ${d.kpi_weeks} KPI weeks` };
+    case "import.workbook": return { what: d.replaced ? "Replaced all team data with an Excel import" : "Imported the Excel workbook", more: `${d.sheets} sheets · ${d.kpi_weeks} KPI weeks` };
     default: return { what: `${i.action} ${i.target}`, more: "" };
   }
 }

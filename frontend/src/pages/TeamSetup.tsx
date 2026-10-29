@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Archive, Pencil, Plus } from "lucide-react";
+import { AlertTriangle, Archive, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { api, errorText } from "../api/client";
 import type { JobRole, Sheet, TeamSettings, User } from "../api/types";
@@ -110,6 +110,12 @@ export default function TeamSetup() {
   const st = useQuery({ queryKey: ["team-settings"], queryFn: async () => (await api.get<TeamSettings>("/team/settings/")).data });
   const warnings = useQuery({ queryKey: ["warnings"], queryFn: async () => (await api.get<{ warnings: string[] }>("/team/warnings/")).data.warnings });
   const [editing, setEditing] = useState<number | "new" | null>(null);
+  const [confirmDel, setConfirmDel] = useState<number | null>(null);
+  const [resetText, setResetText] = useState("");
+  const refreshAll = () => ["setup-sheets", "sheets", "dashboard", "performance", "kpi-week", "leaderboard", "warnings", "activity"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+  const del = useMutation({ mutationFn: async (id: number) => api.delete(`/team/sheets/${id}/`), onSuccess: () => { setConfirmDel(null); refreshAll(); } });
+  const reset = useMutation({ mutationFn: async () => (await api.post<{ sheets: number; days: number; kpi_weeks: number }>("/team/reset/", { confirm: resetText })).data,
+    onSuccess: () => { setResetText(""); refreshAll(); } });
   const archive = useMutation({
     mutationFn: async (s: Sheet) => (await api.patch(`/team/sheets/${s.id}/`, { archived: !s.archived })).data,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["setup-sheets"] }); qc.invalidateQueries({ queryKey: ["sheets"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); },
@@ -158,6 +164,11 @@ export default function TeamSetup() {
                     <Button variant="ghost" className="py-1.5" onClick={() => setEditing(editing === s.id ? null : s.id)}><Pencil className="size-4" /> Edit</Button>
                     <Button variant="ghost" className="py-1.5" onClick={() => archive.mutate(s)} title={s.archived ? "Bring back" : "Hide from the sheet list; data is kept"}>
                       <Archive className="size-4" /> {s.archived ? "Restore" : "Archive"}</Button>
+                    {confirmDel === s.id
+                      ? <span className="ml-1 inline-flex items-center gap-1 text-xs">Delete with all its days?
+                          <Button variant="danger" className="py-1 text-xs" onClick={() => del.mutate(s.id)} busy={del.isPending}>Delete</Button>
+                          <Button variant="ghost" className="py-1 text-xs" onClick={() => setConfirmDel(null)}>Keep</Button></span>
+                      : <Button variant="ghost" className="py-1.5 text-accent-600" onClick={() => setConfirmDel(s.id)} title="Delete this sheet and all its days and KPIs"><Trash2 className="size-4" /> Delete</Button>}
                   </td>
                 </tr>,
                 editing === s.id ? <tr key={`e-${s.id}`}><td colSpan={8} className="p-0"><SheetEditor sheet={s} people={people.data!} roles={roles.data!} onDone={() => setEditing(null)} /></td></tr> : null,
@@ -172,6 +183,20 @@ export default function TeamSetup() {
       <div className="mb-6"><RulesCard st={st.data!} /></div>
 
       <TasksRoles />
+
+      <Card className="mt-6 border-accent-300 p-5 dark:border-accent-500/40">
+        <h2 className="flex items-center gap-2 text-base font-bold text-accent-600"><AlertTriangle className="size-5" /> Danger zone: delete all team data</h2>
+        <p className="mt-1 max-w-3xl text-sm text-slate-600 dark:text-slate-300">
+          Deletes <b>every sheet with all its days and weekly KPIs</b>, so you can start again or import a new workbook. People's accounts and profiles,
+          tasks, job roles, team rules and everyone's private tracker are kept. This can't be undone. To replace the data in one step instead,
+          tick <b>Replace everything</b> in "Import from the Excel sheet" above. Download the Excel first if you want a copy.</p>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Input value={resetText} onChange={(e) => setResetText(e.target.value)} placeholder='Type DELETE to confirm' className="w-56" aria-label="Type DELETE to confirm" />
+          <Button variant="danger" disabled={resetText !== "DELETE"} busy={reset.isPending} onClick={() => reset.mutate()}><Trash2 className="size-4" /> Delete all team data</Button>
+          {reset.data && <Alert tone="green">Deleted {reset.data.sheets} sheets, {reset.data.days} days and {reset.data.kpi_weeks} KPI weeks.</Alert>}
+          {(reset.error || del.error) && <Alert>{errorText(reset.error || del.error)}</Alert>}
+        </div>
+      </Card>
     </>
   );
 }

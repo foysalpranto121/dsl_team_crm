@@ -21,7 +21,7 @@ export function BrandName({ compact }: { compact?: boolean }) {
   return (
     <div className="min-w-0 border-l border-slate-200 pl-3 leading-tight dark:border-white/15">
       <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-600 dark:text-accent-400">Business Team</div>
-      <div className={clsx("font-display font-extrabold text-brand-800 dark:text-white", compact ? "text-sm" : "text-base")}>Team CRM</div>
+      <div className={clsx("font-display font-extrabold text-brand-800 dark:text-white", compact ? "text-sm" : "text-base")}>Operation System <span className="text-accent-600 dark:text-accent-400">TOS</span></div>
     </div>
   );
 }

@@ -197,6 +197,14 @@ def sheet_summary(sheet, frm, to, st=None):
             "lock_days": st.lock_days, "timezone": st.timezone, "seconds_to_lock": calc.seconds_to_midnight(st.timezone, now())}
 
 
+def delete_team_data():
+    """Remove every sheet with its days and weekly KPIs. Accounts, profiles, tasks, job roles, team rules,
+    personal trackers and the activity log stay. Returns what was removed."""
+    counts = {"sheets": Sheet.objects.count(), "days": SheetEntry.objects.count(), "kpi_weeks": KpiEntry.objects.count()}
+    Sheet.objects.all().delete()          # days and KPIs go with their sheet
+    return counts
+
+
 def link_unowned_sheets(user):
     """Give a person the sheets that carry their name and have nobody filling them in yet (work log and plan).
     Called when someone is approved or signs in, so admins don't have to link imported sheets by hand."""

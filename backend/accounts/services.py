@@ -129,7 +129,7 @@ def notify_admins_of_request(user):
     for admin in admins:
         link = lambda action: settings.BACKEND_URL + reverse("approval-link", args=[approval_token(user, action, admin)])
         _send([admin.email], f"Access request: {user.name or user.email}",
-              f"Hi {admin.name or 'there'},\n\n{user.name or user.email} ({user.email}) asked for access to the DSL Business Team CRM.\n\n"
+              f"Hi {admin.name or 'there'},\n\n{user.name or user.email} ({user.email}) asked for access to the DSL Business Team Operation System (TOS).\n\n"
               f"Approve: {link('approve')}\nReject:  {link('reject')}\n\n"
               f"Each link opens a page where you confirm. They work for 7 days. You can also decide in the app under Admin → Approvals:\n"
               f"{settings.FRONTEND_URL}/admin/approvals\n")
@@ -139,8 +139,8 @@ def notify_admins_of_request(user):
 
 def notify_user_decision(user, approved):
     if approved:
-        _send([user.email], "You now have access to the DSL Business Team CRM",
+        _send([user.email], "You now have access to the DSL Business Team Operation System (TOS)",
               f"Hi {user.name or 'there'},\n\nYour access was approved. Sign in with Google to finish setting up your profile:\n{settings.FRONTEND_URL}/login\n")
     else:
-        _send([user.email], "Your access request to the DSL Business Team CRM",
+        _send([user.email], "Your access request to the DSL Business Team Operation System (TOS)",
               f"Hi {user.name or 'there'},\n\nYour access request was not approved. If you think this is a mistake, contact your team admin.\n")

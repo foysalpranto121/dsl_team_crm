@@ -15,7 +15,7 @@ class Command(BaseCommand):
             raise CommandError("Email isn't set up yet: add EMAIL_HOST_USER and EMAIL_HOST_PASSWORD (the 16-letter Gmail App Password) "
                                "to backend/.env, then run this again.")
         try:
-            send_mail("DSL Team CRM: test email", "If you can read this, approval emails will reach admins and new team members.",
+            send_mail("DSL TOS: test email", "If you can read this, approval emails will reach admins and new team members.",
                       settings.DEFAULT_FROM_EMAIL, [opts["to"]], fail_silently=False)
         except Exception as e:
             raise CommandError(f"Gmail refused the email: {e}. Check the App Password (no spaces) and that 2-Step Verification is on.") from e

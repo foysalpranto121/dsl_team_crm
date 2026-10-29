@@ -52,7 +52,7 @@ def _role_title(header):
     return re.sub(r"^[^\w(]+", "", first).strip()
 
 
-def import_workbook(fileobj, actor, dry_run=False):
+def import_workbook(fileobj, actor, dry_run=False, replace=False):
     try:
         wb = load_workbook(fileobj, data_only=True)
     except Exception as e:
@@ -65,6 +65,9 @@ def import_workbook(fileobj, actor, dry_run=False):
     warn = report["warnings"].append
 
     with transaction.atomic():
+        if replace:   # start from nothing: inside the same transaction, so a failed import leaves the old data untouched
+            from .services import delete_team_data
+            report["replaced"] = delete_team_data()
         st = TeamSettings.load()
         cal = calc.Cfg(week_start_dow=st.week_start_dow, weekend_days=frozenset(st.weekend_days), count_weekend=st.count_weekend)
 
@@ -223,5 +226,5 @@ def import_workbook(fileobj, actor, dry_run=False):
         if dry_run:
             transaction.set_rollback(True)
         else:
-            audit.log(actor, "import.workbook", "Team Operation Sheet", sheets=len(report["sheets"]), kpi_weeks=report["kpi"]["weeks"])
+            audit.log(actor, "import.workbook", "Team Operation Sheet", flagged=replace, replaced=replace, sheets=len(report["sheets"]), kpi_weeks=report["kpi"]["weeks"])
     return report

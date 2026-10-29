@@ -1,4 +1,4 @@
-"""Settings for the DSL Business Team CRM. Secrets and machine-specific values come from backend/.env."""
+"""Settings for the DSL Business Team Operation System (TOS). Secrets and machine-specific values come from backend/.env."""
 import os
 from datetime import timedelta
 from pathlib import Path
@@ -112,7 +112,7 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_THROTTLE_RATES": {"auth": "30/min"},
 }
-SPECTACULAR_SETTINGS = {"TITLE": "DSL Business Team CRM API", "VERSION": "1.0.0", "SERVE_INCLUDE_SCHEMA": False}
+SPECTACULAR_SETTINGS = {"TITLE": "DSL Business Team Operation System (TOS) API", "VERSION": "1.0.0", "SERVE_INCLUDE_SCHEMA": False}
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
@@ -154,7 +154,7 @@ if env("EMAIL_HOST_USER") and env("EMAIL_HOST_PASSWORD"):   # Gmail needs both; 
     DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL") or EMAIL_HOST_USER
 else:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"  # prints emails in the terminal
-    DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "DSL Business Team CRM <no-reply@localhost>")
+    DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "DSL Business Team Operation System (TOS) <no-reply@localhost>")
 
 # ---------- Uploads ----------
 PROFILE_PHOTO_MAX_BYTES = 3 * 1024 * 1024

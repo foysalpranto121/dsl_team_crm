@@ -1,4 +1,4 @@
-# DSL Business Team CRM — Admin guide
+# DSL Business Team Operation System (TOS) — Admin guide
 
 Step-by-step instructions for the four things still to finish, plus the daily routine for the team.
 
@@ -115,3 +115,18 @@ npm run dev                        # keep this window open
 ```
 
 Then open **http://localhost:5173**. To let the team use it from anywhere, it has to be put online (next step of the plan).
+
+---
+
+## Deleting sheets, or replacing all the data
+
+All in **Team setup** (admins only). Every deletion is recorded in the **Activity log**.
+
+| You want to… | Do this |
+|---|---|
+| Remove one sheet and all its days and KPIs | Sheets table → **Delete** → **Delete** again to confirm. (Use **Archive** instead to hide it and keep the history.) |
+| Start again from a new workbook in one step | **Import from the Excel sheet** → choose the file → tick **Replace everything** → **Check file** (shows what will be deleted, nothing is saved yet) → **Import now** |
+| Delete all team data | **Danger zone** at the bottom → type `DELETE` → **Delete all team data** |
+
+What is **never** deleted: people's accounts and profiles, tasks, job roles, team rules, everyone's private tracker, and the activity log.
+Download the Excel first (**Performance → Download team Excel**) if you want a copy. Deleting can't be undone.

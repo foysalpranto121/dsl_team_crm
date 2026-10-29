@@ -171,7 +171,7 @@ export default function Home() {
       <footer className="border-t border-slate-200 dark:border-white/10">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-6 text-xs text-slate-500 sm:px-6">
           <Logo className="h-7" />
-          <span>© {new Date().getFullYear()} Daffodil Software Ltd. · Business Team CRM · For internal use only</span>
+          <span>© {new Date().getFullYear()} Daffodil Software Ltd. · Business Team Operation System (TOS) · For internal use only</span>
           <span className="sm:ml-auto">We only use your Google name, email and photo.</span>
         </div>
       </footer>
