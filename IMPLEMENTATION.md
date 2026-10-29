@@ -174,6 +174,8 @@ the Team Operation Sheet, numbers from calc.py). 42 tests pass.
 Then step 6: the personal tracker (overview with pace, funnel, follow-ups and weekly report; pipeline with CSV import/export;
 daily plan with the Central AI 30-day template; activity log with point rules; own product, period, targets and lists; import of the
 old single-page tracker's backup). Private to each person. 50 tests pass.
+Then: approving someone links the sheets that carry their name; `python manage.py send_test_email` checks Gmail. 52 tests pass.
+Admin how-to: see [GUIDE.md](GUIDE.md).
 Next: the activity log screen (audit trail), the 9 pm "not filled in today" reminder email (needs the Gmail App Password), then deployment (step 13).
 
 | # | Step | Done when |

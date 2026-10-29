@@ -14,12 +14,19 @@ const ROLES: { value: Role; label: string; hint: string }[] = [
   { value: "viewer", label: "Viewer", hint: "Can only look" },
 ];
 
-function Request({ u }: { u: AdminUser }) {
+function Request({ u, onApproved }: { u: AdminUser; onApproved: (msg: string) => void }) {
   const qc = useQueryClient();
   const [role, setRole] = useState<Role>("member");
   const decide = useMutation({
-    mutationFn: async (action: "approve" | "reject") => (await api.post(`/admin/users/${u.id}/${action}/`, action === "approve" ? { role } : {})).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
+    mutationFn: async (action: "approve" | "reject") => (await api.post<AdminUser & { linked_sheets?: string[] }>(`/admin/users/${u.id}/${action}/`, action === "approve" ? { role } : {})).data,
+    onSuccess: (data, action) => {
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      qc.invalidateQueries({ queryKey: ["sheets"] });
+      const who = u.name || u.email;
+      if (action === "approve") onApproved(data.linked_sheets?.length
+        ? `${who} is approved and linked to: ${data.linked_sheets.join(", ")}.`
+        : `${who} is approved. No sheet carries the name "${u.name}" — link one in Team setup → Edit → Filled in by.`);
+    },
   });
   return (
     <Card className="p-5">
@@ -51,6 +58,7 @@ function Request({ u }: { u: AdminUser }) {
 export default function Approvals() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const [notice, setNotice] = useState("");
   const all = useQuery({ queryKey: ["admin-users", "all"], queryFn: async () => (await api.get<AdminUser[]>("/admin/users/")).data });
   const change = useMutation({
     mutationFn: async ({ id, body }: { id: number; body: Partial<Pick<AdminUser, "role" | "status">> }) => (await api.patch(`/admin/users/${id}/`, body)).data,
@@ -66,7 +74,8 @@ export default function Approvals() {
       <PageHeader title="Approvals & people" subtitle="Approve new people and choose what they can do. You can change it any time." />
       <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-500">Waiting for you · {pending.length}</h2>
       <div className="grid gap-3">
-        {pending.length ? pending.map((u) => <Request key={u.id} u={u} />)
+        {notice && <Alert tone="green">{notice}</Alert>}
+        {pending.length ? pending.map((u) => <Request key={u.id} u={u} onApproved={setNotice} />)
           : <Card><EmptyState icon={<Inbox />} title="No requests right now">When someone signs in with Google for the first time, they'll appear here and you'll get an email.</EmptyState></Card>}
       </div>
 

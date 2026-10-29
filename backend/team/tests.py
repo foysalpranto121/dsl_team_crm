@@ -357,6 +357,33 @@ class ImportTests(TestCase):
         self.assertEqual(self.upload(self.admin, f=bad).status_code, 400)
 
 
+class LinkSheetsTests(TestCase):
+    """Imported sheets carry the person's name; approving that person links them automatically."""
+
+    def test_approval_links_sheets_with_the_same_name(self):
+        from accounts import services as acc
+        admin = User.objects.create_user("a@x.com", name="Admin", status="approved", role="admin")
+        orin = User.objects.create_user("orin@x.com", name="orin tasfia", status="pending")
+        work = Sheet.objects.create(name="Orin", person="Orin Tasfia")
+        plan = Sheet.objects.create(name="Planning - Orin", kind="plan", person="Orin Tasfia")
+        taken = Sheet.objects.create(name="Orin old", person="Orin Tasfia", owner=admin)
+        other = Sheet.objects.create(name="Shohan", person="Shohanur Rahaman")
+        c = APIClient()
+        c.force_authenticate(admin)
+        r = c.post(f"/api/admin/users/{orin.pk}/approve/", {"role": "member"}, format="json")
+        self.assertEqual(sorted(r.data["linked_sheets"]), ["Orin", "Planning - Orin"])
+        self.assertEqual([Sheet.objects.get(pk=s.pk).owner for s in (work, plan, taken, other)], [orin, orin, admin, None])
+        viewer = User.objects.create_user("s@x.com", name="Shohanur Rahaman", status="pending")
+        self.assertEqual(acc.approve(viewer, admin, "viewer").linked_sheets, [])       # viewers don't fill in sheets
+
+    def test_sign_in_links_a_sheet_created_later(self):
+        from accounts import services as acc
+        me = User.objects.create_user("p@x.com", name="Foysal Ahmed Pranto", status="approved", role="admin", google_sub="g1")
+        s = Sheet.objects.create(name="Pranto", person="Foysal Ahmed Pranto")
+        acc.sign_in_with_google({"sub": "g1", "email": "p@x.com", "name": "Foysal Ahmed Pranto", "picture": ""})
+        self.assertEqual(Sheet.objects.get(pk=s.pk).owner, me)
+
+
 class CalcTests(TestCase):
     cfg = calc.Cfg()
 

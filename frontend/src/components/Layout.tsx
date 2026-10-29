@@ -88,6 +88,7 @@ export default function Layout() {
         <NavGroup title="Admin" onNavigate={close} items={[
           { to: "/admin/approvals", label: "Approvals", icon: <ShieldCheck />, badge: pending.data?.length },
           { to: "/admin/settings", label: "Team setup", icon: <Settings /> },
+          { to: "/admin/pipelines", label: "Team pipelines", icon: <Briefcase /> },
           { to: "/admin/activity", label: "Activity log", icon: <ClipboardList /> },
         ]} />
       )}

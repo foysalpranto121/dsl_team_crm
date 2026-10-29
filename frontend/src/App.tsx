@@ -4,6 +4,7 @@ import { useAuth } from "./auth/AuthContext";
 import Layout from "./components/Layout";
 import ProfileForm from "./components/ProfileForm";
 import { Card, PageHeader, Spinner } from "./components/ui";
+import ActivityLog from "./pages/ActivityLog";
 import Approvals from "./pages/Approvals";
 import Dashboard from "./pages/Dashboard";
 import Home from "./pages/Home";
@@ -11,7 +12,7 @@ import KpiPage from "./pages/Kpi";
 import People from "./pages/People";
 import Performance from "./pages/Performance";
 import Sheets from "./pages/Sheets";
-import Soon from "./pages/Soon";
+import TeamPipelines from "./pages/TeamPipelines";
 import TeamSetup from "./pages/TeamSetup";
 import Tracker from "./pages/Tracker";
 import Waiting from "./pages/Waiting";
@@ -65,7 +66,8 @@ export default function App() {
           <Route element={<RequireAdmin />}>
             <Route path="/admin/approvals" element={<Approvals />} />
             <Route path="/admin/settings" element={<TeamSetup />} />
-            <Route path="/admin/activity" element={<Soon title="Activity log" text="Every change with who and when, with admin corrections to locked days highlighted." />} />
+            <Route path="/admin/activity" element={<ActivityLog />} />
+            <Route path="/admin/pipelines" element={<TeamPipelines />} />
           </Route>
         </Route>
       </Route>

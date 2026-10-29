@@ -24,6 +24,7 @@ class TrackerSettings(models.Model):
     rules = models.JSONField(default=dict)          # point rules: milestone and activity keys -> points
     lists = models.JSONField(default=dict)          # {countries, industries, channels, plans}
     plan_template = models.CharField(max_length=10, choices=Template.choices, default=Template.BLANK)
+    share_with_admins = models.BooleanField(default=False, help_text="Let admins see this pipeline (read-only).")
     updated_at = models.DateTimeField(auto_now=True)
 
 

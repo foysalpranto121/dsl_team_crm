@@ -7,6 +7,7 @@ import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAx
 import { api, errorText } from "../api/client";
 import type { DashboardRow, Pace, Today } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
+import { Announcements, Leaderboard } from "../components/DashboardExtras";
 import { Alert, Badge, Button, Card, EmptyState, PageHeader, Spinner } from "../components/ui";
 
 const nf = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 1 });
@@ -87,6 +88,8 @@ export default function Dashboard() {
         subtitle={<>{dayFmt(t.today)} · Week {t.week_no} · times in {t.timezone.replace("_", " ")}</>}
         actions={<Link to="/sheets"><Button><CalendarCheck2 className="size-4" /> Fill in today</Button></Link>} />
 
+      <Announcements />
+
       {t.lock_days && unfilled.length > 0 && (
         <div className="mb-6"><Alert tone="amber">
           <span className="inline-flex items-center gap-2 font-semibold"><AlarmClock className="size-4" /> You haven't filled in today yet.</span>{" "}
@@ -131,6 +134,8 @@ export default function Dashboard() {
               </Card>
             ))}
           </div>
+
+          <Leaderboard />
 
           <Card className="mt-6 overflow-hidden">
             <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 pt-5"><h2 className="text-base font-bold">Team status</h2>

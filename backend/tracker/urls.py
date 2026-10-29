@@ -13,4 +13,5 @@ urlpatterns = [
     path("plan/", views.PlanView.as_view(), name="tracker-plan"),
     path("plan/<str:day>/", views.PlanDayView.as_view(), name="tracker-plan-day"),
     path("import-backup/", views.BackupImportView.as_view(), name="tracker-import-backup"),
+    path("team/", views.TeamPipelinesView.as_view(), name="tracker-team"),
 ] + router.urls

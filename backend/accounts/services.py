@@ -61,7 +61,14 @@ def sign_in_with_google(info):
     user.save()
     if created and user.status == User.Status.PENDING:
         transaction.on_commit(lambda: notify_admins_of_request(user))
+    if user.is_approved:
+        link_sheets(user)          # e.g. a sheet imported or created after they were approved
     return user, created
+
+
+def link_sheets(user):
+    from team.services import link_unowned_sheets   # imported here: the team app builds on accounts
+    return link_unowned_sheets(user)
 
 
 # ---------- approval ----------
@@ -90,6 +97,9 @@ def approve(user, by, role=User.Role.MEMBER):
     user.status, user.role, user.is_active = User.Status.APPROVED, role, True
     user.approved_by, user.approved_at = by, timezone.now()
     user.save(update_fields=["status", "role", "is_active", "approved_by", "approved_at"])
+    user.linked_sheets = link_sheets(user)
+    from core import audit
+    audit.log(by, "user.approve", user.email, role=role, linked=user.linked_sheets)
     if first_time:
         transaction.on_commit(lambda: notify_user_decision(user, approved=True))
     return user
@@ -99,6 +109,8 @@ def approve(user, by, role=User.Role.MEMBER):
 def reject(user, by):
     user.status, user.approved_by, user.approved_at = User.Status.REJECTED, by, timezone.now()
     user.save(update_fields=["status", "approved_by", "approved_at"])
+    from core import audit
+    audit.log(by, "user.reject", user.email)
     transaction.on_commit(lambda: notify_user_decision(user, approved=False))
     return user
 

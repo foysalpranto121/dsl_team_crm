@@ -197,6 +197,19 @@ def sheet_summary(sheet, frm, to, st=None):
             "lock_days": st.lock_days, "timezone": st.timezone, "seconds_to_lock": calc.seconds_to_midnight(st.timezone, now())}
 
 
+def link_unowned_sheets(user):
+    """Give a person the sheets that carry their name and have nobody filling them in yet (work log and plan).
+    Called when someone is approved or signs in, so admins don't have to link imported sheets by hand."""
+    if not (user.is_approved and user.role != User.Role.VIEWER and user.name.strip()):
+        return []
+    sheets = list(Sheet.objects.filter(owner__isnull=True, archived=False, person__iexact=user.name.strip()))
+    for s in sheets:
+        s.owner = user
+        s.save(update_fields=["owner", "updated_at"])
+        audit.log(user, "sheet.linked", s, how="name matches")
+    return [s.name for s in sheets]
+
+
 def entry_numbers(entry, pts):
     return {"hours": calc.day_hours(entry.slots), "points": calc.day_points(entry.slots, pts)}
 

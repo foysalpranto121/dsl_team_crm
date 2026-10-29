@@ -12,7 +12,7 @@ class TrackerSettingsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TrackerSettings
-        fields = ["product", "tagline", "period_start", "period_days", "targets", "weeks", "rules", "lists", "plan_template",
+        fields = ["product", "tagline", "period_start", "period_days", "targets", "weeks", "rules", "lists", "plan_template", "share_with_admins",
                   "stages", "milestones", "activity_types", "updated_at"]
         read_only_fields = ["updated_at"]
 

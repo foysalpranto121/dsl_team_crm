@@ -53,6 +53,14 @@ class TaskViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminOrReadOnly]
     pagination_class = None
 
+    def perform_create(self, ser):
+        audit.log(self.request.user, "task.save", ser.save().name, points=str(ser.validated_data.get("points", "")))
+
+    def perform_update(self, ser):
+        before = {k: str(getattr(ser.instance, k)) for k in ser.validated_data}
+        t = ser.save()
+        audit.log(self.request.user, "task.save", t.name, before=before, after={k: str(v) for k, v in ser.validated_data.items()})
+
     def destroy(self, request, *args, **kwargs):
         task = self.get_object()
         if SheetEntry.objects.filter(slots__contains=[task.id]).exists():
@@ -65,6 +73,13 @@ class JobRoleViewSet(viewsets.ModelViewSet):
     serializer_class = JobRoleSerializer
     permission_classes = [IsAdminOrReadOnly]
     pagination_class = None
+
+    def perform_create(self, ser):
+        audit.log(self.request.user, "role.save", ser.save().name)
+
+    def perform_update(self, ser):
+        r = ser.save()
+        audit.log(self.request.user, "role.save", r.name, weights=r.weights, tasks=r.tasks.count())
 
 
 class SheetViewSet(viewsets.ModelViewSet):
@@ -256,6 +271,20 @@ class ImportView(APIView):
         except WorkbookError as e:
             raise ValidationError(str(e))
         return Response(report)
+
+
+class LeaderboardView(APIView):
+    """This month's score so far, points this month and hours this week, for everyone with a work sheet."""
+
+    @extend_schema(responses=OpenApiTypes.OBJECT)
+    def get(self, request):
+        t = services.today()
+        _, dash = services.dashboard_rows(t)
+        _, perf = services.performance_rows(t.year, t)
+        score = {r["id"]: r["months"][t.month - 1].get("score") for r in perf}
+        rows = [{"id": r["id"], "person": r["person"] or r["name"], "role": r["role"], "score": score.get(r["id"]),
+                 "points": r["month_points"], "hours": r["week_hours"], "ytd_points": r["ytd_points"]} for r in dash]
+        return Response({"date": t, "rows": rows})
 
 
 class WarningsView(APIView):

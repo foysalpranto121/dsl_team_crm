@@ -12,10 +12,11 @@ from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.permissions import IsTeamAdmin
 from team.services import Locked, parse_day
 
 from . import services
-from .models import Activity, PlanDay, Prospect
+from .models import Activity, PlanDay, Prospect, TrackerSettings
 from .serializers import ActivitySerializer, PlanDayWriteSerializer, ProspectSerializer, TrackerSettingsSerializer
 
 # Everything here belongs to the signed-in person only; querysets are always filtered by owner.
@@ -132,6 +133,23 @@ class PlanDayView(APIView):
             raise ValidationError(str(e))
         PlanDay.objects.filter(owner=request.user, date=d).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class TeamPipelinesView(APIView):
+    """Admins: the pipelines people chose to share (read-only). Nothing is shown for anyone who didn't opt in."""
+    permission_classes = [IsTeamAdmin]
+
+    @extend_schema(responses=OpenApiTypes.OBJECT)
+    def get(self, request):
+        out = []
+        for st in TrackerSettings.objects.filter(share_with_admins=True, owner__status="approved", owner__is_active=True).select_related("owner"):
+            s = services.summary(st.owner)
+            prospects = Prospect.objects.filter(owner=st.owner).exclude(stage__in=["client", "lost"]).order_by("next_follow_up")[:200]
+            out.append({"user": {"id": st.owner.id, "name": st.owner.name or st.owner.email}, "product": st.product, "funnel": s["funnel"],
+                        "totals": s["totals"], "targets": s["targets"], "due_count": s["due_count"], "period": s["period"],
+                        "prospects": [{"id": p.id, "company": p.company, "contact": p.contact, "country": p.country, "stage": p.stage,
+                                       "next_follow_up": p.next_follow_up, "next_action": p.next_action} for p in prospects]})
+        return Response({"people": out})
 
 
 class BackupImportView(APIView):

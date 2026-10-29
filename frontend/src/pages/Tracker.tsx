@@ -10,7 +10,7 @@ import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader, Selec
 type Key = { key: string; label: string; points?: number };
 interface Settings { product: string; tagline: string; period_start: string; period_days: number; targets: Record<"points" | "leads" | "opps" | "clients", number>;
   weeks: { leads: number; opps: number; clients: number; points: number; focus: string }[]; rules: Record<string, number>;
-  lists: Record<"countries" | "industries" | "channels" | "plans", string[]>; plan_template: "blank" | "centralai"; stages: Key[]; milestones: Key[]; activity_types: Key[]; updated_at: string }
+  lists: Record<"countries" | "industries" | "channels" | "plans", string[]>; plan_template: "blank" | "centralai"; share_with_admins: boolean; stages: Key[]; milestones: Key[]; activity_types: Key[]; updated_at: string }
 interface Prospect { id: number; company: string; website: string; contact: string; role: string; email: string; phone: string; linkedin: string; country: string;
   industry: string; channel: string; plan: string; stage: string; last_contacted: string | null; next_follow_up: string | null; next_action: string;
   lead_date: string | null; opp_date: string | null; client_date: string | null; lost_reason: string; notes: string; updated_at: string }
@@ -321,7 +321,7 @@ function TrackerSettings({ st }: { st: Settings }) {
   const weeks = Array.from({ length: nWeeks }, (_, i) => f.weeks[i] ?? { leads: 0, opps: 0, clients: 0, points: 0, focus: "" });
   const save = useMutation({
     mutationFn: async () => (await api.patch<Settings>("/tracker/settings/", { product: f.product, tagline: f.tagline, period_start: f.period_start, period_days: f.period_days,
-      targets: f.targets, weeks, rules: f.rules, plan_template: f.plan_template,
+      targets: f.targets, weeks, rules: f.rules, plan_template: f.plan_template, share_with_admins: f.share_with_admins,
       lists: Object.fromEntries(Object.entries(listsText).map(([k, v]) => [k, v.split("\n").map((x) => x.trim()).filter(Boolean)])) })).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tracker"] }),
   });
@@ -344,6 +344,8 @@ function TrackerSettings({ st }: { st: Settings }) {
           onChange={(e) => setF({ ...f, targets: { ...f.targets, [k]: +e.target.value || 0 } })} /></Field>)}
         <Field label="Daily plan template" className="sm:col-span-2"><Select value={f.plan_template} onChange={(e) => setF({ ...f, plan_template: e.target.value as Settings["plan_template"] })}>
           <option value="blank">Blank: only my own tasks</option><option value="centralai">Central AI 30-day launch plan</option></Select></Field>
+        <label className="flex items-start gap-2 text-sm sm:col-span-2"><input type="checkbox" className="mt-1" checked={f.share_with_admins} onChange={(e) => setF({ ...f, share_with_admins: e.target.checked })} />
+          <span><b>Share my pipeline with admins.</b> They can see your prospects and funnel (read-only) on their Team pipelines page. Off = only you can see it.</span></label>
       </div>, "Weeks and the daily plan follow the start date.")}
       {section("Weekly targets", <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-sm"><thead><tr className="text-left text-[11px] uppercase tracking-wider text-slate-500">
         {["Week", "Leads", "Opps", "Clients", "Points", "Focus"].map((h) => <th key={h} className="px-2 py-1">{h}</th>)}</tr></thead>

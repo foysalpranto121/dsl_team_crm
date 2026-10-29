@@ -123,6 +123,12 @@ class AdminUserViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.
     permission_classes = [IsTeamAdmin]
     http_method_names = ["get", "patch", "post"]
 
+    def perform_update(self, ser):
+        from core import audit
+        before = {k: getattr(ser.instance, k) for k in ser.validated_data}
+        user = ser.save()
+        audit.log(self.request.user, "user.update", user.email, before=before, after={k: getattr(user, k) for k in ser.validated_data})
+
     def get_queryset(self):
         qs = User.objects.select_related("profile", "approved_by").order_by("-requested_at")
         s = self.request.query_params.get("status")
@@ -134,7 +140,7 @@ class AdminUserViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.
         ser = DecisionSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         user = services.approve(self.get_object(), request.user, ser.validated_data["role"])
-        return Response(self.get_serializer(user).data)
+        return Response({**self.get_serializer(user).data, "linked_sheets": user.linked_sheets})
 
     @extend_schema(request=None, responses=AdminUserSerializer)
     @action(detail=True, methods=["post"])
