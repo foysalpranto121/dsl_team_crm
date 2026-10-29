@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Access request · DSL Business Team CRM</title>
+<style>
+  :root{--bg:#f3f5f8;--card:#fff;--ink:#14213a;--muted:#5b6880;--navy:#1f3864;--gold:#e0a21b;--bad:#c2413a;--line:#d5dce6}
+  @media (prefers-color-scheme:dark){:root{--bg:#0f1522;--card:#172033;--ink:#e6ebf4;--muted:#9aa7bf;--navy:#9db8ea;--line:#2c3a55}}
+  body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px 24px;max-width:440px;width:100%}
+  h1{font-size:20px;margin:0 0 4px;color:var(--navy)} .muted{color:var(--muted)}
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;align-items:center}
+  button,a.btn{font:inherit;font-weight:600;border-radius:8px;padding:9px 16px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;text-decoration:none}
+  .primary{background:var(--navy);border-color:var(--navy);color:#fff} .danger{background:var(--bad);border-color:var(--bad);color:#fff}
+  select{font:inherit;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+  .bar{height:4px;background:var(--gold);border-radius:4px;margin-bottom:18px;width:48px}
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="bar"></div>
+  {% if error %}
+    <h1>Link not valid</h1><p class="muted">{{ error }}</p>
+  {% elif done %}
+    <h1>Done</h1><p>{{ done }}</p>
+    <div class="row"><a class="btn" href="{{ app_url }}/admin/approvals">Open the app</a></div>
+  {% else %}
+    <h1>{% if action == "approve" %}Approve access?{% else %}Reject access?{% endif %}</h1>
+    <p><b>{{ person.name|default:person.email }}</b><br><span class="muted">{{ person.email }} · asked {{ person.requested_at|date:"j M Y, H:i" }}</span></p>
+    {% if person.status != "pending" %}
+      <p class="muted">This request was already decided ({{ person.get_status_display|lower }}).</p>
+    {% else %}
+      <form method="post">{% csrf_token %}
+        {% if action == "approve" %}
+          <label class="muted" for="role">Give them access as</label>
+          <div class="row" style="margin-top:6px">
+            <select id="role" name="role">{% for value, label in roles %}<option value="{{ value }}" {% if value == "member" %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+            <button class="primary" type="submit">Approve</button>
+          </div>
+        {% else %}
+          <div class="row"><button class="danger" type="submit">Reject request</button></div>
+        {% endif %}
+      </form>
+      <p class="muted" style="margin-top:16px;font-size:13px">You're deciding as {{ admin.email }}.</p>
+    {% endif %}
+  {% endif %}
+</main>
+</body>
+</html>
