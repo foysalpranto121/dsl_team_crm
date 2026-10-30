@@ -1,0 +1,125 @@
+# Central AI Pipeline Tracker
+
+A CRM for Central AI international business development. It has five tabs:
+
+- **Daily plan:** an editable checklist for every day of the period, with notes
+- **Pipeline:** prospects and their stages, with follow-up reminders
+- **Activity log:** daily outreach, which earns points
+- **Weekly report:** actual results against weekly targets, plus results by market and channel
+- **Settings & team:** targets, point rules, backups, CSV import/export and team access
+
+It runs in two modes:
+
+| Mode | When | Where data lives | Who can use it |
+|---|---|---|---|
+| **Personal** (default) | `config.js` left empty | Your browser, plus an optional `.json` file on your PC | Only you, on this computer |
+| **Team** | `config.js` filled in | Your own free Supabase project | You plus anyone you add by email, as **editor** or **viewer** |
+
+## Files
+
+| File | Purpose |
+|---|---|
+| `index.html` | The app |
+| `config.js` | Leave empty for personal mode. Add Supabase details for team mode. |
+| `supabase-setup.sql` | One-time database setup for team mode |
+| `sample-prospects.csv` | Example import file |
+| `netlify.toml` / `vercel.json` | Hosting config (security headers, no search indexing) |
+
+---
+
+## 1. Deploy
+
+**Netlify (easiest):** go to https://app.netlify.com/drop and drag the whole `central-ai-crm` folder onto the page. Rename the site under **Site settings → Change site name**.
+
+**Vercel:**
+```bash
+npm i -g vercel
+cd central-ai-crm
+vercel --prod
+```
+You can also push the folder to GitHub, then import it in Vercel or Netlify. There is no build step: framework is "Other", the publish/output folder is the root, and the build command is empty.
+
+To update the site later, drag the folder again on Netlify, or run `vercel --prod` again.
+
+---
+
+## 2. Team access by email (optional, about 10 minutes)
+
+This lets a colleague open your link, enter their email, click the sign-in link they receive and work on the same live data. You decide who can **edit** and who can only **view**.
+
+1. **Create a Supabase project.** Sign up at https://supabase.com (the free plan is enough) and click **New project**. Choose a region close to you, such as Singapore.
+2. **Create the tables and access rules.**
+   - Open **SQL Editor → New query** and paste in the contents of `supabase-setup.sql`.
+   - On the last line, replace `you@example.com` with **your** email address.
+   - Click **Run**. You'll be the *owner*.
+3. **Set the sign-in link address.**
+   - Go to **Authentication → URL Configuration**.
+   - Set **Site URL** to your live link, for example `https://central-ai-crm.netlify.app`.
+   - Add the same link under **Redirect URLs**.
+4. **Connect the app.**
+   - Go to **Project Settings → API** and copy the **Project URL** and the **anon public** key.
+   - Paste them into `config.js`, then redeploy.
+   - Never use the `service_role` key here.
+5. **Move your existing data (if you have any).** Before switching, open the old personal version and click *Download backup*. After you sign in to the team version, go to *Settings & team → Restore from backup*.
+6. **Invite people.**
+   - Go to **Settings & team → Team access**, enter a colleague's email, choose *Can edit* or *Can view only*, and click **Give access**.
+   - Click **Open in my email app** to send them a ready-made invite, or copy the text.
+   - You can change someone's access or remove them at any time.
+
+**Access levels**
+
+| | Owner | Editor | Viewer |
+|---|---|---|---|
+| See pipeline, plan, reports | ✓ | ✓ | ✓ |
+| Add/edit prospects, log activity, edit the plan and targets | ✓ | ✓ | |
+| Import CSV | ✓ | ✓ | |
+| Add/remove team members, restore backup, clear data | ✓ | | |
+
+**Good to know**
+- Security is enforced in the database (Row Level Security). Even someone who has the link and the anon key can't read anything unless their email is on the team list.
+- **Email limit:** Supabase's built-in email service sends only a few sign-in emails per hour. That's fine for a small team. If people get a "too many emails" message, add your own SMTP under **Project Settings → Authentication → SMTP**. Free options include Brevo and Resend.
+- Sign-in emails can land in spam the first time.
+- Changes show up for everyone within a second or two.
+- Free Supabase projects pause after a week with no activity. Open the dashboard and click **Restore** if that happens.
+
+---
+
+## 3. Where your data is saved
+
+**Personal mode**
+- **Browser storage:** saved automatically and kept after restarts. It's tied to the exact link you use, so always open the same address.
+- **A file on your PC:** go to *Settings & team → Save to a file on my PC* and choose a file, such as `Documents/CRM/central-ai-crm-data.json`. Every change is then written there too. This works in Chrome or Edge. After a browser restart, click the status chip at the top once to reconnect.
+- **Backups:** use *Download backup (.json)* weekly. *Restore from backup* loads one on any PC.
+
+**Team mode**
+- The data lives in your Supabase project. You can still keep an automatic `.json` copy on your PC and download backups.
+
+---
+
+## 4. Daily plan
+
+- The plan is pre-filled with the 30-day roadmap. Every task can be changed.
+- **Change a task:** click its text, type, then press Enter or click away.
+- **Add a task:** type in "Add a task" and press Enter.
+- **Delete a task:** hover over it and click ×.
+- **Notes:** each day has a notes box.
+- **Reset day to default** restores the original tasks for that day.
+- The week focus line at the top of each week is editable too.
+- Fridays are marked as weekend days with a light workload.
+- The *Today* chip in the header shows today's progress and jumps to today's plan.
+
+## 5. Importing prospect lists
+
+Go to **Settings & team → Import prospects (.csv)**. The importer recognises columns like `Company`, `Website`, `First Name`, `Last Name` (or `Name`), `Title`, `Email`, `Phone`, `LinkedIn URL`, `Country`, `Industry`, `Channel`, `Notes` and `Stage`. Exports from Apollo, Hunter and Snov work directly. Rows that repeat an existing company and email are skipped.
+
+## 6. How the numbers work
+
+- **Stages:** *Lead* means they replied with interest. *Opportunity* means a demo is done or a trial has started. *Client* means they signed up on a paid plan.
+- **Dates:** the tracker stamps the date a prospect reaches each stage. Weekly and monthly counts use those dates.
+- **Points:** activity log (quantity × points per unit) plus milestone points for each lead, opportunity and client. Set both under **Point rules** to match your company's policy.
+
+## Keyboard
+
+- `N`: new prospect
+- `Esc`: close the form
+- `Enter`: save a task

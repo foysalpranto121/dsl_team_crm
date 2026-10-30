@@ -1,7 +1,7 @@
 """Team sheet calculations: hours, points, weeks, months, dashboard and performance scores.
 
-Plain functions on plain data (no database), ported from calc.js, which was checked against the
-values Excel saved in the DSL Team Operation Sheet. Day-of-week numbers follow that sheet: 0 = Sunday … 6 = Saturday.
+Plain functions on plain data (no database), checked against the values Excel saved in the
+DSL Team Operation Sheet. Day-of-week numbers follow that sheet: 0 = Sunday … 6 = Saturday.
 """
 import calendar
 from dataclasses import dataclass, field

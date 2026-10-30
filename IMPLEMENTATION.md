@@ -39,8 +39,8 @@ Central AI CRM/
 │   └── core/                  ← notifications, activity feed, announcements
 ├── frontend/
 │   ├── .env                   ← VITE_API_URL, VITE_GOOGLE_CLIENT_ID
-│   └── src/ (pages, components, api, hooks, assets/logo.svg)
-└── legacy/                    ← the old single-page app, kept for reference until the new one replaces it
+│   └── src/ (pages, components, api, auth, assets/dsl-logo.png, dsl-mark.png)
+└── index.html, config.js, …   ← the old single-page tracker, kept until its data is migrated (see LEGACY_TRACKER.md)
 ```
 
 ## 3. Sign-in, approval and first-time sign-up
@@ -119,7 +119,7 @@ The rules come from the original workbook, with its bugs fixed:
 - **Composite score** = Σ role weight × (actual ÷ own target), for hours (average per week vs weekly target), points, leads, opps, clients and revenue. The start month is pro-rated. Quarter and year = average of completed months. *Fix:* Excel looked up the wrong names for Pranto ("Safi") and D ("Nazmul"), so their KPI scores were always 0.
 - Admins see warnings when weightages don't add up to 100% or a weighted metric has no target.
 
-These rules already exist as tested functions (`calc.js`, checked against the workbook's saved values) and will be ported to `backend/team/calc.py` with the same tests. The API returns the finished numbers, so the screens and the Excel download always agree.
+These rules are implemented in `backend/team/calc.py` and checked against the workbook's saved values. The API returns the finished numbers, so the screens and the Excel download always agree.
 
 **Workbook data to check during import** (found by comparing with Excel's saved values):
 - Shohan and Orin show 1 hour on the Eid holiday days (25–29 May) although no task is chosen. A hidden value probably sits in an hour cell, which also makes their yearly hours 11 and 9 higher.
@@ -144,7 +144,7 @@ These rules already exist as tested functions (`calc.js`, checked against the wo
 | **Admin → Settings** | Sheets (rename, owner, role, targets), tasks and points, job roles and weightages, lock and time zone |
 | **Profile** | Edit own profile and photo |
 
-Design: navy and gold brand colours from the current app, light and dark mode, sidebar layout on desktop, bottom-friendly layout on phones. The logo goes in `frontend/src/assets/logo.svg` (a placeholder until you provide yours).
+Design: navy and gold brand colours from the current app, light and dark mode, sidebar layout on desktop, bottom-friendly layout on phones. The DSL logo is in `frontend/src/assets/`.
 
 ## 8. Extra features I recommend
 
@@ -187,7 +187,7 @@ Next: the 9 pm "not filled in today" reminder email (needs the Gmail App Passwor
 | 2 | Google sign-in endpoint, approval flow, approval emails, signed approve/reject links | Tests: new user → pending; admin email auto-approved; approve link works; pending gets no token |
 | 3 | Profile + photo upload, "me" endpoint | Tests for profile completion and image validation |
 | 4 | Team models, admin settings API, sheet/entry/KPI API with the midnight lock | Permission tests (same cases as the 64 database checks already written) |
-| 5 | `calc.py` (port of `calc.js`) + dashboard and performance endpoints | Calculation tests incl. comparison with the workbook |
+| 5 | `calc.py` + dashboard and performance endpoints | Calculation tests incl. comparison with the workbook |
 | 6 | Personal tracker API (prospects, activities, plan, settings, CSV) | Owner-only tests |
 | 7 | Excel download + Excel import command | Downloaded file opens in Excel; import reproduces the workbook's totals |
 | 8 | React app: Vite, Tailwind, routing, auth (Google button, token refresh), layout, logo | Sign in → pending → approved → profile flow works in the browser |
@@ -204,7 +204,6 @@ Next: the 9 pm "not filled in today" reminder email (needs the Gmail App Passwor
 | Google OAuth **Client ID** | Google Cloud Console → APIs & Services → Credentials → Create OAuth client ID → *Web application*. Authorised JavaScript origin: `http://localhost:5173` | `backend/.env` `GOOGLE_CLIENT_ID` and `frontend/.env` `VITE_GOOGLE_CLIENT_ID` |
 | Gmail address + **App Password** (for sending approval emails) | Google Account → Security → 2-Step Verification → App passwords | `backend/.env` `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` |
 | Admin email(s) | Your Google account email | `backend/.env` `ADMIN_EMAILS` |
-| Logo (SVG or PNG) | — | `frontend/src/assets/` |
 
 Until the email settings are filled in, emails are printed in the backend terminal, so the approve link can still be clicked during development.
 
