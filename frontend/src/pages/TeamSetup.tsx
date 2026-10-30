@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Archive, Pencil, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Archive, Download, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import { api, errorText } from "../api/client";
-import type { JobRole, Sheet, TeamSettings, User } from "../api/types";
+import { api, downloadFile, errorText } from "../api/client";
+import type { Backup, JobRole, Sheet, TeamSettings, User } from "../api/types";
 import ImportWorkbook from "../components/ImportWorkbook";
 import TasksRoles from "../components/TasksRoles";
 import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select, Spinner } from "../components/ui";
@@ -102,6 +102,66 @@ function RulesCard({ st }: { st: TeamSettings }) {
   );
 }
 
+/** Automatic and manual copies of the team data, with download and restore. Restoring backs up the current data first. */
+function BackupsCard({ onRestored }: { onRestored: () => void }) {
+  const qc = useQueryClient();
+  const backups = useQuery({ queryKey: ["snapshots"], queryFn: async () => (await api.get<Backup[]>("/team/snapshots/")).data });
+  const [restoring, setRestoring] = useState<string | null>(null);
+  const [text, setText] = useState("");
+  const [downloadError, setDownloadError] = useState("");
+  const refresh = () => qc.invalidateQueries({ queryKey: ["snapshots"] });
+  const take = useMutation({ mutationFn: async () => (await api.post("/team/snapshots/")).data, onSuccess: refresh });
+  const restore = useMutation({
+    mutationFn: async (name: string) => (await api.post(`/team/snapshots/${name}/restore/`, { confirm: text })).data,
+    onSuccess: () => { setRestoring(null); setText(""); refresh(); onRestored(); },
+  });
+  const download = async (name: string) => {
+    setDownloadError("");
+    try { await downloadFile(`/team/snapshots/${name}/`, name); } catch (e) { setDownloadError(errorText(e)); }
+  };
+  const problem = take.error || restore.error ? errorText(take.error || restore.error) : downloadError;
+  return (
+    <Card className="mb-6 overflow-hidden">
+      <div className="flex flex-wrap items-start justify-between gap-3 px-5 pt-5">
+        <div><h2 className="text-base font-bold">Backups</h2>
+          <p className="max-w-3xl text-xs text-slate-500">A copy of all sheets, days and weekly results is saved automatically before a sheet is deleted, all team data is deleted, or a workbook replaces the data. The newest 30 are kept.</p></div>
+        <Button variant="secondary" onClick={() => take.mutate()} busy={take.isPending}><Plus className="size-4" /> Back up now</Button>
+      </div>
+      {problem && <div className="px-5 pt-3"><Alert>{problem}</Alert></div>}
+      {backups.data?.length === 0 && <p className="px-5 py-5 text-sm text-slate-500">No backups yet. One is saved the next time you delete a sheet, delete all team data, or replace the data from a workbook.</p>}
+      {!!backups.data?.length && (
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[720px] text-sm">
+            <thead><tr className="border-y border-slate-200 bg-slate-50 text-left text-[11px] uppercase tracking-wider text-slate-500 dark:border-white/10 dark:bg-white/5">
+              {["Saved", "Why", "Contains", ""].map((h) => <th key={h} className="px-5 py-2.5 font-semibold">{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {backups.data.map((b) => (
+                <tr key={b.name} className="border-b border-slate-100 last:border-0 dark:border-white/5">
+                  <td className="whitespace-nowrap px-5 py-3">{new Date(b.created).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}</td>
+                  <td className="px-5 py-3">{b.reason}</td>
+                  <td className="num px-5 py-3">{b.sheets} sheets · {b.days} days · {b.kpi_weeks} weeks</td>
+                  <td className="px-5 py-3 text-right whitespace-nowrap">
+                    {restoring === b.name
+                      ? <span className="inline-flex flex-wrap items-center justify-end gap-2 text-xs">Type RESTORE to replace all team data with this backup:
+                          <Input value={text} onChange={(e) => setText(e.target.value)} className="w-36" aria-label="Type RESTORE to confirm" />
+                          <Button variant="danger" className="py-1 text-xs" disabled={text !== "RESTORE"} busy={restore.isPending} onClick={() => restore.mutate(b.name)}>Restore</Button>
+                          <Button variant="ghost" className="py-1 text-xs" onClick={() => { setRestoring(null); setText(""); }}>Cancel</Button></span>
+                      : <>
+                          <Button variant="ghost" className="py-1.5" onClick={() => download(b.name)} title="Download as a JSON file"><Download className="size-4" /> Download</Button>
+                          <Button variant="ghost" className="py-1.5" onClick={() => { setRestoring(b.name); setText(""); }}><RotateCcw className="size-4" /> Restore…</Button>
+                        </>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export default function TeamSetup() {
   const qc = useQueryClient();
   const sheets = useQuery({ queryKey: ["setup-sheets"], queryFn: async () => (await api.get<Sheet[]>("/team/sheets/?archived=1")).data });
@@ -114,7 +174,7 @@ export default function TeamSetup() {
   const [resetText, setResetText] = useState("");
   const refreshAll = () => ["setup-sheets", "sheets", "dashboard", "performance", "kpi-week", "leaderboard", "warnings", "activity"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
   const del = useMutation({ mutationFn: async (id: number) => api.delete(`/team/sheets/${id}/`), onSuccess: () => { setConfirmDel(null); refreshAll(); } });
-  const reset = useMutation({ mutationFn: async () => (await api.post<{ sheets: number; days: number; kpi_weeks: number }>("/team/reset/", { confirm: resetText })).data,
+  const reset = useMutation({ mutationFn: async () => (await api.post<{ sheets: number; days: number; kpi_weeks: number; backup: string }>("/team/reset/", { confirm: resetText })).data,
     onSuccess: () => { setResetText(""); refreshAll(); } });
   const archive = useMutation({
     mutationFn: async (s: Sheet) => (await api.patch(`/team/sheets/${s.id}/`, { archived: !s.archived })).data,
@@ -165,7 +225,7 @@ export default function TeamSetup() {
                     <Button variant="ghost" className="py-1.5" onClick={() => archive.mutate(s)} title={s.archived ? "Bring back" : "Hide from the sheet list; data is kept"}>
                       <Archive className="size-4" /> {s.archived ? "Restore" : "Archive"}</Button>
                     {confirmDel === s.id
-                      ? <span className="ml-1 inline-flex items-center gap-1 text-xs">Delete with all its days?
+                      ? <span className="ml-1 inline-flex items-center gap-1 text-xs">Delete with all its days? A backup is saved first.
                           <Button variant="danger" className="py-1 text-xs" onClick={() => del.mutate(s.id)} busy={del.isPending}>Delete</Button>
                           <Button variant="ghost" className="py-1 text-xs" onClick={() => setConfirmDel(null)}>Keep</Button></span>
                       : <Button variant="ghost" className="py-1.5 text-accent-600" onClick={() => setConfirmDel(s.id)} title="Delete this sheet and all its days and KPIs"><Trash2 className="size-4" /> Delete</Button>}
@@ -184,16 +244,18 @@ export default function TeamSetup() {
 
       <TasksRoles />
 
+      <BackupsCard onRestored={refreshAll} />
+
       <Card className="mt-6 border-accent-300 p-5 dark:border-accent-500/40">
         <h2 className="flex items-center gap-2 text-base font-bold text-accent-600"><AlertTriangle className="size-5" /> Danger zone: delete all team data</h2>
         <p className="mt-1 max-w-3xl text-sm text-slate-600 dark:text-slate-300">
           Deletes <b>every sheet with all its days and weekly KPIs</b>, so you can start again or import a new workbook. People's accounts and profiles,
           tasks, job roles, team rules and everyone's private tracker are kept. This can't be undone. To replace the data in one step instead,
-          tick <b>Replace everything</b> in "Import from the Excel sheet" above. Download the Excel first if you want a copy.</p>
+          tick <b>Replace everything</b> in "Import from the Excel sheet" above. A backup is saved first, listed under Backups above.</p>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <Input value={resetText} onChange={(e) => setResetText(e.target.value)} placeholder='Type DELETE to confirm' className="w-56" aria-label="Type DELETE to confirm" />
           <Button variant="danger" disabled={resetText !== "DELETE"} busy={reset.isPending} onClick={() => reset.mutate()}><Trash2 className="size-4" /> Delete all team data</Button>
-          {reset.data && <Alert tone="green">Deleted {reset.data.sheets} sheets, {reset.data.days} days and {reset.data.kpi_weeks} KPI weeks.</Alert>}
+          {reset.data && <Alert tone="green">Deleted {reset.data.sheets} sheets, {reset.data.days} days and {reset.data.kpi_weeks} KPI weeks. Backup saved: {reset.data.backup}.</Alert>}
           {(reset.error || del.error) && <Alert>{errorText(reset.error || del.error)}</Alert>}
         </div>
       </Card>

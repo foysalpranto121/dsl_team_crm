@@ -66,7 +66,10 @@ def import_workbook(fileobj, actor, dry_run=False, replace=False):
 
     with transaction.atomic():
         if replace:   # start from nothing: inside the same transaction, so a failed import leaves the old data untouched
+            from . import snapshots
             from .services import delete_team_data
+            if not dry_run:
+                report["backup"] = snapshots.take("before replacing with the workbook", actor)
             report["replaced"] = delete_team_data()
         st = TeamSettings.load()
         cal = calc.Cfg(week_start_dow=st.week_start_dow, weekend_days=frozenset(st.weekend_days), count_weekend=st.count_weekend)
@@ -211,14 +214,18 @@ def import_workbook(fileobj, actor, dry_run=False, replace=False):
                 k, _ = KpiEntry.objects.get_or_create(sheet=sheet, week_start=ws0)
                 k.leads, k.opps, k.clients = (int(_num(v)) for v in values[:3])
                 k.revenue, k.notes, k.updated_by = _num(values[3]), notes[:2000], actor
+                # The workbook's month number decides which month the week counts in (the sheet types it by hand, so it
+                # doesn't always match the month holding most of the week's days).
+                month = int(row[3]) if isinstance(row[3], (int, float)) and 1 <= int(row[3]) <= 12 else None
+                k.counts_in = calc.month_for_number(ws0, month) if month else ""
                 k.save()
                 report["kpi"]["weeks"] += 1
-                if isinstance(row[3], (int, float)) and calc.month_of_week(ws0)[1] != int(row[3]):
+                if month and calc.month_of_week(ws0) != (int(k.counts_in[:4]), month):
                     report["kpi"]["month_differs"] += 1
 
         if report["kpi"]["month_differs"]:
-            warn(f'{report["kpi"]["month_differs"]} weekly KPI row(s) had a month number that differs from the month holding most of that week; '
-                 "the system counts each week in the month that holds most of its days.")
+            warn(f'{report["kpi"]["month_differs"]} weekly KPI row(s) count in the workbook\'s month, which is not the month holding most of that '
+                 "week's days. The dashboard and performance follow the workbook.")
         leave = sum(s["leave_only_days"] for s in report["sheets"])
         if leave:
             warn(f"{leave} day(s) have only a remark (leave, holiday) and no tasks. They are kept but count 0 hours; "

@@ -140,7 +140,7 @@ def _snapshot(sheets_qs):
     data = []
     for s in sheets:
         entries = [calc.Day(e.day, e.slots) for e in s.entries.all()]
-        kpis = [{"week_start": k.week_start, "leads": k.leads, "opps": k.opps, "clients": k.clients, "revenue": float(k.revenue)} for k in s.kpis.all()]
+        kpis = [{"week_start": k.week_start, "leads": k.leads, "opps": k.opps, "clients": k.clients, "revenue": float(k.revenue), "counts_in": k.counts_in} for k in s.kpis.all()]
         data.append((s, entries, kpis))
     return st, cfg_of(st), pts, data
 
@@ -203,6 +203,28 @@ def delete_team_data():
     counts = {"sheets": Sheet.objects.count(), "days": SheetEntry.objects.count(), "kpi_weeks": KpiEntry.objects.count()}
     Sheet.objects.all().delete()          # days and KPIs go with their sheet
     return counts
+
+
+def missing_results(on, owner_id=None):
+    """Completed weeks this year with no results entered (no row, or all four numbers zero), per work sheet.
+    Counts from each sheet's start date. owner_id limits the list to one person's sheets."""
+    _, cfg, _, data = _snapshot(work_sheets())
+    year_start = date(on.year, 1, 1)
+    gaps = []
+    for s, _, kpis in data:
+        if owner_id is not None and s.owner_id != owner_id:
+            continue
+        have = {k["week_start"]: k for k in kpis}
+        ws = calc.week_start_of(max(s.start_date or year_start, year_start), cfg)
+        weeks = []
+        while ws + timedelta(days=6) < on:
+            k = have.get(ws)
+            if k is None or not any(k[f] for f in ("leads", "opps", "clients", "revenue")):
+                weeks.append(ws.isoformat())
+            ws += timedelta(days=7)
+        if weeks:
+            gaps.append({"sheet": s.id, "person": s.person or s.name, "weeks": weeks})
+    return gaps
 
 
 def link_unowned_sheets(user):

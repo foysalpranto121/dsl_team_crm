@@ -5,15 +5,16 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.models import User
 from accounts.permissions import IsAdminOrReadOnly, IsApproved, IsTeamAdmin
 from core import audit
 
-from . import calc, services
+from . import calc, services, snapshots
 from .exporter import build_workbook
 from .importer import WorkbookError, import_workbook
 from .models import JobRole, KpiEntry, Sheet, SheetEntry, Task, TeamSettings
@@ -99,6 +100,7 @@ class SheetViewSet(viewsets.ModelViewSet):
         return super().get_permissions()
 
     def perform_destroy(self, sheet):
+        snapshots.take(f"before deleting {sheet.name}", self.request.user)
         audit.log(self.request.user, "sheet.delete", sheet.name, flagged=True, days=sheet.entries.count(), kpi_weeks=sheet.kpis.count())
         sheet.delete()
 
@@ -197,7 +199,9 @@ class DashboardView(APIView):
         except services.Locked as e:
             raise ValidationError(str(e))
         on, rows = services.dashboard_rows(on)
-        return Response({"date": on, "rows": rows})
+        # Admins see every person's gaps; everyone else sees only their own.
+        owner = None if request.user.role == User.Role.ADMIN else request.user.pk
+        return Response({"date": on, "rows": rows, "gaps": services.missing_results(on, owner)})
 
 
 class PerformanceView(APIView):
@@ -300,9 +304,10 @@ class ResetView(APIView):
     def post(self, request):
         if request.data.get("confirm") != "DELETE":
             raise ValidationError('Type DELETE to confirm.')
+        backup = snapshots.take("before deleting all team data", request.user)
         counts = services.delete_team_data()
         audit.log(request.user, "team.reset", "all team data", flagged=True, **counts)
-        return Response(counts)
+        return Response({**counts, "backup": backup})
 
 
 class WarningsView(APIView):
@@ -311,3 +316,47 @@ class WarningsView(APIView):
     @extend_schema(responses=OpenApiTypes.OBJECT)
     def get(self, request):
         return Response({"warnings": services.setup_warnings()})
+
+
+class SnapshotView(APIView):
+    """Admins: the automatic and manual backups of team data, newest first. POST takes a backup now."""
+    permission_classes = [IsTeamAdmin]
+
+    @extend_schema(responses=OpenApiTypes.OBJECT)
+    def get(self, request):
+        return Response(snapshots.list_backups())
+
+    @extend_schema(request=None, responses=OpenApiTypes.OBJECT)
+    def post(self, request):
+        return Response({"name": snapshots.take("manual backup", request.user)}, status=status.HTTP_201_CREATED)
+
+
+class SnapshotFileView(APIView):
+    """Admins: download one backup as a JSON file."""
+    permission_classes = [IsTeamAdmin]
+
+    @extend_schema(responses={(200, "application/json"): OpenApiTypes.BINARY})
+    def get(self, request, name):
+        try:
+            data = snapshots.read(name)
+        except FileNotFoundError:
+            raise NotFound("There is no backup with that name.")
+        resp = HttpResponse(data, content_type="application/json")
+        resp["Content-Disposition"] = f'attachment; filename="{name}"'
+        return resp
+
+
+class SnapshotRestoreView(APIView):
+    """Admins: replace all team data with a backup. The body must be {"confirm": "RESTORE"}."""
+    permission_classes = [IsTeamAdmin]
+
+    @extend_schema(request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT)
+    def post(self, request, name):
+        if request.data.get("confirm") != "RESTORE":
+            raise ValidationError("Type RESTORE to confirm.")
+        try:
+            return Response(snapshots.restore(name, request.user))
+        except FileNotFoundError:
+            raise NotFound("There is no backup with that name.")
+        except ValueError as e:
+            raise ValidationError(str(e))

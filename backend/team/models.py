@@ -152,6 +152,7 @@ class KpiEntry(models.Model):
     clients = models.PositiveIntegerField(default=0)
     revenue = models.DecimalField(max_digits=14, decimal_places=2, default=0, validators=[MinValueValidator(0)])
     notes = models.TextField(max_length=2000, blank=True)
+    counts_in = models.CharField(max_length=7, blank=True, help_text="Month this week counts in, as YYYY-MM. Empty = the month holding most of its days.")
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
     updated_at = models.DateTimeField(auto_now=True)
 

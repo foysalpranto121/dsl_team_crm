@@ -75,7 +75,7 @@ def build_workbook(year, sheet_ids=None):
         if s.kind != Sheet.Kind.WORK:
             continue
         days = [calc.Day(e.day, e.slots) for e in s.entries.all()]
-        kp = [{"week_start": k.week_start, "leads": k.leads, "opps": k.opps, "clients": k.clients, "revenue": float(k.revenue)} for k in s.kpis.all()]
+        kp = [{"week_start": k.week_start, "leads": k.leads, "opps": k.opps, "clients": k.clients, "revenue": float(k.revenue), "counts_in": k.counts_in} for k in s.kpis.all()]
         d = calc.dashboard(s.targets, days, kp, cfg, pts, on)
         h, p = calc.totals(days, first, last, cfg, pts)
         for c, v in enumerate([s.name, s.person, s.role.name if s.role else "", h, p, float(s.target_hours), d["avg_week_hours"],

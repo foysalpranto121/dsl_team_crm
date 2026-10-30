@@ -1,5 +1,8 @@
+import tempfile
 from datetime import date, datetime, timedelta
 from datetime import timezone as tz
+from decimal import Decimal
+from pathlib import Path
 from unittest import mock
 
 from django.test import TestCase
@@ -8,7 +11,7 @@ from rest_framework.test import APIClient
 from accounts.models import User
 from core.models import AuditLog
 
-from . import calc, services
+from . import calc, services, snapshots
 from .models import JobRole, KpiEntry, Sheet, SheetEntry, Task, TeamSettings
 
 # 10:00 in Dhaka on Thursday 29 Oct 2026 (UTC+6). The team week starts on Saturday 24 Oct.
@@ -357,11 +360,23 @@ class ImportTests(TestCase):
         self.assertEqual(self.upload(self.admin, f=bad).status_code, 400)
 
 
+def keep_backups_in_a_temp_folder(test):
+    """Backups written during a test go to a temporary folder, not the real backend/snapshots."""
+    folder = tempfile.TemporaryDirectory()
+    test.addCleanup(folder.cleanup)
+    patch = mock.patch.object(snapshots, "FOLDER", Path(folder.name))
+    patch.start()
+    test.addCleanup(patch.stop)
+
+
 class DeleteAndReplaceTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.admin = User.objects.create_user("admin@x.com", name="Admin", status="approved", role="admin")
         cls.member = User.objects.create_user("pranto@x.com", name="Foysal Ahmed Pranto", status="approved", role="member")
+
+    def setUp(self):
+        keep_backups_in_a_temp_folder(self)
 
     def api(self, u):
         c = APIClient()
@@ -394,6 +409,79 @@ class DeleteAndReplaceTests(TestCase):
         self.api(self.admin).post("/api/team/import/", {"file": f, "replace": "1"}, format="multipart")
         self.assertFalse(Sheet.objects.filter(name="Not in the workbook").exists())
         self.assertTrue(Sheet.objects.filter(name="Pranto").exists())
+
+
+class BackupAndGapTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = User.objects.create_user("admin@x.com", name="Admin", status="approved", role="admin")
+        cls.member = User.objects.create_user("pranto@x.com", name="Foysal Ahmed Pranto", status="approved", role="member")
+
+    def setUp(self):
+        keep_backups_in_a_temp_folder(self)
+
+    def api(self, u):
+        c = APIClient()
+        c.force_authenticate(u)
+        return c
+
+    def test_deleting_a_sheet_leaves_a_backup_that_restores_it(self):
+        s = Sheet.objects.create(name="Pranto", owner=self.member, start_date=date(2026, 10, 1))
+        SheetEntry.objects.create(sheet=s, day=date(2026, 10, 1), slots=[Task.objects.first().pk], remarks="kept")
+        KpiEntry.objects.create(sheet=s, week_start=date(2026, 10, 3), leads=2, revenue=Decimal("1500"))
+        self.assertEqual(self.api(self.admin).delete(f"/api/team/sheets/{s.pk}/").status_code, 204)
+        self.assertEqual(self.api(self.member).get("/api/team/snapshots/").status_code, 403)
+        backups = self.api(self.admin).get("/api/team/snapshots/").data
+        self.assertEqual((len(backups), backups[0]["sheets"], backups[0]["days"], backups[0]["kpi_weeks"]), (1, 1, 1, 1))
+        name = backups[0]["name"]
+        self.assertEqual(self.api(self.admin).post(f"/api/team/snapshots/{name}/restore/", {"confirm": "yes"}, format="json").status_code, 400)
+        self.assertEqual(self.api(self.admin).post(f"/api/team/snapshots/{name}/restore/", {"confirm": "RESTORE"}, format="json").status_code, 200)
+        restored = Sheet.objects.get(name="Pranto")
+        self.assertEqual(restored.owner, self.member)
+        self.assertEqual(restored.entries.get().remarks, "kept")
+        self.assertEqual(restored.kpis.get().revenue, Decimal("1500"))
+        self.assertEqual(len(self.api(self.admin).get("/api/team/snapshots/").data), 2)   # the restore backed up what was there first
+
+    def test_import_replace_and_delete_all_leave_backups(self):
+        Sheet.objects.create(name="Not in the workbook")
+        f = dsl_workbook()
+        f.name = "x.xlsx"
+        self.api(self.admin).post("/api/team/import/", {"file": f, "check": "1", "replace": "1"}, format="multipart")
+        self.assertEqual(self.api(self.admin).get("/api/team/snapshots/").data, [])   # a check writes no backup
+        f = dsl_workbook()
+        f.name = "x.xlsx"
+        self.api(self.admin).post("/api/team/import/", {"file": f, "replace": "1"}, format="multipart")
+        self.assertIn("before replacing with the workbook", [b["reason"] for b in self.api(self.admin).get("/api/team/snapshots/").data])
+        r = self.api(self.admin).post("/api/team/reset/", {"confirm": "DELETE"}, format="json")
+        self.assertTrue(r.data["backup"].endswith("-before-deleting-all-team-data.json"))
+
+    def test_gaps_flag_completed_weeks_without_results(self):
+        s = Sheet.objects.create(name="Pranto", owner=self.member, start_date=date(2026, 10, 1))
+        KpiEntry.objects.create(sheet=s, week_start=date(2026, 10, 3), leads=2)
+        KpiEntry.objects.create(sheet=s, week_start=date(2026, 10, 10))   # all zero: not entered
+        self.assertEqual(services.missing_results(TODAY), [
+            {"sheet": s.pk, "person": "Pranto", "weeks": ["2026-09-26", "2026-10-10", "2026-10-17"]}])   # the week of 24 Oct is not over yet
+        self.assertEqual(services.missing_results(TODAY, owner_id=self.admin.pk), [])
+        self.assertIn("gaps", self.api(self.member).get("/api/team/dashboard/").data)
+
+
+class CountsInTests(TestCase):
+    """A week counts in the month the workbook gives it; a week without one counts in the month holding most of its days."""
+
+    def test_the_workbook_month_decides_where_a_week_counts(self):
+        s = Sheet.objects.create(name="Pranto", start_date=date(2026, 9, 1))
+        KpiEntry.objects.create(sheet=s, week_start=date(2026, 9, 26), leads=3, counts_in="2026-10")   # the week runs Sep 26 to Oct 2
+        KpiEntry.objects.create(sheet=s, week_start=date(2026, 10, 3), leads=1)
+        _, rows = services.dashboard_rows(TODAY)
+        self.assertEqual(next(r for r in rows if r["id"] == s.pk)["kpi_month"]["leads"], 4)
+        self.assertEqual(calc.month_for_number(date(2026, 12, 27), 1), "2027-01")   # a week that runs into the next year
+        self.assertEqual(calc.month_for_number(date(2026, 1, 3), 12), "2025-12")
+
+    def test_the_workbook_month_is_kept_in_backups(self):
+        s = Sheet.objects.create(name="Pranto")
+        KpiEntry.objects.create(sheet=s, week_start=date(2026, 9, 26), leads=3, counts_in="2026-10")
+        data = snapshots._sheet_data(s)
+        self.assertEqual(data["kpis"][0]["counts_in"], "2026-10")
 
 
 class LinkSheetsTests(TestCase):

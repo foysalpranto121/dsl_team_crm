@@ -129,4 +129,5 @@ All in **Team setup** (admins only). Every deletion is recorded in the **Activit
 | Delete all team data | **Danger zone** at the bottom → type `DELETE` → **Delete all team data** |
 
 What is **never** deleted: people's accounts and profiles, tasks, job roles, team rules, everyone's private tracker, and the activity log.
-Download the Excel first (**Performance → Download team Excel**) if you want a copy. Deleting can't be undone.
+Before any of these, the system saves a **backup** of all sheets, days and weekly results. Find them under **Backups** in Team setup: **Download** keeps a copy on your PC, and **Restore…** (type `RESTORE`) brings the data back. Restoring first backs up what is there now, so it can be undone. The newest 30 backups are kept.
+Download the Excel too (**Performance → Download team Excel**) if you want a copy in the familiar layout.

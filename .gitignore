@@ -9,6 +9,7 @@ __pycache__/
 *.pyc
 backend/media/
 backend/staticfiles/
+backend/snapshots/
 
 # Node
 node_modules/

@@ -163,3 +163,20 @@ export interface Today {
   week_no: number;
   my_sheets: { id: number; name: string; kind: "work" | "plan"; filled_today: boolean }[];
 }
+
+/** A completed week with no results entered for one work sheet. */
+export interface Gap {
+  sheet: number;
+  person: string;
+  weeks: string[];   // week start dates, oldest first
+}
+
+/** An automatic or manual copy of the team data, newest first on the server. */
+export interface Backup {
+  name: string;
+  created: string;
+  reason: string;
+  sheets: number;
+  days: number;
+  kpi_weeks: number;
+}

@@ -81,6 +81,20 @@ def month_of_week(ws):
     return d.year, d.month
 
 
+def month_for_number(ws, m):
+    """The YYYY-MM a workbook's month number means for the week starting ws: the year nearest the week's start."""
+    y = min((ws.year - 1, ws.year, ws.year + 1), key=lambda y: abs((y * 12 + m) - (ws.year * 12 + ws.month)))
+    return f"{y}-{m:02d}"
+
+
+def counted_month(k):
+    """(year, month) a week's results count in: the month the workbook gave, else the month holding most of its days."""
+    if k.get("counts_in"):
+        y, m = k["counts_in"].split("-")
+        return int(y), int(m)
+    return month_of_week(k["week_start"])
+
+
 def working_days(a, b, cfg):
     n, d = 0, a
     while d <= b:
@@ -197,7 +211,7 @@ def dashboard(targets, entries, kpis, cfg, pts, today):
         "month_status": pace_of(month_p, T["points"], working_days(ms0, today, cfg), working_days(ms0, me0, cfg)),
         "last_month_status": final_of(last_p, T["points"]),
         "ytd_hours": ytd_h, "ytd_points": ytd_p, "today_hours": day_hours(today_entry.slots) if today_entry else 0,
-        "kpi_month": kpi_for(kpis, lambda k: month_of_week(k["week_start"]) == key),
+        "kpi_month": kpi_for(kpis, lambda k: counted_month(k) == key),
         "kpi_targets": {k: T[k] for k in KPI_KEYS},
     }
 
@@ -217,7 +231,7 @@ def performance(targets, entries, kpis, cfg, pts, weights, year, today):
         if ms > today:
             months.append({"m": m, "state": "future"})
             continue
-        k = kpi_for(kpis, lambda x, key=(year, m): month_of_week(x["week_start"]) == key)
+        k = kpi_for(kpis, lambda x, key=(year, m): counted_month(x) == key)
         if start > me:
             h, p = totals(entries, ms, me, cfg, pts)
             months.append({"m": m, "state": "before", "hours": h, "points": p, **k})

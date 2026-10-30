@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
-import { AlarmClock, CalendarCheck2, Clock, Coins, LayoutDashboard, Star, Target } from "lucide-react";
+import { AlarmClock, AlertTriangle, CalendarCheck2, Clock, Coins, LayoutDashboard, Star, Target } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api, errorText } from "../api/client";
-import type { DashboardRow, Pace, Today } from "../api/types";
+import type { DashboardRow, Gap, Pace, Today } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { Announcements, Leaderboard } from "../components/DashboardExtras";
 import { Alert, Badge, Button, Card, EmptyState, PageHeader, Spinner } from "../components/ui";
@@ -65,12 +65,12 @@ export default function Dashboard() {
   const { user } = useAuth();
   const dark = useIsDark();
   const today = useQuery({ queryKey: ["today"], queryFn: async () => (await api.get<Today>("/team/today/")).data, refetchInterval: 300_000 });
-  const dash = useQuery({ queryKey: ["dashboard"], queryFn: async () => (await api.get<{ date: string; rows: DashboardRow[] }>("/team/dashboard/")).data });
+  const dash = useQuery({ queryKey: ["dashboard"], queryFn: async () => (await api.get<{ date: string; rows: DashboardRow[]; gaps: Gap[] }>("/team/dashboard/")).data });
   const countdown = useCountdown(today.data?.seconds_to_lock);
 
   if (dash.isLoading || today.isLoading) return <Spinner />;
   if (dash.error || today.error) return <Alert>{errorText(dash.error || today.error)}</Alert>;
-  const rows = dash.data!.rows, t = today.data!;
+  const rows = dash.data!.rows, gaps = dash.data!.gaps, t = today.data!;
   const sum = (f: (r: DashboardRow) => number) => rows.reduce((s, r) => s + f(r), 0);
   const unfilled = t.my_sheets.filter((s) => s.kind === "work" && !s.filled_today);
   const hour = new Date().getHours();
@@ -94,6 +94,16 @@ export default function Dashboard() {
         <div className="mb-6"><Alert tone="amber">
           <span className="inline-flex items-center gap-2 font-semibold"><AlarmClock className="size-4" /> You haven't filled in today yet.</span>{" "}
           Today locks at midnight, in <b className="num">{countdown}</b>. <Link to="/sheets" className="font-semibold underline">Open your sheet</Link>
+        </Alert></div>
+      )}
+
+      {gaps.length > 0 && (
+        <div className="mb-6"><Alert tone="amber">
+          <div className="mb-1 flex items-center gap-2 font-semibold"><AlertTriangle className="size-4" /> Weekly results missing</div>
+          <ul className="list-disc space-y-0.5 pl-5">
+            {gaps.map((g) => <li key={g.sheet}><b>{g.person}</b>: {g.weeks.length} {g.weeks.length === 1 ? "week" : "weeks"}, most recent the week of {dayFmt(g.weeks[g.weeks.length - 1])}</li>)}
+          </ul>
+          <Link to="/kpi" className="mt-2 inline-block font-semibold underline">Enter the weekly results</Link>
         </Alert></div>
       )}
 
