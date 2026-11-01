@@ -96,7 +96,7 @@ export default function Home() {
         <span className="text-xs text-slate-500">New? Your sign-in becomes an access request.</span>
       </div>
       <div className="mt-4 flex min-h-11 items-center">
-        {session.phase === "loading" || busy ? <Spinner label={busy ? "Signing you in…" : "Checking your session…"} />
+        {session.phase === "loading" || busy ? <Spinner label={busy ? "Signing you in…" : session.phase === "loading" && session.waking ? "Waking up the server… up to a minute" : "Checking your session…"} />
           : <GoogleLogin onSuccess={(r) => onCredential(r.credential)} onError={() => setError("Google sign-in was cancelled or blocked. Allow pop-ups and try again.")}
               text="continue_with" shape="rectangular" size="large" width="320" logo_alignment="left" />}
       </div>

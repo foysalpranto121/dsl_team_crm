@@ -37,6 +37,10 @@ The dev server proxies `/api`, `/media` and `/static` to the backend, so open th
 
 Until `EMAIL_HOST_USER` and `EMAIL_HOST_PASSWORD` are set in `backend/.env`, approval emails are printed in the backend terminal.
 
+## Put it online
+
+Free hosting on Neon (database), Render (API, `render.yaml`) and Netlify (site, `frontend/netlify.toml`): see [DEPLOY.md](DEPLOY.md).
+
 ## Checks
 
 ```bash

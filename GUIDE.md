@@ -115,7 +115,7 @@ cd frontend
 npm run dev                        # keep this window open
 ```
 
-Then open **http://localhost:5173**. To let the team use it from anywhere, it has to be put online (next step of the plan).
+Then open **http://localhost:5173**. To let the team use it from anywhere, put it online for free: follow **DEPLOY.md**.
 
 ---
 

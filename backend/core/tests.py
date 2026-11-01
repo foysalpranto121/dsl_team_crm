@@ -2,7 +2,9 @@ from datetime import date, datetime
 from datetime import timezone as tz
 from unittest import mock
 
-from django.test import TestCase
+import requests
+from django.core.mail import send_mail
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from accounts import services as acc
@@ -15,6 +17,24 @@ from tracker.services import settings_for
 from .models import Announcement, AuditLog
 
 NOW = datetime(2026, 10, 29, 4, 0, tzinfo=tz.utc)   # Thu 29 Oct 2026, 10:00 in Dhaka
+
+
+@override_settings(EMAIL_BACKEND="core.mail.BrevoEmailBackend", BREVO_API_KEY="test-key")
+class DeployTests(TestCase):
+    def test_health_needs_no_sign_in(self):
+        r = self.client.get("/api/health/")
+        self.assertEqual((r.status_code, r.json()), (200, {"ok": True}))
+
+    def test_email_goes_out_over_https_through_brevo(self):
+        with mock.patch("core.mail.requests.post") as post:
+            post.return_value.raise_for_status.return_value = None
+            sent = send_mail("Hello", "Body text", "DSL TOS <team@example.com>", ["a@example.com"])
+        self.assertEqual(sent, 1)
+        body, headers = post.call_args.kwargs["json"], post.call_args.kwargs["headers"]
+        self.assertEqual((body["sender"], body["to"], body["subject"], body["textContent"], headers["api-key"]),
+                         ({"email": "team@example.com", "name": "DSL TOS"}, [{"email": "a@example.com"}], "Hello", "Body text", "test-key"))
+        with mock.patch("core.mail.requests.post", side_effect=requests.ConnectionError("down")), self.assertRaises(RuntimeError):
+            send_mail("Hello", "Body", "team@example.com", ["a@example.com"])
 
 
 class ExtrasTests(TestCase):

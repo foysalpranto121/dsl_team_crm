@@ -1,0 +1,33 @@
+# Render Blueprint for the Django API (free plan). Render -> New -> Blueprint -> pick this repository.
+# Values marked sync: false are asked for when the Blueprint is created; see DEPLOY.md.
+services:
+  - type: web
+    name: dsl-tos-api
+    runtime: python
+    plan: free
+    region: singapore
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate --noinput
+    startCommand: gunicorn config.wsgi --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    healthCheckPath: /api/health/
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: DATABASE_URL          # Neon connection string (with ?sslmode=require)
+        sync: false
+      - key: FRONTEND_URL          # the Netlify address, e.g. https://dsl-tos.netlify.app
+        sync: false
+      - key: BACKEND_URL           # the same Netlify address: links in emails go through the site
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: BREVO_API_KEY         # optional: approval emails (free Render blocks Gmail's SMTP)
+        sync: false
+      - key: DEFAULT_FROM_EMAIL    # optional: e.g. DSL TOS <your-verified-sender@gmail.com>
+        sync: false

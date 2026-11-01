@@ -142,9 +142,14 @@ class SignInAndApprovalTests(TestCase):
         Image.new("RGB", (2000, 1000), "navy").save(buf, "PNG")
         up = self.api.patch("/api/me/profile/", {"photo": SimpleUploadedFile("me.png", buf.getvalue(), "image/png")}, format="multipart")
         self.assertEqual(up.status_code, 200, up.data)
-        self.assertTrue(up.data["photo_url"].endswith(".jpg"))
-        stored = Image.open(User.objects.get(email="boss@example.com").profile.photo.path)
-        self.assertLessEqual(max(stored.size), 512)
+        self.assertTrue(up.data["photo_url"].startswith("/media/profiles/") and up.data["photo_url"].endswith(".jpg"))
+        photo = User.objects.get(email="boss@example.com").profile.photo
+        self.assertLessEqual(max(Image.open(BytesIO(photo.read())).size), 512)
+        served = self.client.get(up.data["photo_url"])                    # kept in the database, served from there
+        self.assertEqual((served.status_code, served["Content-Type"]), (200, "image/jpeg"))
+        again = self.api.patch("/api/me/profile/", {"photo": SimpleUploadedFile("me.png", buf.getvalue(), "image/png")}, format="multipart")
+        self.assertEqual(self.client.get(up.data["photo_url"]).status_code, 404)   # replacing a photo removes the old one
+        self.assertEqual(self.client.get(again.data["photo_url"]).status_code, 200)
         junk = self.api.patch("/api/me/profile/", {"photo": SimpleUploadedFile("x.png", b"not an image", "image/png")}, format="multipart")
         self.assertEqual(junk.status_code, 400)
 

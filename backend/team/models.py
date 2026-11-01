@@ -159,3 +159,19 @@ class KpiEntry(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=["sheet", "week_start"], name="one_kpi_per_sheet_week")]
         ordering = ["week_start"]
+
+
+class Backup(models.Model):
+    """A copy of all team data taken before anything deletes it (see team.snapshots). Kept in the database so it survives server restarts."""
+
+    name = models.CharField(max_length=120, unique=True)
+    created = models.DateTimeField()
+    reason = models.CharField(max_length=200)
+    counts = models.JSONField(default=dict)
+    data = models.JSONField()
+
+    class Meta:
+        ordering = ["-created", "-name"]
+
+    def __str__(self):
+        return self.name

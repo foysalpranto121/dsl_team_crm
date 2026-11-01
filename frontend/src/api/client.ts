@@ -17,6 +17,26 @@ export function bindSession(handlers: { refreshed: (u: User) => void; signedOut:
 
 export const api = axios.create({ baseURL: "/api", withCredentials: true });
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const WAKING = new Set([502, 503, 504]);   // what the host answers while the server is still starting
+
+/** The free server sleeps when nobody uses it and takes up to about a minute to start.
+ *  Ask until it answers (two minutes at most); onSlow runs once if the first try fails. */
+export async function wakeServer(onSlow?: () => void): Promise<boolean> {
+  const start = Date.now();
+  for (let i = 0; Date.now() - start < 120_000; i++) {
+    try {
+      await axios.get("/api/health/", { timeout: 30_000 });
+      return true;
+    } catch (e) {
+      if (axios.isAxiosError(e) && e.response && !WAKING.has(e.response.status)) return true;   // it answered, just not "ok"
+      if (i === 0) onSlow?.();
+      await sleep(3000);
+    }
+  }
+  return false;
+}
+
 api.interceptors.request.use((cfg) => {
   if (accessToken) cfg.headers.Authorization = `Bearer ${accessToken}`;
   return cfg;
@@ -42,7 +62,13 @@ export function refreshSession(): Promise<User | null> {
 }
 
 api.interceptors.response.use(undefined, async (err: AxiosError) => {
-  const cfg = err.config as (InternalAxiosRequestConfig & { _retried?: boolean }) | undefined;
+  const cfg = err.config as (InternalAxiosRequestConfig & { _retried?: boolean; _tries?: number }) | undefined;
+  // Only reads are retried while the server wakes up: a save might already have gone through.
+  if (cfg && (cfg.method ?? "get") === "get" && (!err.response || WAKING.has(err.response.status)) && (cfg._tries ?? 0) < 3) {
+    cfg._tries = (cfg._tries ?? 0) + 1;
+    await sleep(3000);
+    return api(cfg);
+  }
   if (err.response?.status === 401 && cfg && !cfg._retried && !cfg.url?.startsWith("/auth/")) {
     cfg._retried = true;
     if (await refreshSession()) return api(cfg);

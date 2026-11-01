@@ -1,8 +1,7 @@
-import tempfile
+import json
 from datetime import date, datetime, timedelta
 from datetime import timezone as tz
 from decimal import Decimal
-from pathlib import Path
 from unittest import mock
 
 from django.test import TestCase
@@ -12,7 +11,7 @@ from accounts.models import User
 from core.models import AuditLog
 
 from . import calc, services, snapshots
-from .models import JobRole, KpiEntry, Sheet, SheetEntry, Task, TeamSettings
+from .models import Backup, JobRole, KpiEntry, Sheet, SheetEntry, Task, TeamSettings
 
 # 10:00 in Dhaka on Thursday 29 Oct 2026 (UTC+6). The team week starts on Saturday 24 Oct.
 NOW = datetime(2026, 10, 29, 4, 0, tzinfo=tz.utc)
@@ -373,23 +372,11 @@ class ImportTests(TestCase):
         self.assertEqual(self.upload(self.admin, f=bad).status_code, 400)
 
 
-def keep_backups_in_a_temp_folder(test):
-    """Backups written during a test go to a temporary folder, not the real backend/snapshots."""
-    folder = tempfile.TemporaryDirectory()
-    test.addCleanup(folder.cleanup)
-    patch = mock.patch.object(snapshots, "FOLDER", Path(folder.name))
-    patch.start()
-    test.addCleanup(patch.stop)
-
-
 class DeleteAndReplaceTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.admin = User.objects.create_user("admin@x.com", name="Admin", status="approved", role="admin")
         cls.member = User.objects.create_user("pranto@x.com", name="Foysal Ahmed Pranto", status="approved", role="member")
-
-    def setUp(self):
-        keep_backups_in_a_temp_folder(self)
 
     def api(self, u):
         c = APIClient()
@@ -429,9 +416,7 @@ class BackupAndGapTests(TestCase):
     def setUpTestData(cls):
         cls.admin = User.objects.create_user("admin@x.com", name="Admin", status="approved", role="admin")
         cls.member = User.objects.create_user("pranto@x.com", name="Foysal Ahmed Pranto", status="approved", role="member")
-
-    def setUp(self):
-        keep_backups_in_a_temp_folder(self)
+        Backup.objects.all().delete()   # the test database copies any backup files on this machine when it is created
 
     def api(self, u):
         c = APIClient()
@@ -467,6 +452,16 @@ class BackupAndGapTests(TestCase):
         self.assertIn("before replacing with the workbook", [b["reason"] for b in self.api(self.admin).get("/api/team/snapshots/").data])
         r = self.api(self.admin).post("/api/team/reset/", {"confirm": "DELETE"}, format="json")
         self.assertTrue(r.data["backup"].endswith("-before-deleting-all-team-data.json"))
+
+    def test_backups_live_in_the_database_and_only_the_newest_are_kept(self):
+        Sheet.objects.create(name="Kept")
+        with mock.patch.object(snapshots, "KEEP", 2):
+            names = [snapshots.take(f"backup {i}") for i in range(3)]
+        self.assertEqual([b["name"] for b in snapshots.list_backups()], names[:0:-1])   # newest first; the oldest was dropped
+        r = self.api(self.admin).get(f"/api/team/snapshots/{names[-1]}/")
+        self.assertEqual((r.status_code, r["Content-Type"]), (200, "application/json"))
+        self.assertEqual(json.loads(r.content)["sheets"][0]["name"], "Kept")
+        self.assertEqual(self.api(self.admin).get(f"/api/team/snapshots/{names[0]}/").status_code, 404)
 
     def test_gaps_flag_completed_weeks_without_results(self):
         s = Sheet.objects.create(name="Pranto", owner=self.member, start_date=date(2026, 10, 1))

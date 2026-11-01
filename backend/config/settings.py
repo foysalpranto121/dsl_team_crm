@@ -2,7 +2,9 @@
 import os
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import urlparse
 
+import dj_database_url
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
@@ -28,6 +30,8 @@ if not SECRET_KEY:
     raise ImproperlyConfigured("Set DJANGO_SECRET_KEY in backend/.env (see .env.example).")
 DEBUG = env_bool("DJANGO_DEBUG")
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS") or ["localhost", "127.0.0.1"]
+if env("RENDER_EXTERNAL_HOSTNAME"):   # set by Render to the service's own address
+    ALLOWED_HOSTS.append(env("RENDER_EXTERNAL_HOSTNAME"))
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -49,6 +53,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",   # serves /static/ (the Django admin's files) in production
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -74,17 +79,20 @@ TEMPLATES = [
 ]
 WSGI_APPLICATION = "config.wsgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": env("DB_NAME", "DSLCRM"),
-        "USER": env("DB_USER", "postgres"),
-        "PASSWORD": env("DB_PASSWORD"),
-        "HOST": env("DB_HOST", "localhost"),
-        "PORT": env("DB_PORT", "5432"),
-        "CONN_MAX_AGE": 60,
+if env("DATABASE_URL"):   # hosted (Neon): one connection string. No long-lived connections, so the free database can sleep when idle.
+    DATABASES = {"default": dj_database_url.parse(env("DATABASE_URL"), conn_max_age=int(env("DB_CONN_MAX_AGE", "0")), conn_health_checks=True)}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": env("DB_NAME", "DSLCRM"),
+            "USER": env("DB_USER", "postgres"),
+            "PASSWORD": env("DB_PASSWORD"),
+            "HOST": env("DB_HOST", "localhost"),
+            "PORT": env("DB_PORT", "5432"),
+            "CONN_MAX_AGE": 60,
+        }
     }
-}
 
 AUTH_USER_MODEL = "accounts.User"
 AUTH_PASSWORD_VALIDATORS = [
@@ -102,7 +110,11 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = BASE_DIR / "media"   # only read once, to move older uploads into the database
+STORAGES = {
+    "default": {"BACKEND": "core.storage.DatabaseStorage"},   # uploads live in the database: hosting disks are wiped on restart
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
+}
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ---------- API ----------
@@ -133,6 +145,10 @@ REFRESH_COOKIE = {
 
 FRONTEND_URL = env("FRONTEND_URL", "http://localhost:5173").rstrip("/")
 BACKEND_URL = env("BACKEND_URL", "http://localhost:8000").rstrip("/")
+for _url in (FRONTEND_URL, BACKEND_URL):   # the site forwards /api to this server, so requests may arrive under its name
+    _host = urlparse(_url).hostname
+    if _host and _host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_host)
 CORS_ALLOWED_ORIGINS = [FRONTEND_URL]
 CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [FRONTEND_URL, BACKEND_URL]
@@ -144,7 +160,11 @@ ADMIN_EMAILS = [e.lower() for e in env_list("ADMIN_EMAILS")]
 APPROVAL_LINK_MAX_AGE = 7 * 24 * 3600
 
 # ---------- Email ----------
-if env("EMAIL_HOST_USER") and env("EMAIL_HOST_PASSWORD"):   # Gmail needs both; until then emails print in the terminal
+BREVO_API_KEY = env("BREVO_API_KEY")
+if BREVO_API_KEY:   # email over HTTPS: free Render servers block the SMTP ports Gmail uses
+    EMAIL_BACKEND = "core.mail.BrevoEmailBackend"
+    DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL") or env("EMAIL_HOST_USER")
+elif env("EMAIL_HOST_USER") and env("EMAIL_HOST_PASSWORD"):   # Gmail needs both; until then emails print in the terminal
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
     EMAIL_HOST = "smtp.gmail.com"
     EMAIL_PORT = 587

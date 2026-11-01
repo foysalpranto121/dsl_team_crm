@@ -19,6 +19,18 @@ class AuditLog(models.Model):
         return f"{self.created_at:%Y-%m-%d %H:%M} {self.actor} {self.action} {self.target}"
 
 
+class StoredFile(models.Model):
+    """An uploaded file (a profile photo) kept in the database; see core.storage."""
+
+    name = models.CharField(max_length=255, unique=True)
+    content = models.BinaryField()
+    size = models.PositiveIntegerField(default=0)
+    created = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+
+
 class Announcement(models.Model):
     """A message from an admin shown on everyone's dashboard until it expires (or forever if no end date)."""
 

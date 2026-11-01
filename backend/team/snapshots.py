@@ -1,6 +1,6 @@
 """Automatic copies of the team's sheets, days and weekly results, taken before anything deletes them.
 
-Files are JSON in backend/snapshots/ (not under MEDIA_ROOT, which is served publicly). Only the newest KEEP are kept.
+Each copy is a Backup row in the database (never served publicly), downloadable as a .json file. Only the newest KEEP are kept.
 Accounts, tasks, job roles and team rules are not part of a snapshot, because deleting team data never touches them.
 """
 import json
@@ -9,7 +9,6 @@ import secrets
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils.dateparse import parse_date
@@ -18,9 +17,8 @@ from django.utils.text import slugify
 from core import audit
 
 from . import services
-from .models import JobRole, KpiEntry, Sheet, SheetEntry
+from .models import Backup, JobRole, KpiEntry, Sheet, SheetEntry
 
-FOLDER = settings.BASE_DIR / "snapshots"
 KEEP = 30
 TARGET_FIELDS = ["target_hours", "target_points", "target_leads", "target_opps", "target_clients", "target_revenue"]
 KPI_FIELDS = ["leads", "opps", "clients"]
@@ -46,11 +44,9 @@ def take(reason, actor=None):
     sheets = [_sheet_data(s) for s in Sheet.objects.select_related("role").prefetch_related("entries", "kpis")]
     counts = {"sheets": len(sheets), "days": sum(len(s["entries"]) for s in sheets), "kpi_weeks": sum(len(s["kpis"]) for s in sheets)}
     name = f"{now:%Y%m%d-%H%M%S}-{secrets.token_hex(3)}-{slugify(reason)[:40] or 'backup'}.json"
-    FOLDER.mkdir(parents=True, exist_ok=True)
-    (FOLDER / name).write_text(json.dumps({"format": 1, "created": now.isoformat(), "reason": reason, "counts": counts, "sheets": sheets},
-                                          ensure_ascii=False, indent=1), encoding="utf-8")
-    for old in sorted(FOLDER.glob("*.json"), reverse=True)[KEEP:]:
-        old.unlink()
+    Backup.objects.create(name=name, created=now, reason=reason, counts=counts,
+                          data={"format": 1, "created": now.isoformat(), "reason": reason, "counts": counts, "sheets": sheets})
+    Backup.objects.filter(pk__in=list(Backup.objects.values_list("pk", flat=True)[KEEP:])).delete()
     audit.log(actor, "team.backup", name, reason=reason, **counts)
     return name
 
@@ -58,24 +54,21 @@ def take(reason, actor=None):
 def _load(name):
     if not NAME.match(name):
         raise ValueError("Not a backup file name.")
-    return json.loads((FOLDER / name).read_text(encoding="utf-8"))
+    b = Backup.objects.filter(name=name).first()
+    if b is None:
+        raise FileNotFoundError(name)
+    return b.data
 
 
 def list_backups():
-    if not FOLDER.exists():
-        return []
-    out = []
-    for path in sorted(FOLDER.glob("*.json"), reverse=True):
-        data = _load(path.name)
-        out.append({"name": path.name, "created": data["created"], "reason": data["reason"], **data["counts"]})
-    return out
+    return [{"name": b.name, "created": b.created.isoformat(), "reason": b.reason, **b.counts} for b in Backup.objects.defer("data")]
 
 
 def read(name):
-    """The backup file's bytes, for download."""
-    if not NAME.match(name) or not (FOLDER / name).exists():
+    """The backup as .json file bytes, for download."""
+    if not NAME.match(name):
         raise FileNotFoundError(name)
-    return (FOLDER / name).read_bytes()
+    return json.dumps(_load(name), ensure_ascii=False, indent=1).encode("utf-8")
 
 
 def restore(name, actor):

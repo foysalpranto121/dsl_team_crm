@@ -22,9 +22,8 @@ class ProfileSerializer(serializers.ModelSerializer):
         extra_kwargs = {"photo": {"write_only": True, "required": False}}
 
     def get_photo_url(self, obj):
-        if obj.photo:
-            request = self.context.get("request")
-            return request.build_absolute_uri(obj.photo.url) if request else obj.photo.url
+        if obj.photo:   # a relative /media/... address: the site forwards it to the API, wherever that runs
+            return obj.photo.url
         return obj.user.google_picture or None
 
     def validate_photo(self, f):

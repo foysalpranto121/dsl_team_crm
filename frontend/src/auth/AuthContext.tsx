@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { api, bindSession, refreshSession, setAccessToken } from "../api/client";
+import { api, bindSession, refreshSession, setAccessToken, wakeServer } from "../api/client";
 import type { SignInResponse, Status, User } from "../api/types";
 
 type Session =
-  | { phase: "loading" }
+  | { phase: "loading"; waking?: boolean }   // waking: the server was asleep and is starting up
   | { phase: "signedOut" }
   | { phase: "waiting"; status: Exclude<Status, "approved">; email: string; name: string }
   | { phase: "signedIn"; user: User };
@@ -26,10 +26,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshed: (user) => setSession({ phase: "signedIn", user }),
       signedOut: () => setSession({ phase: "signedOut" }),
     });
-    // a returning visitor still has the refresh cookie: pick the session back up
-    refreshSession().then((u) => {
-      if (!u) setSession((s) => (s.phase === "loading" ? { phase: "signedOut" } : s));
-    });
+    // Wake the server first: the refresh token is single-use, so that request must not be cut off and retried.
+    // Then a returning visitor still has the refresh cookie: pick the session back up.
+    wakeServer(() => setSession((s) => (s.phase === "loading" ? { phase: "loading", waking: true } : s)))
+      .then(() => refreshSession())
+      .then((u) => {
+        if (!u) setSession((s) => (s.phase === "loading" ? { phase: "signedOut" } : s));
+      });
   }, []);
 
   const signInWithGoogle = useCallback(async (credential: string) => {

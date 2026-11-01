@@ -22,7 +22,8 @@ import Welcome from "./pages/Welcome";
 function RequireUser() {
   const { session } = useAuth();
   const location = useLocation();
-  if (session.phase === "loading") return <div className="grid min-h-dvh place-items-center"><Spinner label="Loading your workspace…" /></div>;
+  if (session.phase === "loading") return <div className="grid min-h-dvh place-items-center">
+    <Spinner label={session.waking ? "Waking up the server… this can take up to a minute after a quiet spell." : "Loading your workspace…"} /></div>;
   if (session.phase === "waiting") return <Navigate to="/waiting" replace />;
   if (session.phase === "signedOut") return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   return <Outlet />;

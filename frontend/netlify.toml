@@ -1,0 +1,23 @@
+# Netlify site for the React app. In Netlify, set Base directory = frontend.
+# Environment variables (Site configuration -> Environment variables):
+#   API_URL               the Render backend, e.g. https://dsl-tos-api.onrender.com
+#   VITE_GOOGLE_CLIENT_ID the same Google client ID as the backend
+[build]
+  command = "npm run build && node scripts/netlify-redirects.mjs"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

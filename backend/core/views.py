@@ -1,4 +1,8 @@
+import mimetypes
+
 from django.db.models import Q
+from django.http import Http404, HttpResponse, JsonResponse
+from django.views.decorators.http import require_GET
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import serializers, viewsets
@@ -9,9 +13,26 @@ from accounts.permissions import IsAdminOrReadOnly, IsTeamAdmin
 from team.services import today
 
 from . import audit
-from .models import Announcement, AuditLog
+from .models import Announcement, AuditLog, StoredFile
 
 PAGE = 50
+
+
+@require_GET
+def health(request):
+    """For uptime checks: answers without touching the database, so pinging it never wakes the database up."""
+    return JsonResponse({"ok": True})
+
+
+@require_GET
+def media(request, name):
+    """An uploaded file (profile photo) from the database. Names are random per upload, so they can be cached for good."""
+    f = StoredFile.objects.filter(name=name).first()
+    if f is None:
+        raise Http404
+    resp = HttpResponse(bytes(f.content), content_type=mimetypes.guess_type(name)[0] or "application/octet-stream")
+    resp["Cache-Control"] = "public, max-age=31536000, immutable"
+    return resp
 
 
 class AuditSerializer(serializers.ModelSerializer):
