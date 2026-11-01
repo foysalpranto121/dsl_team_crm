@@ -94,6 +94,22 @@ class TrackerTests(TestCase):
         self.setup_period(plan_template="blank")
         self.assertEqual(self.api.get("/api/tracker/plan/?from=2026-11-01&to=2026-11-01").data["days"][0]["tasks"], [])
 
+    def test_period_rolls_over_and_past_periods_stay_visible(self):
+        self.setup_period(period_start="2026-10-01", plan_template="centralai")
+        s = self.api.get("/api/tracker/summary/").data["period"]
+        self.assertEqual((s["n"], s["current"], str(s["start"]), str(s["end"]), s["day_index"]), (1, 1, "2026-11-01", "2026-11-30", 5))   # November, by itself
+        old = self.api.get("/api/tracker/summary/?period=0").data
+        self.assertEqual((str(old["period"]["start"]), str(old["period"]["end"]), old["period"]["days"]), ("2026-10-01", "2026-10-31", 31))
+        self.assertEqual(str(old["weeks"][-1]["to"]), "2026-10-31")
+        plan = self.api.get("/api/tracker/plan/").data
+        self.assertEqual((str(plan["days"][0]["date"]), plan["days"][0]["day"], len(plan["days"])), ("2026-11-01", 1, 30))
+        self.assertEqual(len(plan["days"][0]["tasks"]), 5)                           # later periods: the routine only, no launch tasks
+        self.assertEqual(self.api.get("/api/tracker/plan/?period=0").data["days"][0]["tasks"][0]["text"][:21], "Ask your manager exac")
+        self.assertEqual(self.api.get("/api/tracker/plan/?period=-1").status_code, 400)
+        self.setup_period(period_start="2026-10-03", period_days=14)                 # not a month: repeats every 14 days
+        s = self.api.get("/api/tracker/summary/").data["period"]
+        self.assertEqual((s["n"], str(s["start"]), str(s["end"])), (2, "2026-10-31", "2026-11-13"))
+
     def test_csv_import_and_export(self):
         csv = ("Company Name for Emails,First Name,Last Name,Title,Email,Country,Industry,Stage\n"
                "Acme Study,Sara,Khan,Founder,sara@acme.ae,UAE,Education / Study abroad,Lead\n"

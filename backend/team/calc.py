@@ -184,10 +184,17 @@ def start_of(targets, entries, fallback):
 
 # ---------- dashboard ----------
 
-def dashboard(targets, entries, kpis, cfg, pts, today):
+def last_full_week_end(day, cfg):
+    """The last day of the last whole week that ends on or before `day`."""
+    we = week_start_of(day, cfg) + timedelta(days=6)
+    return we if we <= day else we - timedelta(days=7)
+
+
+def dashboard(targets, entries, kpis, cfg, pts, today, week_on=None):
+    """week_on picks the week shown (default: the week of `today`); a finished month uses its last whole week."""
     T = targets
     start = start_of(T, entries, today)
-    ws0 = week_start_of(today, cfg)
+    ws0 = week_start_of(week_on or today, cfg)
     we0 = ws0 + timedelta(days=6)
     week_h, _ = totals(entries, ws0, we0, cfg, pts)
     last_h, _ = totals(entries, ws0 - timedelta(days=7), ws0 - timedelta(days=1), cfg, pts)
@@ -205,7 +212,7 @@ def dashboard(targets, entries, kpis, cfg, pts, today):
     return {
         "start": start, "week_start": ws0, "week_end": we0,
         "week_hours": week_h, "last_week_hours": last_h, "avg_week_hours": avg_week, "week_target": T["hours"],
-        "week_status": pace_of(week_h, T["hours"], working_days(ws0, today, cfg), working_days(ws0, we0, cfg)),
+        "week_status": pace_of(week_h, T["hours"], working_days(ws0, min(today, we0), cfg), working_days(ws0, we0, cfg)),
         "last_week_status": final_of(last_h, T["hours"]),
         "month_points": month_p, "last_month_points": last_p, "avg_month_points": avg_month, "month_target": T["points"],
         "month_status": pace_of(month_p, T["points"], working_days(ms0, today, cfg), working_days(ms0, me0, cfg)),

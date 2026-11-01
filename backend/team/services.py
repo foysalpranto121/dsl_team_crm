@@ -154,10 +154,12 @@ def work_sheets():
     return Sheet.objects.filter(kind=Sheet.Kind.WORK, archived=False)
 
 
-def dashboard_rows(on=None):
+def dashboard_rows(on=None, finished_month=False):
+    """finished_month: `on` is the last day of a past month, so the week shown is that month's last whole week."""
     st, cfg, pts, data = _snapshot(work_sheets())
     on = on or today(st)
-    return on, [{**_sheet_meta(s), **calc.dashboard(s.targets, e, k, cfg, pts, on)} for s, e, k in data]
+    week_on = calc.last_full_week_end(on, cfg) if finished_month else None
+    return on, [{**_sheet_meta(s), **calc.dashboard(s.targets, e, k, cfg, pts, on, week_on)} for s, e, k in data]
 
 
 def performance_rows(year, on=None):
@@ -249,3 +251,14 @@ def parse_day(value, default=None):
         return date.fromisoformat(value) if value else default
     except ValueError:
         raise Locked(f"{value} isn't a date like 2026-10-29.")
+
+
+def month_day(value, t):
+    """The day a month is seen from: its last day for a past month, today for this month (?month=2026-10)."""
+    try:
+        ms = date.fromisoformat(f"{value}-01")
+    except ValueError:
+        raise Locked(f"{value} isn't a month like 2026-10.")
+    if ms > t:
+        raise Locked("That month hasn't started yet.")
+    return min(calc.month_end(ms), t)

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { Download, Plus, Trash2, Upload, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Plus, Trash2, Upload, X } from "lucide-react";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
 import { api, downloadFile, errorText } from "../api/client";
@@ -18,7 +18,8 @@ interface Activity { id: number; date: string; type: string; qty: number; note: 
 type M = { leads: number; opps: number; clients: number; points: number };
 interface Week { n: number; from: string; to: string; leads: number; opps: number; clients: number; points: number; focus: string; actual: M; plan: { done: number; total: number } }
 interface Row { key: string; prospects: number; leads: number; opps: number; clients: number }
-interface Summary { today: string; period: { start: string; end: string; days: number; day_index: number }; targets: M; totals: M; weeks: Week[];
+interface Period { n: number; current: number; start: string; end: string; days: number; day_index: number }
+interface Summary { today: string; period: Period; targets: M; totals: M; weeks: Week[];
   funnel: { prospects: number; contacted: number; leads: number; opps: number; clients: number }; due: { id: number; company: string; next_follow_up: string; next_action: string; overdue: boolean }[];
   due_count: number; by_country: Row[]; by_channel: Row[] }
 interface PlanDay { date: string; tasks: { id: string; text: string; done: boolean }[]; note: string; edited: boolean; day: number; weekend: boolean }
@@ -29,11 +30,26 @@ const longDay = (s: string) => new Date(s + "T00:00:00Z").toLocaleDateString("en
 const nf = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 1 });
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "–");
 const TABS = [["overview", "Overview"], ["pipeline", "Pipeline"], ["plan", "Daily plan"], ["activity", "Activity log"], ["settings", "Settings"]] as const;
+const fmtY = (s: string) => new Date(s + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+
+/** Step between periods. The current period (the one today falls in) is shown unless you pick another. */
+function PeriodNav({ p, set }: { p: Period; set: (n: number | null) => void }) {
+  const when = p.n === p.current ? <Badge tone="green">Current</Badge> : p.n < p.current ? <Badge>Past</Badge> : <Badge tone="brand">Upcoming</Badge>;
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button variant="secondary" className="px-2.5 py-1" onClick={() => set(p.n - 1)} disabled={p.n <= 0} aria-label="Previous period"><ChevronLeft className="size-4" /></Button>
+      <span className="num text-sm font-semibold">{fmt(p.start)} – {fmtY(p.end)}</span>{when}
+      <Button variant="secondary" className="px-2.5 py-1" onClick={() => set(p.n + 1)} aria-label="Next period"><ChevronRight className="size-4" /></Button>
+      {p.n !== p.current && <Button variant="ghost" className="py-1" onClick={() => set(null)}>Back to this period</Button>}
+    </div>
+  );
+}
+
 const chip = (on: boolean) => clsx("rounded-full border px-3 py-1 text-xs font-semibold",
   on ? "border-brand-700 bg-brand-700 text-white dark:border-brand-300 dark:bg-brand-300 dark:text-brand-950" : "border-slate-300 dark:border-white/15");
 
 /* ---------- overview ---------- */
-function Overview({ s, go }: { s: Summary; go: (tab: string, id?: number) => void }) {
+function Overview({ s, go, setPeriod }: { s: Summary; go: (tab: string, id?: number) => void; setPeriod: (n: number | null) => void }) {
   const p = s.period, f = s.funnel;
   const cards = (["points", "leads", "opps", "clients"] as const).map((k) => {
     const v = s.totals[k], t = Number(s.targets[k] || 0), exp = (t * p.day_index) / p.days;
@@ -42,6 +58,7 @@ function Overview({ s, go }: { s: Summary; go: (tab: string, id?: number) => voi
   });
   return (
     <div className="grid gap-6">
+      <PeriodNav p={p} set={setPeriod} />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((c) => (
           <Card key={c.k} className="p-5">
@@ -225,21 +242,23 @@ function Pipeline({ st, openId, clearOpen }: { st: Settings; openId: number | nu
 }
 
 /* ---------- daily plan ---------- */
-function Plan() {
+function Plan({ period, setPeriod }: { period: number | null; setPeriod: (n: number | null) => void }) {
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ["tracker", "plan"], queryFn: async () => (await api.get<{ days: PlanDay[]; weeks: Week[]; today: string }>("/tracker/plan/")).data });
+  const q = useQuery({ queryKey: ["tracker", "plan", period], placeholderData: (prev) => prev,
+    queryFn: async () => (await api.get<{ days: PlanDay[]; weeks: Week[]; period: Period; today: string }>("/tracker/plan/", { params: { period: period ?? undefined } })).data });
   const [week, setWeek] = useState<number | null>(null);
   const save = useMutation({ mutationFn: async (d: PlanDay) => (await api.put(`/tracker/plan/${d.date}/`, { tasks: d.tasks, note: d.note })).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tracker"] }) });
   const reset = useMutation({ mutationFn: async (date: string) => api.delete(`/tracker/plan/${date}/`), onSuccess: () => qc.invalidateQueries({ queryKey: ["tracker"] }) });
   if (q.isLoading || !q.data) return <Spinner />;
   const { days, weeks, today } = q.data;
-  const cur = week ?? (weeks.find((w) => w.from <= today && today <= w.to)?.n ?? (today < weeks[0].from ? 1 : weeks.length));
+  const cur = Math.min(week ?? (weeks.find((w) => w.from <= today && today <= w.to)?.n ?? (today < weeks[0].from ? 1 : weeks.length)), weeks.length);
   const w = weeks[cur - 1];
   const shown = days.filter((d) => d.date >= w.from && d.date <= w.to);
   const update = (d: PlanDay, fn: (x: PlanDay) => void) => { const c = { ...d, tasks: d.tasks.map((t) => ({ ...t })) }; fn(c); save.mutate(c); };
   return (
     <div className="grid gap-4">
+      <PeriodNav p={q.data.period} set={(n) => { setWeek(null); setPeriod(n); }} />
       <div className="flex flex-wrap gap-2">{weeks.map((x) => {
         const ds = days.filter((d) => d.date >= x.from && d.date <= x.to);
         const done = ds.reduce((s, d) => s + d.tasks.filter((t) => t.done).length, 0), tot = ds.reduce((s, d) => s + d.tasks.length, 0);
@@ -346,7 +365,7 @@ function TrackerSettings({ st }: { st: Settings }) {
           <option value="blank">Blank: only my own tasks</option><option value="centralai">Central AI 30-day launch plan</option></Select></Field>
         <label className="flex items-start gap-2 text-sm sm:col-span-2"><input type="checkbox" className="mt-1" checked={f.share_with_admins} onChange={(e) => setF({ ...f, share_with_admins: e.target.checked })} />
           <span><b>Share my pipeline with admins.</b> They can see your prospects and funnel (read-only) on their Team pipelines page. Off = only you can see it.</span></label>
-      </div>, "Weeks and the daily plan follow the start date.")}
+      </div>, "The period repeats on its own. A start on the 1st with 28–31 days runs month by month; anything else repeats every set number of days. Weeks and the daily plan follow it.")}
       {section("Weekly targets", <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-sm"><thead><tr className="text-left text-[11px] uppercase tracking-wider text-slate-500">
         {["Week", "Leads", "Opps", "Clients", "Points", "Focus"].map((h) => <th key={h} className="px-2 py-1">{h}</th>)}</tr></thead>
         <tbody>{weeks.map((w, i) => <tr key={i}><td className="px-2 py-1 font-semibold">Week {i + 1}</td>
@@ -378,7 +397,9 @@ export default function Tracker() {
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") ?? "overview";
   const [openId, setOpenId] = useState<number | null>(null);
-  const summary = useQuery({ queryKey: ["tracker", "summary"], queryFn: async () => (await api.get<Summary>("/tracker/summary/")).data, enabled: tab === "overview" });
+  const [period, setPeriod] = useState<number | null>(null);   // null = the period today falls in
+  const summary = useQuery({ queryKey: ["tracker", "summary", period], placeholderData: (prev) => prev, enabled: tab === "overview",
+    queryFn: async () => (await api.get<Summary>("/tracker/summary/", { params: { period: period ?? undefined } })).data });
   if (settings.isLoading) return <Spinner />;
   if (settings.error) return <Alert>{errorText(settings.error)}</Alert>;
   const st = settings.data!;
@@ -390,9 +411,9 @@ export default function Tracker() {
         {TABS.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => go(k)}
           className={clsx("whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold", tab === k ? "border-accent-500 text-slate-900 dark:text-white" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200")}>{l}</button>)}
       </div>
-      {tab === "overview" && (summary.isLoading ? <Spinner /> : summary.data ? <Overview s={summary.data} go={go} /> : <Alert>{errorText(summary.error)}</Alert>)}
+      {tab === "overview" && (summary.isLoading ? <Spinner /> : summary.data ? <Overview s={summary.data} go={go} setPeriod={setPeriod} /> : <Alert>{errorText(summary.error)}</Alert>)}
       {tab === "pipeline" && <Pipeline st={st} openId={openId} clearOpen={() => setOpenId(null)} />}
-      {tab === "plan" && <Plan />}
+      {tab === "plan" && <Plan period={period} setPeriod={setPeriod} />}
       {tab === "activity" && <ActivityLog st={st} />}
       {tab === "settings" && <TrackerSettings key={st.updated_at} st={st} />}
     </>

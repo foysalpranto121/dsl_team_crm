@@ -35,14 +35,47 @@ def rate(st, key):
     return float(v) if isinstance(v, (int, float)) else float(T.DEFAULT_RULES.get(key, 0))
 
 
-def period(st):
-    start = st.period_start
+def _add_months(d, n):
+    m = d.month - 1 + n
+    return date(d.year + m // 12, m % 12 + 1, 1)
+
+
+def monthly(st):
+    """A period that starts on the 1st and lasts about a month repeats every calendar month; any other repeats every period_days."""
+    return st.period_start.day == 1 and 28 <= st.period_days <= 31
+
+
+def period_number(st, day):
+    """Which period a day falls in. Periods run back to back from the start date: 0 is the first one set in Settings."""
+    if monthly(st):
+        return (day.year - st.period_start.year) * 12 + day.month - st.period_start.month
+    return (day - st.period_start).days // st.period_days
+
+
+def period(st, n=None):
+    """Start and end of period n; the current one (the period today falls in) when n is None."""
+    if n is None:
+        n = max(0, period_number(st, today()))
+    if monthly(st):
+        start = _add_months(st.period_start, n)
+        return start, _add_months(start, 1) - timedelta(days=1)
+    start = st.period_start + timedelta(days=n * st.period_days)
     return start, start + timedelta(days=st.period_days - 1)
 
 
-def weeks(st):
-    start, end = period(st)
-    n = max(1, st.period_days // 7)
+def period_info(st, n=None):
+    current = max(0, period_number(st, today()))
+    n = current if n is None else n
+    start, end = period(st, n)
+    t = today()
+    days = (end - start).days + 1
+    return {"n": n, "current": current, "start": start, "end": end, "days": days,
+            "day_index": 0 if t < start else days if t > end else (t - start).days + 1}
+
+
+def weeks(st, n=None):
+    start, end = period(st, n)
+    n = max(1, ((end - start).days + 1) // 7)
     out = []
     for i in range(n):
         frm = start + timedelta(days=7 * i)
@@ -85,12 +118,21 @@ def metrics(st, prospects, activities, frm, to):
     return {"leads": L, "opps": O, "clients": C, "points": round(A + L * rate(st, "m_lead") + O * rate(st, "m_opp") + C * rate(st, "m_client"), 1)}
 
 
+def day_number(st, day):
+    """Day 1, 2, … within the period the day falls in, and that period's number."""
+    n = period_number(st, day)
+    return (day - period(st, n)[0]).days + 1, n
+
+
 def default_tasks(st, day):
     if st.plan_template != TrackerSettings.Template.CENTRAL_AI:
         return []
-    i = (day - st.period_start).days + 1
-    special = T.PLAN_DAY.get(i, [])
-    routine = [] if day.weekday() == FRIDAY or i < 4 else (T.ROUTINE_CLOSE if i >= 22 else T.ROUTINE)
+    i, n = day_number(st, day)
+    if n < 0:
+        return []
+    launch = n == 0   # the launch plan's one-off tasks belong to the first period; later periods keep only the daily routine
+    special = T.PLAN_DAY.get(i, []) if launch else []
+    routine = [] if day.weekday() == FRIDAY or (launch and i < 4) else (T.ROUTINE_CLOSE if i >= 22 else T.ROUTINE)
     return [{"id": f"d{i}-{k}", "text": text, "done": False} for k, text in enumerate(special + routine)]
 
 
@@ -100,22 +142,22 @@ def plan_days(st, user, frm, to):
     while d <= to:
         p = saved.get(d)
         out.append({"date": d, "tasks": p.tasks if p else default_tasks(st, d), "note": p.note if p else "", "edited": bool(p),
-                    "day": (d - st.period_start).days + 1, "weekend": d.weekday() == FRIDAY})
+                    "day": day_number(st, d)[0], "weekend": d.weekday() == FRIDAY})
         d += timedelta(days=1)
     return out
 
 
-def summary(user):
+def summary(user, n=None):
     st = settings_for(user)
     t = today()
-    start, end = period(st)
+    info = period_info(st, n)
+    start, end = info["start"], info["end"]
     prospects = list(Prospect.objects.filter(owner=user))
     activities = list(Activity.objects.filter(owner=user, date__range=(start, end)))
     plan = plan_days(st, user, start, end)
     plan_stat = lambda a, b: {"done": sum(1 for d in plan if a <= d["date"] <= b for x in d["tasks"] if x.get("done")),
                               "total": sum(len(d["tasks"]) for d in plan if a <= d["date"] <= b)}
-    wk = [{**w, "actual": metrics(st, prospects, activities, w["from"], w["to"]), "plan": plan_stat(w["from"], w["to"])} for w in weeks(st)]
-    day_index = 0 if t < start else st.period_days if t > end else (t - start).days + 1
+    wk = [{**w, "actual": metrics(st, prospects, activities, w["from"], w["to"]), "plan": plan_stat(w["from"], w["to"])} for w in weeks(st, info["n"])]
     contacted = sum(1 for p in prospects if p.stage != "prospect")
     open_ = [p for p in prospects if p.stage not in ("client", "lost")]
     due = sorted((p for p in open_ if p.next_follow_up and p.next_follow_up <= t), key=lambda p: p.next_follow_up)
@@ -128,7 +170,7 @@ def summary(user):
                  "clients": sum(1 for p in g if p.client_date)} for k, g in sorted(groups.items())]
 
     return {
-        "today": t, "period": {"start": start, "end": end, "days": st.period_days, "day_index": day_index},
+        "today": t, "period": info,
         "targets": st.targets, "totals": metrics(st, prospects, activities, start, end), "weeks": wk, "plan": plan_stat(start, end),
         "funnel": {"prospects": len(prospects), "contacted": contacted, "leads": sum(1 for p in prospects if p.lead_date),
                    "opps": sum(1 for p in prospects if p.opp_date), "clients": sum(1 for p in prospects if p.client_date)},

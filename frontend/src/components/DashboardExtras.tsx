@@ -57,13 +57,15 @@ export function Announcements() {
   );
 }
 
-const METRICS = [["score", "Score this month"], ["points", "Points this month"], ["hours", "Hours this week"]] as const;
 const MEDAL = ["bg-amber-400 text-amber-950", "bg-slate-300 text-slate-800", "bg-orange-300 text-orange-950"];
 
-/** Who is leading: score so far this month, points this month, or hours this week. */
-export function Leaderboard() {
+/** Who is leading: score so far this month, points this month, or hours this week. A past month (label set) shows how it ended. */
+export function Leaderboard({ month, label }: { month: string | null; label?: string }) {
+  const METRICS = label ? [["score", `Score in ${label}`], ["points", `Points in ${label}`], ["hours", "Hours, last week of the month"]] as const
+    : [["score", "Score this month"], ["points", "Points this month"], ["hours", "Hours this week"]] as const;
   const [by, setBy] = useState<(typeof METRICS)[number][0]>("score");
-  const q = useQuery({ queryKey: ["leaderboard"], queryFn: async () => (await api.get<{ rows: Leader[] }>("/team/leaderboard/")).data });
+  const q = useQuery({ queryKey: ["leaderboard", month], placeholderData: (prev) => prev,
+    queryFn: async () => (await api.get<{ rows: Leader[] }>("/team/leaderboard/", { params: { month: month ?? undefined } })).data });
   const rows = [...(q.data?.rows ?? [])].sort((a, b) => (b[by] ?? -1) - (a[by] ?? -1));
   if (!rows.length) return null;
   const top = Math.max(...rows.map((r) => r[by] ?? 0), 0.0001);

@@ -170,6 +170,19 @@ class TeamRulesTests(TestCase):
         self.assertAlmostEqual(oct_["score"], expect, places=9)
         self.assertEqual(next(r for r in p["rows"] if r["id"] == self.work.pk)["months"][8]["state"], "before")
 
+    def test_dashboard_and_leaderboard_for_a_past_month(self):
+        SheetEntry.objects.create(sheet=self.work, day=date(2026, 9, 30), slots=[self.demo.pk])        # Wed 30 Sep: 1 h, 10 pts
+        SheetEntry.objects.create(sheet=self.work, day=date(2026, 9, 24), slots=[self.calls.pk] * 3)   # Thu 24 Sep: 3 h, 3 pts
+        d = self.api(self.viewer).get("/api/team/dashboard/?month=2026-09").data
+        row = next(r for r in d["rows"] if r["id"] == self.work.pk)
+        self.assertEqual((str(d["date"]), d["month"], d["current_month"]), ("2026-09-30", "2026-09", "2026-10"))
+        self.assertEqual((str(row["week_start"]), row["week_hours"], row["month_points"]), ("2026-09-19", 3, 13.0))   # last whole week of September
+        lb = self.api(self.viewer).get("/api/team/leaderboard/?month=2026-09").data
+        self.assertEqual((lb["month"], next(r for r in lb["rows"] if r["id"] == self.work.pk)["points"]), ("2026-09", 13.0))
+        self.assertEqual(self.api(self.viewer).get("/api/team/dashboard/?month=2026-10").data["date"], TODAY)   # this month: as of today
+        for bad in ("2026-11", "Sept"):
+            self.assertEqual(self.api(self.viewer).get(f"/api/team/dashboard/?month={bad}").status_code, 400)
+
     def test_sheet_totals_for_the_month_view(self):
         half = Task.objects.create(name="Half-point task", points="0.5")
         self.role.tasks.add(half)

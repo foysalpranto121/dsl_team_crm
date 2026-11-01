@@ -35,10 +35,24 @@ class SettingsView(APIView):
         return Response(ser.data)
 
 
+def period_param(request):
+    """?period=n picks a period (0 = the first one from the start date); without it, the one today falls in."""
+    v = request.query_params.get("period")
+    if v in (None, ""):
+        return None
+    try:
+        n = int(v)
+    except ValueError:
+        raise ValidationError("period must be a whole number.")
+    if not 0 <= n <= 1200:
+        raise ValidationError("That period is out of range.")
+    return n
+
+
 class SummaryView(APIView):
     @extend_schema(responses=OpenApiTypes.OBJECT)
     def get(self, request):
-        return Response(services.summary(request.user))
+        return Response(services.summary(request.user, period_param(request)))
 
 
 class ProspectViewSet(viewsets.ModelViewSet):
@@ -100,7 +114,8 @@ class PlanView(APIView):
     @extend_schema(responses=OpenApiTypes.OBJECT)
     def get(self, request):
         st = services.settings_for(request.user)
-        start, end = services.period(st)
+        info = services.period_info(st, period_param(request))
+        start, end = info["start"], info["end"]
         try:
             frm = parse_day(request.query_params.get("from"), start)
             to = parse_day(request.query_params.get("to"), end)
@@ -108,7 +123,7 @@ class PlanView(APIView):
             raise ValidationError(str(e))
         if to < frm or (to - frm).days > 130:
             raise ValidationError("Ask for up to about four months at a time.")
-        return Response({"days": services.plan_days(st, request.user, frm, to), "weeks": services.weeks(st), "today": services.today()})
+        return Response({"days": services.plan_days(st, request.user, frm, to), "weeks": services.weeks(st, info["n"]), "period": info, "today": services.today()})
 
 
 class PlanDayView(APIView):

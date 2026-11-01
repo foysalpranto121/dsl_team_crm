@@ -49,6 +49,8 @@ export interface DashboardRow {
   person: string;
   role: string | null;
   owner_id: number | null;
+  week_start: string;
+  week_end: string;
   week_hours: number;
   last_week_hours: number;
   avg_week_hours: number | null;

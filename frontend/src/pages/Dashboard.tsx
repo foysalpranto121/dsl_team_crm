@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
-import { AlarmClock, AlertTriangle, CalendarCheck2, Clock, Coins, LayoutDashboard, Star, Target } from "lucide-react";
+import { AlarmClock, AlertTriangle, CalendarCheck2, ChevronLeft, ChevronRight, Clock, Coins, LayoutDashboard, Star, Target } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -13,6 +13,22 @@ import { Alert, Badge, Button, Card, EmptyState, PageHeader, Spinner } from "../
 const nf = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 1 });
 const money = new Intl.NumberFormat("en-GB", { notation: "compact", maximumFractionDigits: 1 });
 const dayFmt = (iso: string) => new Date(iso + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+const shortDay = (iso: string) => new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+const monthName = (ym: string, year = false) => new Date(ym + "-01T00:00:00Z").toLocaleDateString("en-GB", { month: "long", year: year ? "numeric" : undefined, timeZone: "UTC" });
+const shiftMonth = (ym: string, n: number) => { const [y, m] = ym.split("-").map(Number); return new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 7); };
+
+/** Pick the month the dashboard shows: this month (so far) or a finished one. */
+function MonthNav({ month, current, set }: { month: string; current: string; set: (m: string | null) => void }) {
+  const isNow = month === current;
+  return (
+    <div className="mb-6 flex flex-wrap items-center gap-2">
+      <Button variant="secondary" className="px-2.5 py-1" onClick={() => set(shiftMonth(month, -1))} aria-label="Previous month"><ChevronLeft className="size-4" /></Button>
+      <span className="min-w-36 text-center text-sm font-semibold">{monthName(month, true)}</span>
+      <Button variant="secondary" className="px-2.5 py-1" onClick={() => set(shiftMonth(month, 1) === current ? null : shiftMonth(month, 1))} disabled={isNow} aria-label="Next month"><ChevronRight className="size-4" /></Button>
+      {isNow ? <Badge tone="green">This month</Badge> : <><Badge>Finished month</Badge><Button variant="ghost" className="py-1" onClick={() => set(null)}>Back to this month</Button></>}
+    </div>
+  );
+}
 
 export const PACE: Record<Pace["key"], { label: string; tone: "green" | "amber" | "red" | "slate" }> = {
   met: { label: "Target met", tone: "green" }, onpace: { label: "On pace", tone: "green" }, near: { label: "Near", tone: "amber" },
@@ -65,12 +81,23 @@ export default function Dashboard() {
   const { user } = useAuth();
   const dark = useIsDark();
   const today = useQuery({ queryKey: ["today"], queryFn: async () => (await api.get<Today>("/team/today/")).data, refetchInterval: 300_000 });
-  const dash = useQuery({ queryKey: ["dashboard"], queryFn: async () => (await api.get<{ date: string; rows: DashboardRow[]; gaps: Gap[] }>("/team/dashboard/")).data });
+  const [month, setMonth] = useState<string | null>(null);   // null = this month
+  const dash = useQuery({ queryKey: ["dashboard", month], placeholderData: (prev) => prev,
+    queryFn: async () => (await api.get<{ date: string; month: string; current_month: string; rows: DashboardRow[]; gaps: Gap[] }>("/team/dashboard/", { params: { month: month ?? undefined } })).data });
   const countdown = useCountdown(today.data?.seconds_to_lock);
 
   if (dash.isLoading || today.isLoading) return <Spinner />;
   if (dash.error || today.error) return <Alert>{errorText(dash.error || today.error)}</Alert>;
   const rows = dash.data!.rows, gaps = dash.data!.gaps, t = today.data!;
+  const shown = dash.data!.month, isNow = shown === dash.data!.current_month;
+  const mName = monthName(shown), prevName = monthName(shiftMonth(shown, -1));
+  const weekOf = rows[0] ? `week of ${shortDay(rows[0].week_start)}` : "last week";
+  const L = isNow
+    ? { hours: "Team hours this week", points: "Points this month", leads: "Leads this month", revenue: "Revenue this month (BDT)", lastWeek: "last week",
+        thisW: "This week", lastW: "Last week", thisM: "This month", lastM: "Last month", hoursSub: "Saturday to Friday", pointsSub: "This calendar month" }
+    : { hours: `Team hours, ${weekOf}`, points: `Points in ${mName}`, leads: `Leads in ${mName}`, revenue: `Revenue in ${mName} (BDT)`, lastWeek: "week before",
+        thisW: rows[0] ? `Week of ${shortDay(rows[0].week_start)}` : "Last week", lastW: "Week before", thisM: mName, lastM: prevName,
+        hoursSub: `Last whole week of ${mName}`, pointsSub: `${mName} compared with ${prevName}` };
   const sum = (f: (r: DashboardRow) => number) => rows.reduce((s, r) => s + f(r), 0);
   const unfilled = t.my_sheets.filter((s) => s.kind === "work" && !s.filled_today);
   const hour = new Date().getHours();
@@ -78,8 +105,8 @@ export default function Dashboard() {
   const axis = dark ? "#9aa7bf" : "#5b6880", grid = dark ? "rgba(255,255,255,.08)" : "#e2e8f0";
   const colors = { now: dark ? "#7aa9e2" : "#034ea1", last: dark ? "#0b57ae" : "#adcbef", target: "#00a550" };   // DSL blue, light blue, DSL green
   const short = (r: DashboardRow) => (r.person || r.name).split(" ")[0];
-  const hoursData = rows.map((r) => ({ name: short(r), "This week": r.week_hours, "Last week": r.last_week_hours, Target: r.week_target }));
-  const pointsData = rows.map((r) => ({ name: short(r), "This month": r.month_points, "Last month": r.last_month_points, Target: r.month_target }));
+  const hoursData = rows.map((r) => ({ name: short(r), [L.thisW]: r.week_hours, [L.lastW]: r.last_week_hours, Target: r.week_target }));
+  const pointsData = rows.map((r) => ({ name: short(r), [L.thisM]: r.month_points, [L.lastM]: r.last_month_points, Target: r.month_target }));
   const tooltip = { contentStyle: { background: dark ? "#101d35" : "#fff", border: `1px solid ${grid}`, borderRadius: 12, fontSize: 12 }, cursor: { fill: dark ? "rgba(255,255,255,.04)" : "#f1f5f9" } };
 
   return (
@@ -115,16 +142,17 @@ export default function Dashboard() {
         </EmptyState></Card>
       ) : (
         <>
+          <MonthNav month={shown} current={dash.data!.current_month} set={setMonth} />
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Kpi icon={<Clock />} label="Team hours this week" value={sum((r) => r.week_hours)} target={sum((r) => r.week_target)} foot={`last week ${sum((r) => r.last_week_hours)}`} />
-            <Kpi icon={<Star />} label="Points this month" value={sum((r) => r.month_points)} target={sum((r) => r.month_target)} />
-            <Kpi icon={<Target />} label="Leads this month" value={sum((r) => r.kpi_month.leads)} target={sum((r) => r.kpi_targets.leads)} foot={`${sum((r) => r.kpi_month.clients)} clients`} />
-            <Kpi icon={<Coins />} label="Revenue this month (BDT)" value={sum((r) => r.kpi_month.revenue)} target={sum((r) => r.kpi_targets.revenue)} unit="money" />
+            <Kpi icon={<Clock />} label={L.hours} value={sum((r) => r.week_hours)} target={sum((r) => r.week_target)} foot={`${L.lastWeek} ${sum((r) => r.last_week_hours)}`} />
+            <Kpi icon={<Star />} label={L.points} value={sum((r) => r.month_points)} target={sum((r) => r.month_target)} />
+            <Kpi icon={<Target />} label={L.leads} value={sum((r) => r.kpi_month.leads)} target={sum((r) => r.kpi_targets.leads)} foot={`${sum((r) => r.kpi_month.clients)} clients`} />
+            <Kpi icon={<Coins />} label={L.revenue} value={sum((r) => r.kpi_month.revenue)} target={sum((r) => r.kpi_targets.revenue)} unit="money" />
           </div>
 
           <div className="mt-6 grid gap-6 xl:grid-cols-2">
-            {([["Hours per person", "Saturday to Friday", hoursData, ["This week", "Last week"]],
-               ["Points per person", "This calendar month", pointsData, ["This month", "Last month"]]] as const).map(([title, sub, data, [a, b]]) => (
+            {([["Hours per person", L.hoursSub, hoursData, [L.thisW, L.lastW]],
+               ["Points per person", L.pointsSub, pointsData, [L.thisM, L.lastM]]] as const).map(([title, sub, data, [a, b]]) => (
               <Card key={title} className="p-5">
                 <div className="mb-4"><h2 className="text-base font-bold">{title}</h2><p className="text-xs text-slate-500">{sub} · green bar is the target</p></div>
                 <div className="h-72">
@@ -145,21 +173,21 @@ export default function Dashboard() {
             ))}
           </div>
 
-          <Leaderboard />
+          <Leaderboard month={month} label={isNow ? undefined : mName} />
 
           <Card className="mt-6 overflow-hidden">
-            <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 pt-5"><h2 className="text-base font-bold">Team status</h2>
-              <p className="text-xs text-slate-500">Status compares with where each person should be by today</p></div>
+            <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 pt-5"><h2 className="text-base font-bold">Team status{isNow ? "" : ` · ${mName}`}</h2>
+              <p className="text-xs text-slate-500">{isNow ? "Status compares with where each person should be by today" : `How ${mName} ended`}</p></div>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full min-w-[760px] text-sm">
                 <thead><tr className="border-y border-slate-200 bg-slate-50 text-left text-[11px] uppercase tracking-wider text-slate-500 dark:border-white/10 dark:bg-white/5">
-                  {["Person", "Today", "Week hours", "Week", "Month points", "Month", "Leads", "Avg / week"].map((h) => <th key={h} className="px-5 py-2.5 font-semibold">{h}</th>)}
+                  {["Person", ...(isNow ? ["Today"] : []), "Week hours", "Week", "Month points", "Month", "Leads", "Avg / week"].map((h) => <th key={h} className="px-5 py-2.5 font-semibold">{h}</th>)}
                 </tr></thead>
                 <tbody>
                   {rows.map((r) => (
                     <tr key={r.id} className="border-b border-slate-100 last:border-0 dark:border-white/5">
                       <td className="px-5 py-3"><div className="font-semibold">{r.person || r.name}</div><div className="text-xs text-slate-500">{r.role || "No job role"}</div></td>
-                      <td className="num px-5 py-3">{r.today_hours ? `${r.today_hours} h` : <span className="text-slate-400">—</span>}</td>
+                      {isNow && <td className="num px-5 py-3">{r.today_hours ? `${r.today_hours} h` : <span className="text-slate-400">—</span>}</td>}
                       <td className="num px-5 py-3">{r.week_hours} / {nf.format(r.week_target)}</td>
                       <td className="px-5 py-3"><Badge tone={PACE[r.week_status.key].tone}>{PACE[r.week_status.key].label}</Badge></td>
                       <td className="num px-5 py-3">{nf.format(r.month_points)} / {nf.format(r.month_target)}</td>

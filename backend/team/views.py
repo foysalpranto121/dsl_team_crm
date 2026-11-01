@@ -191,17 +191,27 @@ class TodayView(APIView):
                          "my_sheets": [{"id": s.id, "name": s.name, "kind": s.kind, "filled_today": s.id in filled} for s in mine]})
 
 
+def seen_from(request, t):
+    """?month=2026-10 looks at a past month as it ended; ?date= at any day; neither = today.
+    Returns the day and whether it closes a finished month."""
+    p = request.query_params
+    try:
+        if p.get("month"):
+            on = services.month_day(p["month"], t)
+            return on, on < t
+        return services.parse_day(p.get("date"), t), False
+    except services.Locked as e:
+        raise ValidationError(str(e))
+
+
 class DashboardView(APIView):
-    @extend_schema(parameters=[OpenApiParameter("date", str)], responses=OpenApiTypes.OBJECT)
+    @extend_schema(parameters=[OpenApiParameter("month", str), OpenApiParameter("date", str)], responses=OpenApiTypes.OBJECT)
     def get(self, request):
-        try:
-            on = services.parse_day(request.query_params.get("date"))
-        except services.Locked as e:
-            raise ValidationError(str(e))
-        on, rows = services.dashboard_rows(on)
-        # Admins see every person's gaps; everyone else sees only their own.
+        t = services.today()
+        on, rows = services.dashboard_rows(*seen_from(request, t))
+        # Admins see every person's gaps; everyone else sees only their own. Gaps are always as of today.
         owner = None if request.user.role == User.Role.ADMIN else request.user.pk
-        return Response({"date": on, "rows": rows, "gaps": services.missing_results(on, owner)})
+        return Response({"date": on, "month": f"{on:%Y-%m}", "current_month": f"{t:%Y-%m}", "rows": rows, "gaps": services.missing_results(t, owner)})
 
 
 class PerformanceView(APIView):
@@ -283,17 +293,18 @@ class ImportView(APIView):
 
 
 class LeaderboardView(APIView):
-    """This month's score so far, points this month and hours this week, for everyone with a work sheet."""
+    """A month's score, points that month and hours in its last week (this month so far by default), for everyone with a work sheet."""
 
-    @extend_schema(responses=OpenApiTypes.OBJECT)
+    @extend_schema(parameters=[OpenApiParameter("month", str)], responses=OpenApiTypes.OBJECT)
     def get(self, request):
         t = services.today()
-        _, dash = services.dashboard_rows(t)
-        _, perf = services.performance_rows(t.year, t)
-        score = {r["id"]: r["months"][t.month - 1].get("score") for r in perf}
+        on, finished = seen_from(request, t)
+        _, dash = services.dashboard_rows(on, finished)
+        _, perf = services.performance_rows(on.year, on)
+        score = {r["id"]: r["months"][on.month - 1].get("score") for r in perf}
         rows = [{"id": r["id"], "person": r["person"] or r["name"], "role": r["role"], "score": score.get(r["id"]),
                  "points": r["month_points"], "hours": r["week_hours"], "ytd_points": r["ytd_points"]} for r in dash]
-        return Response({"date": t, "rows": rows})
+        return Response({"date": on, "month": f"{on:%Y-%m}", "current_month": f"{t:%Y-%m}", "rows": rows})
 
 
 class ResetView(APIView):
