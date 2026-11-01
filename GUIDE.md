@@ -1,3 +1,4 @@
+-- Active: 1787979307449@@127.0.0.1@5432@DSLCRM@public
 # DSL Business Team Operation System (TOS) — Admin guide
 
 Step-by-step instructions for the four things still to finish, plus the daily routine for the team.
