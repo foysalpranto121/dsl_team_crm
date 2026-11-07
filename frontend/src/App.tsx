@@ -1,9 +1,11 @@
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { Navigate, Outlet, Route, Routes, useLocation } from "react-router";
 import { useAuth } from "./auth/AuthContext";
+import { BootScreen } from "./components/app/BootScreen";
 import Layout from "./components/Layout";
 import ProfileForm from "./components/ProfileForm";
-import { Card, PageHeader, Spinner } from "./components/ui";
+import { Card, PageHeader } from "./components/ui";
+import { PageSkeleton } from "./components/ui/skeleton";
 import ActivityLog from "./pages/ActivityLog";
 import Approvals from "./pages/Approvals";
 import Dashboard from "./pages/Dashboard";
@@ -15,6 +17,9 @@ import Sheets from "./pages/Sheets";
 import TeamPipelines from "./pages/TeamPipelines";
 import TeamSetup from "./pages/TeamSetup";
 import Tracker from "./pages/Tracker";
+
+// Admin-only showcase of every component: loaded on demand so it never weighs on everyone else's download.
+const UiKit = lazy(() => import("./pages/UiKit"));
 import Waiting from "./pages/Waiting";
 import Welcome from "./pages/Welcome";
 
@@ -22,8 +27,7 @@ import Welcome from "./pages/Welcome";
 function RequireUser() {
   const { session } = useAuth();
   const location = useLocation();
-  if (session.phase === "loading") return <div className="grid min-h-dvh place-items-center">
-    <Spinner label={session.waking ? "Waking up the server… this can take up to a minute after a quiet spell." : "Loading your workspace…"} /></div>;
+  if (session.phase === "loading") return <BootScreen waking={session.waking} />;
   if (session.phase === "waiting") return <Navigate to="/waiting" replace />;
   if (session.phase === "signedOut") return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   return <Outlet />;
@@ -69,6 +73,7 @@ export default function App() {
             <Route path="/admin/settings" element={<TeamSetup />} />
             <Route path="/admin/activity" element={<ActivityLog />} />
             <Route path="/admin/pipelines" element={<TeamPipelines />} />
+            <Route path="/ui" element={<Suspense fallback={<PageSkeleton />}><UiKit /></Suspense>} />
           </Route>
         </Route>
       </Route>

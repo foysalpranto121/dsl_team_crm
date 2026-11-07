@@ -1,13 +1,23 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ──────────────────────────────────────────────────────────────────────────────
+   TOS design tokens (v3). Components use the semantic names below (bg-card,
+   text-muted-foreground, bg-primary, bg-success-soft …), never raw colours, so
+   light and dark mode change in one place.
+   DSL brand: blue #034EA1 = primary · green #00A550 = success / on target ·
+   red #EC1C24 = danger and the logo only (never a decorative accent).
+   ────────────────────────────────────────────────────────────────────────────── */
+
 @theme {
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-display: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", "Noto Sans Bengali", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Archivo", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
 
-  /* Daffodil Software Ltd. colours, taken from the DSL logo: blue S (#034EA1), red D and L (#EC1C24), green swoosh (#00A550) */
+  /* Daffodil Software Ltd. colours, taken from the DSL logo: blue S (#034EA1), red D and L (#EC1C24), green swoosh (#00A550).
+     Kept for existing pages; new code uses the semantic tokens instead. */
   --color-brand-50: #eef5fc;
   --color-brand-100: #d6e6f7;
   --color-brand-200: #adcbef;
@@ -28,31 +38,207 @@
   --color-leaf-400: #2fbf73;
   --color-leaf-500: #00a550;
   --color-leaf-600: #008a43;
+
+  /* Elevation: soft levels. Hierarchy comes from surface tone first, shadows second. */
+  --shadow-xs: 0 1px 2px 0 var(--shadow-tint);
+  --shadow-sm: 0 1px 3px 0 var(--shadow-tint), 0 1px 2px -1px var(--shadow-tint);
+  --shadow-md: 0 4px 12px -2px var(--shadow-tint), 0 2px 4px -2px var(--shadow-tint);
+  --shadow-lg: 0 12px 28px -6px var(--shadow-tint-strong), 0 4px 8px -4px var(--shadow-tint);
+  --shadow-xl: 0 24px 48px -12px var(--shadow-tint-strong);
+
+  --animate-boot: boot 1.4s ease-in-out infinite;
+  @keyframes boot {
+    0% { transform: translateX(-110%); }
+    100% { transform: translateX(330%); }
+  }
+}
+
+:root {
+  --background: #f5f6f8;
+  --foreground: #0f1729;
+  --card: #ffffff;
+  --card-foreground: #0f1729;
+  --popover: #ffffff;
+  --popover-foreground: #0f1729;
+  --sidebar: #ffffff;
+  --muted: #eff1f5;
+  --muted-foreground: #586274;
+  --subtle-foreground: #687183;   /* ≥ 4.5:1 on background, card and sidebar */
+  --border: #e4e7ec;
+  --input: #d4d9e1;
+  --ring: #3a7bd5;
+  --overlay: rgb(10 16 28 / 0.45);
+
+  --primary: #034ea1;
+  --primary-hover: #053f80;
+  --primary-foreground: #ffffff;
+  --primary-soft: #e9f1fb;
+  --primary-text: #0a4f9e;
+
+  --success: #00a550;
+  --success-soft: #e5f6ec;
+  --success-text: #036b35;
+  --warning: #e8a10c;
+  --warning-soft: #fdf3dc;
+  --warning-text: #8a5600;
+  --danger: #d9161e;
+  --danger-hover: #b8121a;
+  --danger-soft: #fdeceb;
+  --danger-text: #b4141b;
+  --info: #2a78d6;
+  --info-soft: #e8f1fc;
+  --info-text: #1b5aa6;
+
+  /* Chart series: the validated categorical order (dataviz validator, light surface #fff: all checks pass;
+     slots 3–5 are under 3:1 on white, so charts using them show labels or the table view). Fixed order, never cycled. */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #e87ba4;
+  --chart-6: #008300;
+  --chart-7: #6250d6;
+  --chart-8: #e34948;
+  --chart-grid: #e8ebf0;
+  --chart-axis: #c9ced8;
+
+  --shadow-tint: rgb(16 24 40 / 0.06);
+  --shadow-tint-strong: rgb(16 24 40 / 0.14);
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #0a0f1a;
+  --foreground: #e6eaf2;
+  --card: #0f1724;
+  --card-foreground: #e6eaf2;
+  --popover: #151e2e;
+  --popover-foreground: #e6eaf2;
+  --sidebar: #0c1220;
+  --muted: #1a2335;
+  --muted-foreground: #9ba6b9;
+  --subtle-foreground: #808ba0;   /* ≥ 4.5:1 on background, card, sidebar and popover */
+  --border: #222c3d;
+  --input: #2c374b;
+  --ring: #5b9ae6;
+  --overlay: rgb(0 0 0 / 0.6);
+
+  --primary: #2f6fd0;
+  --primary-hover: #2862bf;
+  --primary-foreground: #ffffff;
+  --primary-soft: #14284a;
+  --primary-text: #8cbaf2;
+
+  --success: #2fbf73;
+  --success-soft: #0e2a20;
+  --success-text: #6fdba2;
+  --warning: #f2b23a;
+  --warning-soft: #2d2410;
+  --warning-text: #f5c96e;
+  --danger: #cf2f35;
+  --danger-hover: #dc3a40;
+  --danger-soft: #33161a;
+  --danger-text: #f7898d;
+  --info: #4b9be8;
+  --info-soft: #12284a;
+  --info-text: #8fc1f3;
+
+  /* Same eight hues stepped for the dark surface (validated against #111a2b: all checks pass). */
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
+  --chart-6: #008300;
+  --chart-7: #9085e9;
+  --chart-8: #e66767;
+  --chart-grid: #1f293a;
+  --chart-axis: #334055;
+
+  --shadow-tint: rgb(0 0 0 / 0.35);
+  --shadow-tint-strong: rgb(0 0 0 / 0.55);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-subtle-foreground: var(--subtle-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-overlay: var(--overlay);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-text: var(--primary-text);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-text: var(--success-text);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-text: var(--warning-text);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-text: var(--danger-text);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-text: var(--info-text);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-chart-7: var(--chart-7);
+  --color-chart-8: var(--chart-8);
+  --color-chart-grid: var(--chart-grid);
+  --color-chart-axis: var(--chart-axis);
 }
 
 @layer base {
-  html { -webkit-text-size-adjust: 100%; }
-  body { @apply bg-slate-50 text-slate-900 antialiased dark:bg-brand-950 dark:text-slate-100; }
-  h1, h2, h3 { @apply font-display tracking-tight; }
-  :focus-visible { @apply outline-2 outline-offset-2 outline-brand-400; }
+  *, ::before, ::after { border-color: var(--border); }
+  html { -webkit-text-size-adjust: 100%; color-scheme: light; }
+  html.dark { color-scheme: dark; }
+  body { @apply bg-background font-sans text-foreground antialiased; }
+  h1 { @apply font-display tracking-tight; }
+  :focus-visible { @apply outline-2 outline-offset-2 outline-ring; }
+  ::selection { background: color-mix(in oklab, var(--primary) 22%, transparent); }
+  * { scrollbar-width: thin; scrollbar-color: var(--input) transparent; }
 }
 
 @layer components {
-  .card { @apply rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.04]; }
-  .input { @apply w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400
-                 focus:border-transparent focus:outline-2 focus:outline-brand-400 disabled:opacity-60
-                 dark:border-white/15 dark:bg-white/5 dark:text-slate-100; }
-  .label { @apply mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300; }
+  .card { @apply rounded-xl border border-border bg-card text-card-foreground shadow-xs; }
+  .input { @apply w-full min-w-0 rounded-lg border border-input bg-card px-3 py-[7px] text-sm text-foreground shadow-xs outline-hidden
+                 transition-[border-color,box-shadow] duration-150 placeholder:text-subtle-foreground
+                 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20
+                 disabled:cursor-not-allowed disabled:opacity-60 aria-invalid:border-danger aria-invalid:ring-danger/20; }
+  select.input {
+    @apply cursor-pointer appearance-none pr-8;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a93a4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+    background-size: 16px;
+  }
+  .label { @apply mb-1.5 block text-[13px] font-medium text-foreground; }
   .num { @apply font-mono tabular-nums; }
   .hero-glow {
     background:
-      radial-gradient(60rem 30rem at 85% -10%, color-mix(in oklab, var(--color-accent-300) 35%, transparent), transparent),
+      radial-gradient(60rem 30rem at 85% -10%, color-mix(in oklab, var(--color-brand-300) 22%, transparent), transparent),
       radial-gradient(50rem 30rem at -10% 10%, color-mix(in oklab, var(--color-brand-200) 50%, transparent), transparent);
   }
   .dark .hero-glow {
     background:
-      radial-gradient(60rem 30rem at 85% -10%, color-mix(in oklab, var(--color-accent-500) 12%, transparent), transparent),
-      radial-gradient(50rem 30rem at -10% 10%, color-mix(in oklab, var(--color-brand-600) 35%, transparent), transparent);
+      radial-gradient(60rem 30rem at 85% -10%, color-mix(in oklab, var(--color-brand-500) 14%, transparent), transparent),
+      radial-gradient(50rem 30rem at -10% 10%, color-mix(in oklab, var(--color-brand-600) 30%, transparent), transparent);
   }
 }
 

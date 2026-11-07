@@ -5,6 +5,8 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import App from "./App";
 import { AuthProvider } from "./auth/AuthContext";
+import { Toaster } from "./components/ui/toaster";
+import { TooltipProvider } from "./components/ui/tooltip";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -18,7 +20,10 @@ createRoot(document.getElementById("root")!).render(
       <GoogleOAuthProvider clientId={clientId} locale="en">
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>
-            <AuthProvider><App /></AuthProvider>
+            <TooltipProvider delayDuration={300}>
+              <AuthProvider><App /></AuthProvider>
+              <Toaster />
+            </TooltipProvider>
           </BrowserRouter>
         </QueryClientProvider>
       </GoogleOAuthProvider>

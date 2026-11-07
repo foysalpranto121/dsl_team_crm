@@ -1,43 +1,23 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import clsx from "clsx";
-import {
-  BarChart3, Briefcase, CalendarCheck2, ClipboardList, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, Table2, UserRound, Users, X,
-} from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { NavLink, Outlet } from "react-router";
-import { api } from "../api/client";
-import type { AdminUser, Today } from "../api/types";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Outlet, useLocation } from "react-router";
+import { pendingUsersQuery, todayQuery } from "../api/queries";
 import { useAuth } from "../auth/AuthContext";
-import { Avatar, BrandName, Logo, LogoMark, ThemeToggle } from "./Brand";
-
-type Item = { to: string; label: string; icon: ReactNode; badge?: number };
-
-function NavGroup({ title, items, onNavigate }: { title: string; items: Item[]; onNavigate: () => void }) {
-  return (
-    <div className="mb-5">
-      <div className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{title}</div>
-      {items.map((i) => (
-        <NavLink key={i.to} to={i.to} onClick={onNavigate}
-          className={({ isActive }) => clsx("group mb-0.5 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-            isActive ? "bg-brand-700 text-white shadow-sm dark:bg-white/10" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white")}>
-          <span className="[&>svg]:size-[18px]">{i.icon}</span>
-          <span className="flex-1">{i.label}</span>
-          {!!i.badge && <span className="rounded-full bg-accent-500 px-2 py-0.5 text-[11px] font-bold text-white">{i.badge}</span>}
-        </NavLink>
-      ))}
-    </div>
-  );
-}
+import { useLocalState } from "../lib/use-local-state";
+import { cn, isTyping } from "../lib/utils";
+import { CommandMenu } from "./app/CommandMenu";
+import { MobileTabBar } from "./app/MobileTabBar";
+import { ShellContext, type Shell } from "./app/shell";
+import { ShortcutsDialog } from "./app/ShortcutsDialog";
+import { Sidebar } from "./app/Sidebar";
+import { Topbar } from "./app/Topbar";
+import { Sheet, SheetContent, SheetTitle } from "./ui/sheet";
 
 /** Keeps every page on the team's current day: checks the server's "today" every minute, and at midnight
     (team time zone) reloads all data so yesterday shows as locked and the new day — or new month — opens by itself. */
 function useDayRollover() {
   const qc = useQueryClient();
-  const today = useQuery({
-    queryKey: ["today"],
-    queryFn: async () => (await api.get<Today>("/team/today/")).data,
-    refetchInterval: 60_000,
-  });
+  const today = useQuery({ ...todayQuery, refetchInterval: 60_000 });
   const seconds = today.data?.seconds_to_lock;
   useEffect(() => {
     if (seconds == null) return;
@@ -57,90 +37,62 @@ function useDayRollover() {
   }, [day, qc]);
 }
 
+/** The signed-in app frame: sidebar (collapsible on desktop, a drawer on phones), top bar, phone tab bar, Ctrl K palette. */
 export default function Layout() {
-  const { user, signOut } = useAuth();
-  const [open, setOpen] = useState(false);
+  const { user } = useAuth();
+  const { pathname } = useLocation();
+  const [collapsed, setCollapsed] = useLocalState("sidebar-collapsed", false);
+  const [mobileNav, setMobileNav] = useState(false);
+  const [command, setCommand] = useState(false);
+  const [shortcuts, setShortcuts] = useState(false);
   useDayRollover();
-  const isAdmin = user?.role === "admin";
-  const pending = useQuery({
-    queryKey: ["admin-users", "pending"],
-    queryFn: async () => (await api.get<AdminUser[]>("/admin/users/?status=pending")).data,
-    enabled: isAdmin,
-    refetchInterval: 60_000,
-  });
+  const pending = useQuery({ ...pendingUsersQuery, enabled: user?.role === "admin", refetchInterval: 60_000 });
+
+  useEffect(() => setMobileNav(false), [pathname]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "?" && !isTyping(e) && !e.ctrlKey && !e.metaKey) { e.preventDefault(); setShortcuts(true); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const shell = useMemo<Shell>(() => ({
+    openCommand: () => setCommand(true),
+    openShortcuts: () => setShortcuts(true),
+    openMobileNav: () => setMobileNav(true),
+  }), []);
+
   if (!user) return null;
-  const close = () => setOpen(false);
-
-  const nav = (
-    <nav aria-label="Main" className="flex-1 overflow-y-auto px-3 py-4">
-      <NavGroup title="Team" onNavigate={close} items={[
-        { to: "/dashboard", label: "Dashboard", icon: <LayoutDashboard /> },
-        { to: "/sheets", label: "Sheets", icon: <Table2 /> },
-        { to: "/kpi", label: "Weekly KPI", icon: <CalendarCheck2 /> },
-        { to: "/performance", label: "Performance", icon: <BarChart3 /> },
-        { to: "/team", label: "People", icon: <Users /> },
-      ]} />
-      <NavGroup title="My tracker" onNavigate={close} items={[
-        { to: "/tracker", label: "Pipeline & plan", icon: <Briefcase /> },
-        { to: "/profile", label: "My profile", icon: <UserRound /> },
-      ]} />
-      {isAdmin && (
-        <NavGroup title="Admin" onNavigate={close} items={[
-          { to: "/admin/approvals", label: "Approvals", icon: <ShieldCheck />, badge: pending.data?.length },
-          { to: "/admin/settings", label: "Team setup", icon: <Settings /> },
-          { to: "/admin/pipelines", label: "Team pipelines", icon: <Briefcase /> },
-          { to: "/admin/activity", label: "Activity log", icon: <ClipboardList /> },
-        ]} />
-      )}
-    </nav>
-  );
-
-  const me = (
-    <div className="flex items-center gap-3 border-t border-slate-200 p-3 dark:border-white/10">
-      <Avatar name={user.name || user.email} src={user.profile.photo_url} size="sm" />
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold">{user.name || user.email}</div>
-        <div className="truncate text-xs text-slate-500 dark:text-slate-400"><span className="capitalize">{user.role}</span> · {user.profile.position || "Team member"}</div>
-      </div>
-      <button type="button" onClick={signOut} aria-label="Sign out" title="Sign out"
-        className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-white/10 dark:hover:text-white">
-        <LogOut className="size-4" />
-      </button>
-    </div>
-  );
+  const badges = { pendingUsers: pending.data?.length };
 
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[260px_1fr]">
-      {/* desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh flex-col border-r border-slate-200 bg-white lg:flex dark:border-white/10 dark:bg-brand-900/60">
-        <div className="flex items-center gap-3 px-5 py-5"><Logo /><BrandName /></div>
-        {nav}
-        {me}
-      </aside>
+    <ShellContext.Provider value={shell}>
+      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-lg focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-primary-foreground">
+        Skip to content
+      </a>
+      <div className={cn("min-h-dvh transition-[grid-template-columns] duration-200 lg:grid", collapsed ? "lg:grid-cols-[68px_1fr]" : "lg:grid-cols-[248px_1fr]")}>
+        <aside className="sticky top-0 hidden h-dvh border-r border-border bg-sidebar lg:block">
+          <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} badges={badges} />
+        </aside>
 
-      {/* phone top bar + drawer */}
-      <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:hidden dark:border-white/10 dark:bg-brand-950/90">
-        <button type="button" onClick={() => setOpen(true)} aria-label="Open menu" className="-ml-1 rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-white/10"><Menu className="size-5" /></button>
-        <LogoMark /><BrandName compact />
-        <div className="ml-auto"><ThemeToggle /></div>
-      </header>
-      {open && (
-        <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
-          <div className="absolute inset-0 bg-brand-950/50" onClick={close} />
-          <div className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-white shadow-xl dark:bg-brand-900">
-            <div className="flex items-center gap-3 px-5 py-4"><Logo /><BrandName />
-              <button type="button" onClick={close} aria-label="Close menu" className="ml-auto rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-white/10"><X className="size-5" /></button>
-            </div>
-            {nav}
-            {me}
-          </div>
+        <Sheet open={mobileNav} onOpenChange={setMobileNav}>
+          <SheetContent side="left" className="bg-sidebar p-0" aria-describedby={undefined}>
+            <SheetTitle className="sr-only">Menu</SheetTitle>
+            <Sidebar badges={badges} onNavigate={() => setMobileNav(false)} inDrawer />
+          </SheetContent>
+        </Sheet>
+
+        <div className="flex min-w-0 flex-col">
+          <Topbar />
+          <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1400px] flex-1 px-4 pb-28 pt-6 outline-hidden sm:px-6 lg:px-8 lg:pb-16 lg:pt-8">
+            <Outlet />
+          </main>
         </div>
-      )}
-
-      <main className="min-w-0">
-        <div className="hidden justify-end px-8 pt-5 lg:flex"><ThemeToggle /></div>
-        <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6 lg:px-8 lg:pt-2"><Outlet /></div>
-      </main>
-    </div>
+      </div>
+      <MobileTabBar />
+      <CommandMenu open={command} onOpenChange={setCommand} />
+      <ShortcutsDialog open={shortcuts} onOpenChange={setShortcuts} />
+    </ShellContext.Provider>
   );
 }

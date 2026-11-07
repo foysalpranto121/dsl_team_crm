@@ -6,6 +6,7 @@ import { defineConfig } from "vite";
 // httpOnly refresh cookie works without any cross-site setup.
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: { alias: { "@": "/src" } },
   server: {
     port: 5173,
     strictPort: true,
