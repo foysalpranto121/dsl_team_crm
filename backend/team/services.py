@@ -134,16 +134,35 @@ def save_kpi(user, sheet, week_start, data):
 
 # ---------- numbers ----------
 
-def _snapshot(sheets_qs):
+def renewal_revenue(cfg):
+    """{(sheet id, week start): amount} from renewals won (SRS FR-RN4)."""
+    from renewals.services import revenue_by_sheet_week   # renewals builds on team, so it's imported here, not at the top
+    return revenue_by_sheet_week(cfg)
+
+
+def kpi_rows(sheet, renewals=None):
+    """A sheet's weekly results as plain rows for calc. renewals (from renewal_revenue) is added to each week's revenue,
+    with a row of its own for a week that has no results entered."""
+    rows = [{"week_start": k.week_start, "leads": k.leads, "opps": k.opps, "clients": k.clients, "revenue": float(k.revenue), "counts_in": k.counts_in}
+            for k in sheet.kpis.all()]
+    if renewals:
+        mine = {ws: v for (sheet_id, ws), v in renewals.items() if sheet_id == sheet.id}
+        for r in rows:
+            if r["week_start"] in mine:
+                r["revenue"] = calc.r2(r["revenue"] + mine.pop(r["week_start"]))
+        rows += [{"week_start": ws, "leads": 0, "opps": 0, "clients": 0, "revenue": v, "counts_in": ""} for ws, v in sorted(mine.items())]
+    return rows
+
+
+def _snapshot(sheets_qs, renewals=True):
+    """renewals=False: only the results people entered (for "missing results")."""
     st = TeamSettings.load()
+    cfg = cfg_of(st)
     pts = {t.id: float(t.points) for t in Task.objects.all()}
     sheets = list(sheets_qs.select_related("owner", "role").prefetch_related("entries", "kpis"))
-    data = []
-    for s in sheets:
-        entries = [calc.Day(e.day, e.slots) for e in s.entries.all()]
-        kpis = [{"week_start": k.week_start, "leads": k.leads, "opps": k.opps, "clients": k.clients, "revenue": float(k.revenue), "counts_in": k.counts_in} for k in s.kpis.all()]
-        data.append((s, entries, kpis))
-    return st, cfg_of(st), pts, data
+    extra = renewal_revenue(cfg) if renewals else None
+    data = [(s, [calc.Day(e.day, e.slots) for e in s.entries.all()], kpi_rows(s, extra)) for s in sheets]
+    return st, cfg, pts, data
 
 
 def _sheet_meta(s):
@@ -234,7 +253,7 @@ def wins_between(a, b, details=True):
 def missing_results(on, owner_id=None):
     """Completed weeks this year with no results entered (no row, or all four numbers zero), per work sheet.
     Counts from each sheet's start date. owner_id limits the list to one person's sheets."""
-    _, cfg, _, data = _snapshot(work_sheets())
+    _, cfg, _, data = _snapshot(work_sheets(), renewals=False)
     year_start = date(on.year, 1, 1)
     gaps = []
     for s, _, kpis in data:

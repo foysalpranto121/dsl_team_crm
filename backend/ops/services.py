@@ -22,6 +22,7 @@ from core import audit
 from core.models import Announcement
 from team import calc
 from team import services as team
+from renewals import services as renewals
 from team.models import KpiEntry, Sheet, SheetEntry, Task, TeamSettings
 from tracker.models import Prospect, TrackerSettings
 from tracker.template import STAGES
@@ -46,6 +47,15 @@ class NoRecipients(Exception):
 
 def _person(sheet):
     return sheet.person or (sheet.owner.name if sheet.owner else sheet.name)
+
+
+def week_results(kpi, renewal_revenue=0):
+    """A week's entered results, with renewal revenue added (None when there's neither)."""
+    if kpi is None and not renewal_revenue:
+        return None
+    k = {"leads": kpi.leads, "opps": kpi.opps, "clients": kpi.clients, "revenue": float(kpi.revenue)} if kpi else {"leads": 0, "opps": 0, "clients": 0, "revenue": 0.0}
+    k["revenue"] = calc.r2(k["revenue"] + renewal_revenue)
+    return k
 
 
 def previous_working_day(day, cfg):
@@ -165,6 +175,7 @@ def huddle(user):
         "missing_results": [{"person": g["person"], "weeks": len(g["weeks"])} for g in team.missing_results(today, None if admin else user.pk)],
         "pending_people": User.objects.filter(status=User.Status.PENDING).count() if admin else None,
         "stuck": stuck_deals(today) if admin else None,
+        "renewals": renewals.huddle_block(user, today),
     }
 
     current = (Announcement.objects.filter(title=FOCUS_TITLE, expires_on=today).select_related("created_by").order_by("-created_at").first())
@@ -198,6 +209,7 @@ def digest(week_start):
     _, perf = team.performance_rows(we.year, we)
     score = {r["id"]: r["months"][we.month - 1].get("score") for r in perf}
     week_kpi = {k.sheet_id: k for k in KpiEntry.objects.filter(sheet_id__in=[r["id"] for r in rows], week_start=ws)}
+    renewed = team.renewal_revenue(cfg)   # renewals won that week count in revenue, as on the dashboard
     month = month_totals(rows)
     ms, me = calc.month_start(we), calc.month_end(we)
     # The month's totals include every day logged so far (up to today), so the pace counts working days up to the same day.
@@ -216,7 +228,7 @@ def digest(week_start):
             "person": r["person"] or r["name"], "role": r["role"], "score": score.get(r["id"]),
             "week_hours": r["week_hours"], "week_target": r["week_target"], "week_status": r["week_status"]["key"],
             "month_points": r["month_points"], "month_target": r["month_target"], "month_status": r["month_status"]["key"],
-            "kpi": {"leads": k.leads, "opps": k.opps, "clients": k.clients, "revenue": float(k.revenue)} if k else None,
+            "kpi": week_results(k, renewed.get((r["id"], ws), 0)),
         })
     cards.sort(key=lambda c: (c["score"] if c["score"] is not None else -1, c["month_points"]), reverse=True)
 
@@ -249,6 +261,7 @@ def digest(week_start):
         "wins": [{k: w[k] for k in WIN_FIELDS} for w in (team.wins_between(ws, we) or [])],
         "scorecards": cards,
         "risks": risks,
+        "renewals": renewals.digest_block(ws, we),
         "link": f"{settings.FRONTEND_URL}/dashboard",
     }
 

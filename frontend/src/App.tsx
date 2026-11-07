@@ -26,6 +26,7 @@ const TvScreens = lazy(() => import("./features/tv/TvScreens"));
 // Team and management tools (SRS v0.3 §14.9): morning huddle and weekly digest.
 const Huddle = lazy(() => import("./features/huddle/Huddle"));
 const WeeklyDigest = lazy(() => import("./features/digest/WeeklyDigest"));
+const Renewals = lazy(() => import("./features/renewals/Renewals"));
 import Waiting from "./pages/Waiting";
 import Welcome from "./pages/Welcome";
 
@@ -71,6 +72,7 @@ export default function App() {
         <Route element={<RequireProfile><Layout /></RequireProfile>}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/huddle" element={<Suspense fallback={<PageSkeleton />}><Huddle /></Suspense>} />
+          <Route path="/renewals" element={<Suspense fallback={<PageSkeleton />}><Renewals /></Suspense>} />
           <Route path="/sheets" element={<Sheets />} />
           <Route path="/kpi" element={<KpiPage />} />
           <Route path="/performance" element={<Performance />} />

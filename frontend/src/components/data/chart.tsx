@@ -18,6 +18,8 @@ export function useChartTheme() {
     return {
       mode: resolved,
       series: Array.from({ length: 8 }, (_, i) => v(`--chart-${i + 1}`)),
+      /** For series that mean good / pending / bad. Never mixed with `series` in one chart. */
+      status: { good: v("--chart-good"), pending: v("--chart-pending"), critical: v("--chart-critical") },
       grid, muted, surface,
       axis: { tick: { fill: muted, fontSize: 12 }, axisLine: false, tickLine: false } as const,
       gridProps: { vertical: false, stroke: grid } as const,

@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { api } from "./client";
+import type { DueRenewals } from "../features/renewals/types";
 import type { AdminUser, Today } from "./types";
 
 /** Queries shared by the app shell and the pages, so they hit one cache entry instead of fetching twice. */
@@ -19,6 +20,12 @@ export interface DueFollowUps {
   due: { id: number; company: string; next_follow_up: string; next_action: string; overdue: boolean }[];
   due_count: number;
 }
+
+/** The signed-in person's renewals whose next step is due (SRS FR-RN2). Under ["renewals"], so every renewal change refreshes it. */
+export const renewalsDueQuery = queryOptions({
+  queryKey: ["renewals", "due"],
+  queryFn: async () => (await api.get<DueRenewals>("/renewals/due/")).data,
+});
 
 export const trackerSummaryQuery = queryOptions({
   queryKey: ["tracker", "summary", null],

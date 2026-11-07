@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlarmClock, Bell, CalendarClock, CheckCircle2, ShieldCheck, type LucideIcon } from "lucide-react";
+import { AlarmClock, Bell, CalendarClock, CalendarSync, CheckCircle2, ShieldCheck, type LucideIcon } from "lucide-react";
 import { Link } from "react-router";
-import { pendingUsersQuery, todayQuery, trackerSummaryQuery } from "@/api/queries";
+import { pendingUsersQuery, renewalsDueQuery, todayQuery, trackerSummaryQuery } from "@/api/queries";
 import { useAuth } from "@/auth/AuthContext";
 import { duration } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,7 @@ export function NotificationBell() {
   const today = useQuery(todayQuery);
   const pending = useQuery({ ...pendingUsersQuery, enabled: isAdmin });
   const follow = useQuery({ ...trackerSummaryQuery, staleTime: 5 * 60_000 });
+  const renewals = useQuery({ ...renewalsDueQuery, staleTime: 5 * 60_000, enabled: user?.role !== "viewer" });
 
   const items: Item[] = [];
   const t = today.data;
@@ -36,6 +37,17 @@ export function NotificationBell() {
     const names = due.slice(0, 3).map((d) => d.company).join(", ");
     items.push({ id: "follow", tone: overdue ? "danger" : "primary", icon: CalendarClock, title: `${dueCount} follow-up${dueCount === 1 ? "" : "s"} due`,
       body: overdue ? `${overdue} overdue · ${names}` : names, to: "/tracker" });
+  }
+  const r = renewals.data;
+  if (r?.count) {
+    const late = r.items.filter((x) => x.overdue).length, first = r.items[0];
+    items.push({ id: "renewals", tone: late || (first && first.days_left < 0) ? "danger" : "primary", icon: CalendarSync,
+      title: `${r.count} ${r.count === 1 ? "renewal needs" : "renewals need"} a next step`,
+      body: r.items.slice(0, 3).map((x) => x.client).join(", "), to: r.count === 1 && first ? `/renewals?tab=renew&open=${first.id}` : "/renewals?tab=renew" });
+  }
+  if (r?.unowned) {
+    items.push({ id: "renewals-unowned", tone: "warning", icon: CalendarSync, title: `${r.unowned} ${r.unowned === 1 ? "renewal has" : "renewals have"} no owner`,
+      body: "Nobody is reminded until a contract has an account owner.", to: "/renewals?tab=contracts" });
   }
 
   return (
@@ -78,7 +90,7 @@ export function NotificationBell() {
             ))}
           </ul>
         )}
-        <div className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">Worked out live from your sheets and pipeline.</div>
+        <div className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">Worked out live from your sheets, pipeline and renewals.</div>
       </PopoverContent>
     </Popover>
   );

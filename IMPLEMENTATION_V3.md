@@ -385,11 +385,55 @@ The backend stays Django REST Framework (decision 9).
   - axe found no WCAG 2.1 A/AA issues on either page.
 - **Setup:** see DEPLOY.md step 8 for the weekly schedule.
 
+### V2-A3 AMC and renewal tracker (§14.6, FR-RN1–RN4): built
+
+- **Backend:** a new Django app, `renewals`.
+  - **Contracts (FR-RN1):** a `Contract` holds the client, product, kind (AMC, licence, software, support, other), start and end dates, value, renewal terms, account owner and an optional external ID.
+    - Admins add, edit and delete contracts at `/api/renewals/contracts/`.
+    - `.../import/` takes a CSV from the old records or an Odoo export. It checks the file first (dry run), recognises common column names and day-first dates, and skips rows with problems while saying why.
+    - A row with the same external ID, or the same client, product and start date, updates the existing contract instead of adding a copy.
+  - **Renewals open by themselves (FR-RN2):** a `Renewal` opens, assigned to the account owner, when a contract comes within the first reminder window (90 days by default).
+    - At each later window (60 and 30 days) it goes back on the owner's to-do list.
+    - This runs on page load (at most hourly, so no scheduler is needed) and straight away when a contract is added, edited or imported.
+    - The owner or an admin moves it through To contact → In talks → Quote sent. Every open renewal needs a next step and a date.
+    - The owner or an admin then records the outcome: **Renewed** starts the next term as a new contract; **Not renewing** asks for a reason. Admins can reopen a renewal recorded by mistake.
+    - Members can only record today's date; admins can backdate.
+    - Management (viewer) reads everything and changes nothing.
+  - **Dashboard (FR-RN3):** `GET /api/renewals/summary/` returns:
+    - renewals due by month for the next 12 months (renewed, to renew, not renewed);
+    - the 12-month renewal rate;
+    - revenue at risk: ended without a renewal, or ending within the last window;
+    - open renewals by stage;
+    - upsell ideas: the owner's note, plus products other clients have that this one doesn't, given as counts only, never which clients.
+    - The key account plan (§14.8) can link to this later.
+  - **Revenue KPI (FR-RN4):** a won renewal's value counts in the owner's Revenue KPI in the week it was renewed, on top of the revenue they type in. It's weighted by `revenue_weight` (100% by default, set by admins).
+    - It flows through `team.services._snapshot`, so the dashboard, performance scores, TV, digest and Excel export all agree.
+    - The Excel KPI tab shows it in a separate column J, which the workbook import doesn't read back.
+    - "Missing results" reminders still look only at what people typed.
+  - **Elsewhere:** `GET /api/renewals/due/` feeds the bell. The huddle's "Needs attention" lists renewals ending within 30 days (all of them for admins, your own for members). The weekly digest gains a Renewals section.
+  - Every change is audit-logged as `contract.*` or `renewal.*`.
+- **Frontend:** `/renewals` (My work → Renewals) has three tabs:
+  - Overview, with stat tiles and a stacked chart that has a table view;
+  - To renew, a table with a side panel to work each renewal;
+  - Contracts, a table with an add/edit panel and CSV import with a preview step.
+  - Admins also get a **Reminders** dialog (the windows and the revenue weight).
+  - The KPI page shows "+ BDT X renewals" under each person's revenue.
+  - New chart tokens `--chart-good/pending/critical`, light and dark, were checked with the dataviz validator. Red and green sit in the colour-blind floor band, so the chart keeps 2px gaps, a legend and a table view.
+- **Checks:**
+  - 10 new DRF tests; 97 backend tests pass.
+  - A browser run as admin, member and management against the real API on a throwaway database:
+    - the import preview and the import;
+    - the bell link to a member's renewal, working it and recording it as renewed (the KPI page then showed the revenue), and recording a client as not renewing;
+    - the huddle and digest sections;
+    - management's read-only view;
+    - no horizontal scroll at 390px wide.
+  - axe found no WCAG 2.1 A/AA issues on any of the views, in light or dark.
+- **To use it locally:** run `python manage.py migrate` (Render runs it on deploy). There are no new settings.
+
 ### Next V2 candidates
 
 These come from SRS §14.1, Wave A first. Each needs the item in brackets before it can start:
 
-- AMC and renewal tracker (§14.6) [contract data, or an import from Odoo]
 - AI daily briefs (§14.10) [an Anthropic API key; called from DRF]
 - WhatsApp logging bot (§14.3) [a WhatsApp Business provider account, OQ-V2-5]
 - Tender alerts (§14.2) [allowed tender sources, OQ-V2-1]

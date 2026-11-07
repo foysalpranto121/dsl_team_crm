@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  AlertTriangle, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Megaphone, Presentation, ShieldCheck, Sunrise,
+  AlertTriangle, CalendarClock, CalendarSync, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Megaphone, Presentation, ShieldCheck, Sunrise,
   Target, Timer, Trophy, X,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
@@ -34,7 +34,9 @@ interface HuddleData {
   wins: { configured: boolean; items: Win[] };
   plan: { people: number; planned: number; hours: number; target_hours: number; workday: boolean; by_type: { type: string; hours: number }[] };
   attention: { missing_results: { person: string; weeks: number }[]; pending_people: number | null;
-    stuck: { items: StuckDeal[]; total: number; shared_pipelines: number } | null };
+    stuck: { items: StuckDeal[]; total: number; shared_pipelines: number } | null;
+    renewals: { days: number; total: number; expired: number;
+      items: { id: number; client: string; product: string; days_left: number; stage: string; owner: string | null }[] } };
   focus: { suggested: { metric: string | null; text: string }; current: { text: string; by: string | null; at: string } | null; can_set: boolean };
 }
 
@@ -148,7 +150,7 @@ function TodaysPlan({ h }: { h: HuddleData }) {
 
 function Attention({ h }: { h: HuddleData }) {
   const a = h.attention;
-  const nothing = !a.pending_people && a.missing_results.length === 0 && !(a.stuck && a.stuck.total);
+  const nothing = !a.pending_people && a.missing_results.length === 0 && !(a.stuck && a.stuck.total) && !a.renewals.total;
   return (
     <Section icon={<AlertTriangle />} title="Needs attention">
       {nothing ? (
@@ -171,6 +173,30 @@ function Attention({ h }: { h: HuddleData }) {
                 {a.missing_results.map((g) => <li key={g.person}><Badge tone="warning">{g.person} · {g.weeks} {g.weeks === 1 ? "week" : "weeks"}</Badge></li>)}
               </ul>
               <Link to="/kpi" className="mt-2 inline-block text-sm font-semibold text-primary-text hover:underline">Enter weekly results</Link>
+            </div>
+          )}
+          {a.renewals.total > 0 && (
+            <div>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Renewals ending within {a.renewals.days} days{a.renewals.expired ? ` · ${a.renewals.expired} already ended` : ""}
+              </h3>
+              <ul className="divide-y divide-border rounded-lg border border-border">
+                {a.renewals.items.map((r) => (
+                  <li key={r.id}>
+                    <Link to={`/renewals?tab=renew&open=${r.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-sm hover:bg-muted">
+                      <CalendarSync className={cn("size-4", r.days_left < 0 ? "text-danger-text" : "text-warning-text")} aria-hidden />
+                      <span className="font-semibold">{r.client}</span>
+                      <span className="text-muted-foreground">{r.product}</span>
+                      <Badge tone="outline">{r.stage}</Badge>
+                      {r.owner && <span className="text-muted-foreground">{r.owner}</span>}
+                      <span className={cn("ml-auto text-xs font-medium", r.days_left < 0 ? "text-danger-text" : "text-warning-text")}>
+                        {r.days_left < 0 ? `Ended ${-r.days_left} ${r.days_left === -1 ? "day" : "days"} ago` : r.days_left === 0 ? "Ends today" : `Ends in ${r.days_left} ${r.days_left === 1 ? "day" : "days"}`}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              {a.renewals.total > a.renewals.items.length && <p className="mt-2 text-xs text-muted-foreground">And {a.renewals.total - a.renewals.items.length} more in Renewals.</p>}
             </div>
           )}
           {a.stuck && (

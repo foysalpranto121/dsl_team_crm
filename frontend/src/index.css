@@ -99,6 +99,12 @@
   --chart-6: #008300;
   --chart-7: #6250d6;
   --chart-8: #e34948;
+  /* Status series (a series that means good / pending / bad, e.g. renewed · to renew · not renewed). Validated as a set with
+     the dataviz validator on the card surface; red↔green sits in the CVD floor band, so charts using them keep 2px gaps,
+     a legend and a table view. */
+  --chart-good: #00a550;
+  --chart-pending: #2a78d6;
+  --chart-critical: #d9161e;
   --chart-grid: #e8ebf0;
   --chart-axis: #c9ced8;
 
@@ -152,6 +158,9 @@
   --chart-6: #008300;
   --chart-7: #9085e9;
   --chart-8: #e66767;
+  --chart-good: #22a565;
+  --chart-pending: #3a8be0;
+  --chart-critical: #cf2f35;
   --chart-grid: #1f293a;
   --chart-axis: #334055;
 

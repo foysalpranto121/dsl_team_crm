@@ -2,12 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { CalendarCheck2, ChevronLeft, ChevronRight, Lock } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router";
 import { api, errorText } from "../api/client";
 import type { DashboardRow } from "../api/types";
 import { Alert, Badge, Button, Card, EmptyState, PageHeader, Spinner } from "../components/ui";
 
 interface Kpi { week_start: string; leads: number; opps: number; clients: number; revenue: string; notes: string; updated_by: string | null; updated_at: string }
-interface KpiRow { sheet: number; name: string; person: string; role: string | null; mine: boolean; editable: boolean; blocked: string | null; kpi: Kpi | null;
+/** renewals: revenue from renewals won that week (the renewal tracker adds it on top of the revenue typed here). */
+interface KpiRow { sheet: number; name: string; person: string; role: string | null; mine: boolean; editable: boolean; blocked: string | null; kpi: Kpi | null; renewals: number;
   targets: { leads: number; opps: number; clients: number; revenue: number } }
 interface KpiWeek { week_start: string; week_end: string; week_no: number; today: string; current_week_start: string; counts_in_month: string; rows: KpiRow[] }
 
@@ -17,6 +19,13 @@ const short = (s: string) => utc(s).toLocaleDateString("en-GB", { day: "numeric"
 const monthName = (ym: string) => utc(ym + "-01").toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" });
 const money = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 0 });
 const FIELDS = [["leads", "Leads", "Client shows interest"], ["opps", "Opportunities", "Client shares requirements"], ["clients", "Clients", "Client issues a work order"]] as const;
+
+/** Renewals won that week count on top of the revenue typed in, so nobody types them twice. */
+function RenewalsNote({ amount }: { amount: number }) {
+  if (!amount) return null;
+  return <Link to="/renewals?tab=renew" className="mt-1 block whitespace-nowrap text-right text-[11px] font-medium text-success-text hover:underline"
+    title="Renewals recorded in Renewals count on top of the revenue typed here. Don't type them again.">+ {money.format(amount)} renewals</Link>;
+}
 
 function Row({ row, week }: { row: KpiRow; week: string }) {
   const qc = useQueryClient();
@@ -42,7 +51,8 @@ function Row({ row, week }: { row: KpiRow; week: string }) {
             {FIELDS.map(([k]) => <td key={k} className="px-2 py-2.5 text-right"><input type="number" min={0} step={1} value={f[k]} aria-label={`${k} for ${row.person}`}
               onChange={(e) => setF({ ...f, [k]: e.target.value })} className={num} /></td>)}
             <td className="px-2 py-2.5 text-right"><input type="number" min={0} step={1000} value={f.revenue} aria-label={`Revenue for ${row.person}`}
-              onChange={(e) => setF({ ...f, revenue: e.target.value })} className={clsx(num, "w-28")} /></td>
+              onChange={(e) => setF({ ...f, revenue: e.target.value })} className={clsx(num, "w-28")} />
+              <RenewalsNote amount={row.renewals} /></td>
             <td className="px-2 py-2.5"><input value={f.notes} maxLength={2000} placeholder="Clients, deals…" aria-label={`Notes for ${row.person}`}
               onChange={(e) => setF({ ...f, notes: e.target.value })} className="w-56 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm focus:outline-2 focus:outline-brand-400 dark:border-white/15 dark:bg-white/5" /></td>
             <td className="px-4 py-2.5 text-right"><Button className="py-1.5" onClick={() => save.mutate()} busy={save.isPending} disabled={!dirty}>Save</Button></td>
@@ -50,7 +60,8 @@ function Row({ row, week }: { row: KpiRow; week: string }) {
         ) : (
           <>
             {FIELDS.map(([k]) => <td key={k} className="num px-4 py-2.5 text-right">{row.kpi ? row.kpi[k] : <span className="text-slate-300 dark:text-white/20">—</span>}</td>)}
-            <td className="num px-4 py-2.5 text-right">{row.kpi ? money.format(+row.kpi.revenue) : <span className="text-slate-300 dark:text-white/20">—</span>}</td>
+            <td className="num px-4 py-2.5 text-right">{row.kpi ? money.format(+row.kpi.revenue) : <span className="text-slate-300 dark:text-white/20">—</span>}
+              <RenewalsNote amount={row.renewals} /></td>
             <td className="max-w-56 truncate px-4 py-2.5 text-xs text-slate-500" title={row.kpi?.notes}>{row.kpi?.notes}</td>
             <td className="px-4 py-2.5 text-right" title={row.blocked ?? undefined}><Lock className="ml-auto size-4 text-slate-400" aria-label={row.blocked ?? "Locked"} /></td>
           </>

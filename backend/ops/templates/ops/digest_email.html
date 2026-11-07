@@ -102,6 +102,45 @@
     <div style="font-size:12px;color:#586274;margin-top:6px;">Score = hours, points and results against each person's own targets, weighted by job role.</div>
   </td></tr>
 
+  {% if renewals %}
+  <tr><td style="padding:22px 28px 0;">
+    <div style="font-size:15px;font-weight:700;">Renewals</div>
+    <div style="font-size:13px;color:#586274;margin-top:6px;line-height:1.6;">
+      That week: <b style="color:#0f1729;">{{ renewals.renewed.count|num }}</b> renewed ({{ renewals.renewed.value|bdt }}){% if renewals.lost.count %},
+      <b style="color:#0f1729;">{{ renewals.lost.count|num }}</b> not renewing ({{ renewals.lost.value|bdt }}){% endif %}.
+      Renewal rate over the last 12 months: <b style="color:#0f1729;">{{ renewals.rate.rate|pct }}</b> ({{ renewals.rate.renewed|num }} of {{ renewals.rate.came_up|num }} contracts).
+    </div>
+    {% if renewals.ended.count %}
+    <div style="margin-top:8px;padding:10px 12px;border-radius:8px;background:#fdecec;font-size:13px;">
+      <b>{{ renewals.ended.count|num }} ended without a renewal yet</b> · {{ renewals.ended.value|bdt }} at risk
+    </div>
+    {% endif %}
+    <div style="font-size:13px;margin-top:10px;">Ending in the next {{ renewals.coming.days }} days: <b>{{ renewals.coming.count|num }}</b> ({{ renewals.coming.value|bdt }})</div>
+    {% if renewals.coming.items %}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;border-collapse:collapse;font-size:13px;">
+      <tr style="background:#eff1f5;color:#586274;">
+        <td style="padding:8px 10px;font-weight:600;">Client</td>
+        <td style="padding:8px 10px;font-weight:600;">Ends</td>
+        <td align="right" style="padding:8px 10px;font-weight:600;">Value</td>
+        <td style="padding:8px 10px;font-weight:600;">Owner · stage</td>
+      </tr>
+      {% for r in renewals.coming.items %}
+      <tr style="border-bottom:1px solid #e4e7ec;">
+        <td style="padding:8px 10px;"><b>{{ r.client }}</b><br><span style="color:#586274;font-size:12px;">{{ r.product }}</span></td>
+        <td style="padding:8px 10px;white-space:nowrap;">{{ r.end_date|date:"j M" }}</td>
+        <td align="right" style="padding:8px 10px;white-space:nowrap;">{{ r.value|bdt }}</td>
+        <td style="padding:8px 10px;">{{ r.owner|default:"No owner" }}<br><span style="color:#586274;font-size:12px;">{{ r.stage }}</span></td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% if renewals.coming.count > renewals.coming.items|length %}<div style="font-size:12px;color:#586274;margin-top:6px;">The first {{ renewals.coming.items|length }} of {{ renewals.coming.count|num }}. Renewals in TOS lists them all.</div>{% endif %}
+    {% endif %}
+    {% if renewals.lost.reasons %}
+    <div style="font-size:12px;color:#586274;margin-top:8px;">Not renewing: {{ renewals.lost.reasons|join:"; " }}</div>
+    {% endif %}
+  </td></tr>
+  {% endif %}
+
   <tr><td style="padding:22px 28px 0;">
     <div style="font-size:15px;font-weight:700;">Needs attention</div>
     {% if risks %}

@@ -236,12 +236,14 @@ class KpiWeekView(APIView):
             raise ValidationError(str(e))
         sheets = list(services.work_sheets().select_related("owner", "role"))
         kpis = {k.sheet_id: k for k in KpiEntry.objects.filter(sheet__in=sheets, week_start=ws).select_related("updated_by")}
+        renewed = services.renewal_revenue(cfg)
         rows = []
         for s in sheets:
             reason = services.kpi_block(request.user, s, ws, st)
             rows.append({"sheet": s.id, "name": s.name, "person": s.person or (s.owner.name if s.owner else s.name), "role": s.role.name if s.role else None,
                          "mine": s.owner_id == request.user.pk, "editable": reason is None, "blocked": reason,
                          "kpi": KpiSerializer(kpis[s.id]).data if s.id in kpis else None,
+                         "renewals": renewed.get((s.id, ws), 0),   # added to the revenue typed in (renewal tracker, SRS FR-RN4)
                          "targets": {"leads": float(s.target_leads), "opps": float(s.target_opps), "clients": float(s.target_clients), "revenue": float(s.target_revenue)}})
         year, month = calc.month_of_week(ws)
         return Response({"week_start": ws, "week_end": ws + timedelta(days=6), "week_no": calc.week_no(ws, cfg)[0], "today": t,

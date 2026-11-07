@@ -10,7 +10,7 @@ interface Item { id: number; created_at: string; actor: { name: string; email: s
 interface Page { results: Item[]; page: number; has_more: boolean; flagged_count: number }
 
 const FILTERS = [["", "Everything"], ["entry.", "Sheet entries"], ["kpi.", "Weekly KPI"], ["user.", "People & access"],
-  ["sheet.", "Sheets & targets"], ["task.", "Tasks"], ["role.", "Job roles"], ["settings.", "Team rules"], ["announcement.", "Announcements"], ["import.", "Excel import"]] as const;
+  ["sheet.", "Sheets & targets"], ["task.", "Tasks"], ["role.", "Job roles"], ["settings.", "Team rules"], ["announcement.", "Announcements"], ["import.", "Excel import"], ["renewal.", "Renewals"], ["contract.", "Contracts"]] as const;
 
 const hours = (v: unknown) => (Array.isArray(v) ? v.filter((x) => x != null).length : 0);
 const day = (v: unknown) => (typeof v === "string" ? new Date(v + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : "");
@@ -46,6 +46,15 @@ function describe(i: Item): { what: string; more: string } {
     case "huddle.focus": return { what: "Posted today's focus from the morning huddle", more: i.target };
     case "digest.send": return { what: `Sent the weekly digest for ${i.target}`, more: `${d.recipients ?? "?"} people${d.automatic ? " · by the weekly schedule" : ""}` };
     case "import.workbook": return { what: d.replaced ? "Replaced all team data with an Excel import" : "Imported the Excel workbook", more: `${d.sheets} sheets · ${d.kpi_weeks} KPI weeks` };
+    case "contract.create": return { what: `Added the contract ${i.target}`, more: `ends ${day(d.ends)} · BDT ${d.value ?? "?"}` };
+    case "contract.update": return { what: `Changed the contract ${i.target}`, more: pairs(d) };
+    case "contract.delete": return { what: `Deleted the contract ${i.target}`, more: `ended ${day(d.ends)} · ${d.status}` };
+    case "contract.import": return { what: "Imported contracts from a CSV", more: `${d.created ?? 0} added · ${d.updated ?? 0} updated · ${d.skipped ?? 0} skipped` };
+    case "renewal.update": return { what: `Updated the renewal of ${i.target}`, more: pairs(d) };
+    case "renewal.won": return { what: `Recorded a renewal: ${i.target}`, more: `BDT ${d.value} until ${day(d.until)} · agreed ${day(d.on)}${d.owner ? ` · counts for ${d.owner}` : ""}` };
+    case "renewal.lost": return { what: `Recorded “not renewing”: ${i.target}`, more: String(d.reason ?? "") };
+    case "renewal.reopen": return { what: `Reopened the renewal of ${i.target}`, more: d.was === "won" ? "the renewal and its next term were undone" : "it was marked as not renewing" };
+    case "renewal.settings": return { what: "Changed the renewal reminders", more: pairs(d) };
     default: return { what: `${i.action} ${i.target}`, more: "" };
   }
 }

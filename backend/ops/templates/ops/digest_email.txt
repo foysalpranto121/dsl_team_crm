@@ -17,7 +17,15 @@ WINS THAT WEEK
 SCORECARDS
 {% for c in scorecards %}- {{ c.person }}: {{ c.week_hours|num }} of {{ c.week_target|num }} h that week, {{ c.month_points|num }} of {{ c.month_target|num }} points this month, score {{ c.score|pct }}
 {% endfor %}
-NEEDS ATTENTION
+{% if renewals %}RENEWALS
+That week: {{ renewals.renewed.count|num }} renewed ({{ renewals.renewed.value|bdt }}), {{ renewals.lost.count|num }} not renewing ({{ renewals.lost.value|bdt }})
+Renewal rate over the last 12 months: {{ renewals.rate.rate|pct }} ({{ renewals.rate.renewed|num }} of {{ renewals.rate.came_up|num }} contracts)
+{% if renewals.ended.count %}Ended without a renewal yet: {{ renewals.ended.count|num }} ({{ renewals.ended.value|bdt }} at risk)
+{% endif %}Ending in the next {{ renewals.coming.days }} days: {{ renewals.coming.count|num }} ({{ renewals.coming.value|bdt }})
+{% for r in renewals.coming.items %}- {{ r.client }} ({{ r.product }}): ends {{ r.end_date|date:"j M" }}, {{ r.value|bdt }}, {{ r.owner|default:"no owner" }}, {{ r.stage }}
+{% endfor %}{% if renewals.lost.reasons %}Not renewing: {{ renewals.lost.reasons|join:"; " }}
+{% endif %}
+{% endif %}NEEDS ATTENTION
 {% for r in risks %}- {{ r.person }}: {{ r.why|join:"; " }}
 {% empty %}Nothing — everyone logged their week and entered their results.
 {% endfor %}

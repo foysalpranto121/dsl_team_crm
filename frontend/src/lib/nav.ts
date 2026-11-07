@@ -1,5 +1,5 @@
 import {
-  Activity, BarChart3, Briefcase, CalendarCheck2, ClipboardList, LayoutDashboard, ListTodo, Network, Newspaper, Palette, Settings, ShieldCheck,
+  Activity, BarChart3, Briefcase, CalendarCheck2, CalendarSync, ClipboardList, LayoutDashboard, ListTodo, Network, Newspaper, Palette, Settings, ShieldCheck,
   Sunrise, Table2, Tv, UserRound, Users, type LucideIcon,
 } from "lucide-react";
 import type { Role } from "../api/types";
@@ -39,6 +39,7 @@ export const NAV: NavSection[] = [
   {
     id: "mine", title: "My work", items: [
       { to: "/tracker", label: "My pipeline", icon: Briefcase, description: "Your own pipeline, plan and activity", keywords: "tracker prospects deals follow-ups" },
+      { to: "/renewals", label: "Renewals", icon: CalendarSync, description: "AMCs, licences and software coming up for renewal", keywords: "amc contract licence subscription expiry renew upsell" },
     ],
   },
   {

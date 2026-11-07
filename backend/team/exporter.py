@@ -52,6 +52,7 @@ def _safe_title(name, used):
 def build_workbook(year, sheet_ids=None):
     st = TeamSettings.load()
     cfg = services.cfg_of(st)
+    renewal_rev = services.renewal_revenue(cfg)   # renewals won count in the Revenue KPI (SRS FR-RN4)
     today = services.today(st)
     tasks = {t.id: t for t in Task.objects.all()}
     pts = {k: float(t.points) for k, t in tasks.items()}
@@ -75,8 +76,7 @@ def build_workbook(year, sheet_ids=None):
         if s.kind != Sheet.Kind.WORK:
             continue
         days = [calc.Day(e.day, e.slots) for e in s.entries.all()]
-        kp = [{"week_start": k.week_start, "leads": k.leads, "opps": k.opps, "clients": k.clients, "revenue": float(k.revenue), "counts_in": k.counts_in} for k in s.kpis.all()]
-        d = calc.dashboard(s.targets, days, kp, cfg, pts, on)
+        d = calc.dashboard(s.targets, days, services.kpi_rows(s, renewal_rev), cfg, pts, on)
         h, p = calc.totals(days, first, last, cfg, pts)
         for c, v in enumerate([s.name, s.person, s.role.name if s.role else "", h, p, float(s.target_hours), d["avg_week_hours"],
                                float(s.target_points), d["avg_month_points"]], start=1):
@@ -122,15 +122,24 @@ def build_workbook(year, sheet_ids=None):
 
     # ---------- weekly KPI ----------
     kws = wb.create_sheet("KPI_Weekly_Input")
-    _title(kws, "Weekly KPI", "One row per person per week (Saturday to Friday). A week counts in the month that holds most of its days.")
-    _header(kws, 3, ["Employee\n(Sheet)", "Week Start\n(Saturday)", "Week\n#", "Month\n#", "Qualified\nLeads", "Opportunities", "Clients", "Revenue\n(BDT)", "Notes"],
-            [16, 14, 7, 7, 10, 13, 9, 14, 40])
+    _title(kws, "Weekly KPI", "One row per person per week (Saturday to Friday). A week counts in the month that holds most of its days. "
+                              "Renewals (column J) come from the renewal tracker and count on top of Revenue.")
+    _header(kws, 3, ["Employee\n(Sheet)", "Week Start\n(Saturday)", "Week\n#", "Month\n#", "Qualified\nLeads", "Opportunities", "Clients", "Revenue\n(BDT)", "Notes",
+                     "Renewals\n(BDT)"], [16, 14, 7, 7, 10, 13, 9, 14, 40, 14])
+    work = {s.id: s for s in sheets if s.kind == "work"}
+    kpi_from = first - timedelta(days=6)
+    entries = {(k.sheet_id, k.week_start): k for k in KpiEntry.objects.filter(sheet__in=list(work.values()), week_start__range=(kpi_from, last))}
+    renewed = {key: v for key, v in renewal_rev.items() if key[0] in work and kpi_from <= key[1] <= last}
     r = 4
-    for k in KpiEntry.objects.filter(sheet__in=[s for s in sheets if s.kind == "work"], week_start__range=(first - timedelta(days=6), last)).select_related("sheet").order_by("week_start", "sheet__position"):
-        for c, v in enumerate([k.sheet.name, k.week_start, calc.week_no(k.week_start, cfg)[0], calc.month_of_week(k.week_start)[1],
-                               k.leads, k.opps, k.clients, float(k.revenue), k.notes], start=1):
+    # Columns A–I are what the workbook import reads back; a week with only renewals leaves E–I empty, so it's skipped there.
+    for sheet_id, ws0 in sorted(set(entries) | set(renewed), key=lambda x: (x[1], work[x[0]].position, x[0])):
+        k = entries.get((sheet_id, ws0))
+        values = [k.leads, k.opps, k.clients, float(k.revenue), k.notes] if k else [None] * 5
+        for c, v in enumerate([work[sheet_id].name, ws0, calc.week_no(ws0, cfg)[0], calc.month_of_week(ws0)[1], *values,
+                               renewed.get((sheet_id, ws0))], start=1):
             kws.cell(r, c, v).border = GRID
         kws.cell(r, 2).number_format = "DD-MMM-YY"
+        kws.cell(r, 10).number_format = "#,##0"
         r += 1
     kws.freeze_panes = "A4"
 
