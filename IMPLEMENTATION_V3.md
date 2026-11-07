@@ -329,9 +329,47 @@ Each one has a proposed default, so work can start. These come from SRS §12 and
 | 6 | "Output hours" (Q4): does every approved slot count as 1 hour? | Yes, every approved and logged slot counts |
 | 7 | Celebrations (Q12): show client name and value? | Team-only, value hidden |
 | 8 | Brand: keep DSL blue, green and red with IBM Plex? | Yes |
-| 9 | Stack (SRS OQ-9): the SRS suggests FastAPI/NestJS | Keep Django + DRF; it's built, tested and deployed |
+| 9 | Stack (SRS OQ-9): the SRS suggests FastAPI/NestJS | **Decided (2026-11-07): Django REST Framework only, for every backend feature — no other framework** |
 
-## 8. First step
+## 8. SRS Version 2 (§14)
+
+On 2026-11-07 the owner chose to start the SRS V2 features now, before M2–M7, beginning with **Office TV mode**.
+The backend stays Django REST Framework (decision 9).
+
+### V2-A1 Office TV mode (§14.5, FR-TV1–TV3): built
+
+- **Backend:** a new Django app, `display`.
+  - `DisplayScreen` has a display-only token: only its SHA-256 is stored, the link is shown once, and admins can replace it.
+  - `GET /api/display/feed/` is read-only. It's signed in with the `X-Display-Token` header, never a person's login, and rate-limited to 60 a minute.
+  - `/api/display/screens/` lets admins add, change and delete screens; `.../rotate/` makes a new link.
+  - Every change goes to the audit log as `display.*`.
+  - Numbers come from `team.services`, so the TV always matches the dashboard.
+- **Wins:** a new `Task.counts_as_win` flag.
+  - Migration `team/0006` flags "Client Work Order Receiving"; the importer flags new "work order" tasks.
+  - Admins can change which tasks count from the TV-screens page.
+- **Fairness (FR-MO9, NFR-11):** the TV shows team totals, a count of who has logged today (not names) and only the top N leaders (top performers or most improved).
+- **Privacy (SRS Q12 default):** win details and the revenue amount are hidden unless the screen allows them; revenue still shows as a percentage.
+- **Frontend:**
+  - `features/tv/TvDisplay.tsx` is the public `/tv` page, opened with the link `https://<site>/tv#<token>`. The token stays in the #fragment, so it never reaches server logs. The page rotates through its panels, shows a live clock and connection status, celebrates new wins with confetti and a chime, and supports full screen and arrow keys.
+  - `features/tv/TvScreens.tsx` is Admin → TV screens.
+- **Checks:**
+  - 8 new DRF tests; 77 backend tests pass in total.
+  - A browser run against the real API on a throwaway database: the panels showed at 1080p; a win logged while the TV was on was celebrated in about 12 s; a replaced link was refused at once.
+  - axe found no WCAG 2.1 A/AA issues on either new page.
+- **To use it locally:** run `python manage.py migrate` (Render runs it on deploy).
+
+### Next V2 candidates
+
+These come from SRS §14.1, Wave A first. Each needs the item in brackets before it can start:
+
+- AMC and renewal tracker (§14.6) [contract data, or an import from Odoo]
+- Morning huddle and weekly digest (§14.9) [email settings, already present]
+- AI daily briefs (§14.10) [an Anthropic API key; called from DRF]
+- WhatsApp logging bot (§14.3) [a WhatsApp Business provider account, OQ-V2-5]
+- Tender alerts (§14.2) [allowed tender sources, OQ-V2-1]
+- Earnings preview (§14.4) [the incentive scheme, OQ-V2-2]
+
+## 9. First step
 
 Start **M1**: install the libraries, write the tokens, build the primitives and the new shell, then the `/ui` page.
 After that, M2 starts with the Dashboard and Sheets, the two screens the client sees most.

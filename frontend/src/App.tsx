@@ -18,8 +18,11 @@ import TeamPipelines from "./pages/TeamPipelines";
 import TeamSetup from "./pages/TeamSetup";
 import Tracker from "./pages/Tracker";
 
-// Admin-only showcase of every component: loaded on demand so it never weighs on everyone else's download.
+// Loaded on demand so they never weigh on everyone else's download: the admin-only component showcase,
+// and Office TV mode (SRS v0.3 §14.5) — the public TV page and its admin settings.
 const UiKit = lazy(() => import("./pages/UiKit"));
+const TvDisplay = lazy(() => import("./features/tv/TvDisplay"));
+const TvScreens = lazy(() => import("./features/tv/TvScreens"));
 import Waiting from "./pages/Waiting";
 import Welcome from "./pages/Welcome";
 
@@ -58,6 +61,8 @@ export default function App() {
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Home />} />
       <Route path="/waiting" element={<Waiting />} />
+      {/* A TV signs in with its screen link, never with a person's account, so this page sits outside RequireUser. */}
+      <Route path="/tv" element={<Suspense fallback={<BootScreen />}><TvDisplay /></Suspense>} />
       <Route element={<RequireUser />}>
         <Route path="/welcome" element={<Welcome />} />
         <Route element={<RequireProfile><Layout /></RequireProfile>}>
@@ -73,6 +78,7 @@ export default function App() {
             <Route path="/admin/settings" element={<TeamSetup />} />
             <Route path="/admin/activity" element={<ActivityLog />} />
             <Route path="/admin/pipelines" element={<TeamPipelines />} />
+            <Route path="/admin/tv" element={<Suspense fallback={<PageSkeleton />}><TvScreens /></Suspense>} />
             <Route path="/ui" element={<Suspense fallback={<PageSkeleton />}><UiKit /></Suspense>} />
           </Route>
         </Route>

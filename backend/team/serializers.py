@@ -32,7 +32,7 @@ class TeamSettingsSerializer(serializers.ModelSerializer):
 class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
-        fields = ["id", "type", "name", "points", "active", "position"]
+        fields = ["id", "type", "name", "points", "active", "position", "counts_as_win"]
 
 
 class JobRoleSerializer(serializers.ModelSerializer):

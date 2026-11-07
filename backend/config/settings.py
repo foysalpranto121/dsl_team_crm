@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "core",
     "team",
     "tracker",
+    "display",
 ]
 
 MIDDLEWARE = [
@@ -122,7 +123,7 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["accounts.authentication.ApprovedJWTAuthentication"],
     "DEFAULT_PERMISSION_CLASSES": ["accounts.permissions.IsApproved"],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "DEFAULT_THROTTLE_RATES": {"auth": "30/min"},
+    "DEFAULT_THROTTLE_RATES": {"auth": "30/min", "display": "60/min"},   # display: an office TV polls every 20 s
 }
 SPECTACULAR_SETTINGS = {"TITLE": "DSL Business Team Operation System (TOS) API", "VERSION": "1.0.0", "SERVE_INCLUDE_SCHEMA": False}
 

@@ -76,6 +76,7 @@ export interface Task {
   points: string;          // decimal from the API, e.g. "1.00"
   active: boolean;
   position: number;
+  counts_as_win: boolean;  // logging it is a win: shown and celebrated on the office TV
 }
 
 export interface JobRole {

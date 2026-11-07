@@ -1,6 +1,6 @@
 import {
   Activity, BarChart3, Briefcase, CalendarCheck2, ClipboardList, LayoutDashboard, ListTodo, Network, Palette, Settings, ShieldCheck,
-  Table2, UserRound, Users, type LucideIcon,
+  Table2, Tv, UserRound, Users, type LucideIcon,
 } from "lucide-react";
 import type { Role } from "../api/types";
 
@@ -45,6 +45,7 @@ export const NAV: NavSection[] = [
       { to: "/admin/approvals", label: "Approvals", icon: ShieldCheck, badge: "pendingUsers", description: "Approve new people and change access", keywords: "users sign-up" },
       { to: "/admin/settings", label: "Team setup", icon: Settings, description: "Sheets, targets, tasks, job roles and rules", keywords: "settings config" },
       { to: "/admin/pipelines", label: "Team pipelines", icon: Network, description: "Pipelines people have shared with admins" },
+      { to: "/admin/tv", label: "TV screens", icon: Tv, description: "Team progress and wins on the office TV", keywords: "display office screen tv mode wins" },
       { to: "/admin/activity", label: "Activity log", icon: ClipboardList, description: "Every change, who made it and when", keywords: "audit history" },
       { to: "/ui", label: "UI kit", icon: Palette, description: "Every component in both themes", keywords: "design system components" },
     ],

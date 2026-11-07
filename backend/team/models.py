@@ -58,12 +58,18 @@ class Task(models.Model):
     points = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal("1"), validators=[MinValueValidator(0)])
     active = models.BooleanField(default=True, help_text="Inactive tasks disappear from dropdowns but keep counting in history.")
     position = models.PositiveIntegerField(default=0)
+    counts_as_win = models.BooleanField(default=False, help_text="Logging this task is a win: it shows on the office TV and is celebrated.")
 
     class Meta:
         ordering = ["position", "id"]
 
     def __str__(self):
         return self.name
+
+    @staticmethod
+    def looks_like_win(name):
+        """New tasks named like the workbook's "Client Work Order Receiving" count as wins unless an admin says otherwise."""
+        return "work order" in (name or "").lower()
 
 
 def pct():

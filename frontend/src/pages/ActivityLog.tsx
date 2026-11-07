@@ -39,6 +39,10 @@ function describe(i: Item): { what: string; more: string } {
     case "user.update": return { what: `Changed access for ${i.target}`, more: pairs(d) };
     case "announcement.save": return { what: `Posted an announcement: "${i.target}"`, more: "" };
     case "announcement.delete": return { what: `Removed an announcement: "${i.target}"`, more: "" };
+    case "display.create": return { what: `Added TV screen "${i.target}"`, more: "" };
+    case "display.update": return { what: `Changed TV screen "${i.target}"`, more: pairs(d) };
+    case "display.rotate": return { what: `Made a new link for TV screen "${i.target}"`, more: "the old link stopped working" };
+    case "display.delete": return { what: `Deleted TV screen "${i.target}"`, more: "" };
     case "import.workbook": return { what: d.replaced ? "Replaced all team data with an Excel import" : "Imported the Excel workbook", more: `${d.sheets} sheets · ${d.kpi_weeks} KPI weeks` };
     default: return { what: `${i.action} ${i.target}`, more: "" };
   }

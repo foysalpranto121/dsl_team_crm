@@ -88,7 +88,8 @@ def import_workbook(fileobj, actor, dry_run=False, replace=False):
             t = tasks.get(name.lower())
             if t is None:
                 position += 1
-                t = tasks[name.lower()] = Task.objects.create(name=name, type=typ, points=_num(pts, Decimal(1)), position=position)
+                t = tasks[name.lower()] = Task.objects.create(name=name, type=typ, points=_num(pts, Decimal(1)), position=position,
+                                                              counts_as_win=Task.looks_like_win(name))
                 report["tasks"]["created"].append(name)
             elif (t.type, t.points) != (typ or t.type, _num(pts, t.points)):
                 t.type, t.points = typ or t.type, _num(pts, t.points)
