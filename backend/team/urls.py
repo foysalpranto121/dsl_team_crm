@@ -22,11 +22,14 @@ urlpatterns = [
     path("snapshots/", views.SnapshotView.as_view(), name="team-snapshots"),
     path("snapshots/<str:name>/", views.SnapshotFileView.as_view(), name="team-snapshot-file"),
     path("snapshots/<str:name>/restore/", views.SnapshotRestoreView.as_view(), name="team-snapshot-restore"),
-    # Weekly plans: plan the week → an admin approves → log the work (SRS §5.2, §6)
+    # Planning and approval: plan → submit → a supervisor approves → log against it (SRS v0.5 §5.2, §6)
     path("plans/week/", plan_views.PlanWeekView.as_view(), name="team-plan-week"),
     path("plans/action/", plan_views.PlanActionView.as_view(), name="team-plan-action"),
     path("plans/copy/", plan_views.PlanCopyView.as_view(), name="team-plan-copy"),
-    path("plans/queue/", plan_views.PlanQueueView.as_view(), name="team-plan-queue"),
+    path("plans/templates/", plan_views.PlanTemplatesView.as_view(), name="team-plan-templates"),
+    path("plans/templates/<int:pk>/", plan_views.PlanTemplateView.as_view(), name="team-plan-template"),
     path("plans/history/", plan_views.PlanHistoryView.as_view(), name="team-plan-history"),
     path("plans/mine/", plan_views.PlanMineView.as_view(), name="team-plan-mine"),
+    path("board/", plan_views.BoardView.as_view(), name="team-board"),
+    path("board/decide/", plan_views.BoardDecideView.as_view(), name="team-board-decide"),
 ] + router.urls
