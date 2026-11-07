@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "team",
     "tracker",
     "display",
+    "ops",
 ]
 
 MIDDLEWARE = [
@@ -123,7 +124,8 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["accounts.authentication.ApprovedJWTAuthentication"],
     "DEFAULT_PERMISSION_CLASSES": ["accounts.permissions.IsApproved"],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "DEFAULT_THROTTLE_RATES": {"auth": "30/min", "display": "60/min"},   # display: an office TV polls every 20 s
+    # display: an office TV polls every 20 s. cron: the weekly digest schedule.
+    "DEFAULT_THROTTLE_RATES": {"auth": "30/min", "display": "60/min", "cron": "10/min"},
 }
 SPECTACULAR_SETTINGS = {"TITLE": "DSL Business Team Operation System (TOS) API", "VERSION": "1.0.0", "SERVE_INCLUDE_SCHEMA": False}
 
@@ -158,6 +160,12 @@ CSRF_TRUSTED_ORIGINS = [FRONTEND_URL, BACKEND_URL]
 GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID")
 GOOGLE_ALLOWED_DOMAINS = [d.lower() for d in env_list("GOOGLE_ALLOWED_DOMAINS")]
 ADMIN_EMAILS = [e.lower() for e in env_list("ADMIN_EMAILS")]
+
+# Weekly management digest (SRS FR-TM4). A weekly job (e.g. cron-job.org) POSTs /api/ops/digest/run/ with the header
+# X-Cron-Secret: <this value>. Empty = automatic sending is off (admins can still send it from the app).
+DIGEST_CRON_SECRET = env("DIGEST_CRON_SECRET")
+# Extra people who get the digest besides admins and management accounts, comma separated.
+DIGEST_EXTRA_RECIPIENTS = [e.lower() for e in env_list("DIGEST_EXTRA_RECIPIENTS")]
 APPROVAL_LINK_MAX_AGE = 7 * 24 * 3600
 
 # ---------- Email ----------
@@ -174,7 +182,7 @@ elif env("EMAIL_HOST_USER") and env("EMAIL_HOST_PASSWORD"):   # Gmail needs both
     EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
     DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL") or EMAIL_HOST_USER
 else:
-    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"  # prints emails in the terminal
+    EMAIL_BACKEND = "core.mail.ConsoleEmailBackend"  # prints emails in the terminal (safe for any terminal code page)
     DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "DSL Business Team Operation System (TOS) <no-reply@localhost>")
 
 # ---------- Uploads ----------

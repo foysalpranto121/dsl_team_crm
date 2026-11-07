@@ -1,6 +1,6 @@
 import {
-  Activity, BarChart3, Briefcase, CalendarCheck2, ClipboardList, LayoutDashboard, ListTodo, Network, Palette, Settings, ShieldCheck,
-  Table2, Tv, UserRound, Users, type LucideIcon,
+  Activity, BarChart3, Briefcase, CalendarCheck2, ClipboardList, LayoutDashboard, ListTodo, Network, Newspaper, Palette, Settings, ShieldCheck,
+  Sunrise, Table2, Tv, UserRound, Users, type LucideIcon,
 } from "lucide-react";
 import type { Role } from "../api/types";
 
@@ -29,6 +29,7 @@ export const NAV: NavSection[] = [
   {
     id: "team", title: "Team", items: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Team hours, points and results at a glance", keywords: "home overview" },
+      { to: "/huddle", label: "Morning huddle", icon: Sunrise, description: "Yesterday, today's plan, what needs attention, one focus", keywords: "meeting standup daily focus" },
       { to: "/sheets", label: "Sheets", icon: Table2, description: "The hour-by-hour work log", keywords: "log hours timesheet today fill" },
       { to: "/kpi", label: "Weekly KPI", icon: CalendarCheck2, description: "Leads, opportunities, clients and revenue per week", keywords: "results" },
       { to: "/performance", label: "Performance", icon: BarChart3, description: "Monthly, quarterly and yearly scores", keywords: "score composite" },
@@ -46,6 +47,7 @@ export const NAV: NavSection[] = [
       { to: "/admin/settings", label: "Team setup", icon: Settings, description: "Sheets, targets, tasks, job roles and rules", keywords: "settings config" },
       { to: "/admin/pipelines", label: "Team pipelines", icon: Network, description: "Pipelines people have shared with admins" },
       { to: "/admin/tv", label: "TV screens", icon: Tv, description: "Team progress and wins on the office TV", keywords: "display office screen tv mode wins" },
+      { to: "/admin/digest", label: "Weekly digest", icon: Newspaper, description: "The weekly email for admins and management", keywords: "email report management summary" },
       { to: "/admin/activity", label: "Activity log", icon: ClipboardList, description: "Every change, who made it and when", keywords: "audit history" },
       { to: "/ui", label: "UI kit", icon: Palette, description: "Every component in both themes", keywords: "design system components" },
     ],

@@ -2,6 +2,7 @@
 from datetime import date, timedelta
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from accounts.models import User
@@ -205,6 +206,29 @@ def delete_team_data():
     counts = {"sheets": Sheet.objects.count(), "days": SheetEntry.objects.count(), "kpi_weeks": KpiEntry.objects.count()}
     Sheet.objects.all().delete()          # days and KPIs go with their sheet
     return counts
+
+
+def wins_between(a, b, details=True):
+    """Wins logged from day a to day b: a task that counts as a win (e.g. Client Work Order Receiving) in someone's work log.
+    Newest first; one win per task per day, however many hour slots it took. Used by the office TV and the morning huddle.
+    Returns None when no task counts as a win yet."""
+    from accounts.services import photo_of
+    names = dict(Task.objects.filter(counts_as_win=True).values_list("id", "name"))
+    if not names:
+        return None
+    match = Q()
+    for task_id in names:
+        match |= Q(slots__contains=[task_id])
+    entries = (SheetEntry.objects.filter(match, day__range=(a, b), sheet__kind=Sheet.Kind.WORK, sheet__archived=False)
+               .select_related("sheet__owner__profile").order_by("-day", "-updated_at"))
+    out = []
+    for e in entries:
+        s = e.sheet
+        for task_id in dict.fromkeys(x for x in e.slots if x in names):
+            out.append({"id": f"{e.pk}-{task_id}", "day": e.day, "what": names[task_id], "owner_id": s.owner_id,
+                        "person": s.person or (s.owner.name if s.owner else s.name), "photo": photo_of(s.owner),
+                        "details": (e.remarks.strip()[:160] or None) if details else None})
+    return out
 
 
 def missing_results(on, owner_id=None):

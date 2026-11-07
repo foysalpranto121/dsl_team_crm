@@ -14,6 +14,16 @@ log = logging.getLogger(__name__)
 APPROVAL_SALT = "accounts.approval"
 
 
+def photo_of(user):
+    """A person's photo address: their uploaded photo, else their Google picture, else None (show initials)."""
+    if user is None:
+        return None
+    profile = getattr(user, "profile", None)   # a missing profile raises an AttributeError subclass, so getattr's default applies
+    if profile is not None and profile.photo:
+        return profile.photo.url
+    return user.google_picture or None
+
+
 class SignInError(Exception):
     pass
 

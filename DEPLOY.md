@@ -103,6 +103,19 @@ A free Render server sleeps after 15 minutes without visitors; the next visit th
 
 This address never touches the database, so Neon still sleeps when nobody is working (that keeps it inside its free hours).
 
+## 8. Send the weekly digest automatically (optional)
+
+Admins can always send the weekly management digest from **Admin → Weekly digest**. To have it go out every week by itself:
+
+1. On Render → the API service → **Environment**, add `DIGEST_CRON_SECRET` = a long random value (for example from a password manager) → Save.
+2. On **cron-job.org** → **Create cronjob**:
+   - URL `https://dsl-tos-api.onrender.com/api/ops/digest/run/`, schedule **every Saturday at 9:00** (time zone Asia/Dhaka).
+   - **Advanced**: request method **POST**, and a header `X-Cron-Secret` with the same value as above.
+3. Save. Each run sends last week's digest once; extra runs do nothing. Admin → Weekly digest then shows "Turned on".
+
+The digest goes to every approved admin and management (viewer) account. To add other people, set `DIGEST_EXTRA_RECIPIENTS`
+(comma separated) on Render. It needs email to work (step 6).
+
 ---
 
 ## Checklist

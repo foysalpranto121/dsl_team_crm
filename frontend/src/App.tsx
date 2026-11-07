@@ -23,6 +23,9 @@ import Tracker from "./pages/Tracker";
 const UiKit = lazy(() => import("./pages/UiKit"));
 const TvDisplay = lazy(() => import("./features/tv/TvDisplay"));
 const TvScreens = lazy(() => import("./features/tv/TvScreens"));
+// Team and management tools (SRS v0.3 §14.9): morning huddle and weekly digest.
+const Huddle = lazy(() => import("./features/huddle/Huddle"));
+const WeeklyDigest = lazy(() => import("./features/digest/WeeklyDigest"));
 import Waiting from "./pages/Waiting";
 import Welcome from "./pages/Welcome";
 
@@ -67,6 +70,7 @@ export default function App() {
         <Route path="/welcome" element={<Welcome />} />
         <Route element={<RequireProfile><Layout /></RequireProfile>}>
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/huddle" element={<Suspense fallback={<PageSkeleton />}><Huddle /></Suspense>} />
           <Route path="/sheets" element={<Sheets />} />
           <Route path="/kpi" element={<KpiPage />} />
           <Route path="/performance" element={<Performance />} />
@@ -79,6 +83,7 @@ export default function App() {
             <Route path="/admin/activity" element={<ActivityLog />} />
             <Route path="/admin/pipelines" element={<TeamPipelines />} />
             <Route path="/admin/tv" element={<Suspense fallback={<PageSkeleton />}><TvScreens /></Suspense>} />
+            <Route path="/admin/digest" element={<Suspense fallback={<PageSkeleton />}><WeeklyDigest /></Suspense>} />
             <Route path="/ui" element={<Suspense fallback={<PageSkeleton />}><UiKit /></Suspense>} />
           </Route>
         </Route>

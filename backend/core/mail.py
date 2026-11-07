@@ -9,9 +9,33 @@ from email.utils import parseaddr
 import requests
 from django.conf import settings
 from django.core.mail.backends.base import BaseEmailBackend
+from django.core.mail.backends.console import EmailBackend as DjangoConsoleBackend
 
 log = logging.getLogger(__name__)
 URL = "https://api.brevo.com/v3/smtp/email"
+
+
+class _SafeStream:
+    """Writes text the terminal can't encode with a replacement mark instead of raising."""
+
+    def __init__(self, stream):
+        self._stream = stream
+
+    def write(self, text):
+        enc = getattr(self._stream, "encoding", None) or "utf-8"
+        return self._stream.write(text.encode(enc, errors="replace").decode(enc))
+
+    def flush(self):
+        self._stream.flush()
+
+
+class ConsoleEmailBackend(DjangoConsoleBackend):
+    """Development, when no email service is set up: emails print in the terminal. A character the terminal can't show
+    (e.g. "→" on a Windows code page) is replaced, instead of failing the send."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.stream = _SafeStream(self.stream)
 
 
 class BrevoEmailBackend(BaseEmailBackend):

@@ -37,6 +37,18 @@ class DeployTests(TestCase):
             send_mail("Hello", "Body", "team@example.com", ["a@example.com"])
 
 
+class ConsoleEmailTests(TestCase):
+    def test_a_terminal_that_cannot_show_a_character_never_fails_an_email(self):
+        import io
+
+        from django.core.mail import EmailMessage
+
+        from .mail import ConsoleEmailBackend
+        out = io.TextIOWrapper(io.BytesIO(), encoding="cp1252")   # a Windows terminal code page
+        sent = ConsoleEmailBackend(stream=out).send_messages([EmailMessage("Week 44 · digest", "Leads → opportunities → clients", "a@x.com", ["b@x.com"])])
+        self.assertEqual(sent, 1)
+
+
 class ExtrasTests(TestCase):
     @classmethod
     def setUpTestData(cls):

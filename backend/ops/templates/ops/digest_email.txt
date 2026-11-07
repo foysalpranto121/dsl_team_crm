@@ -1,0 +1,25 @@
+{% load ops_format %}{% autoescape off %}{{ team }} · weekly digest
+Week {{ week.no }} · {{ week.start|date:"j M" }} – {{ week.end|date:"j M Y" }}
+
+THAT WEEK
+Hours: {{ week_totals.hours|num }} of {{ week_totals.target|num }}
+Results: {{ week_totals.leads|num }} leads, {{ week_totals.opps|num }} opportunities, {{ week_totals.clients|num }} clients, {{ week_totals.revenue|bdt }} revenue
+
+{{ month.name|upper }} SO FAR ({{ month.elapsed_wd }} of {{ month.total_wd }} working days)
+{% for m in month_metrics %}- {{ m.label }}: {% if m.key == "revenue" %}{{ m.actual|bdt }} of {{ m.target|bdt }}{% else %}{{ m.actual|num }} of {{ m.target|num }}{% endif %} ({{ m.ratio|pct }})
+{% endfor %}If the pace so far continues: {{ forecast.points.projected|num }} points ({{ forecast.points.ratio|pct }} of target) and {{ forecast.revenue.projected|bdt }} revenue ({{ forecast.revenue.ratio|pct }}).
+Funnel: {{ funnel.leads|num }} leads -> {{ funnel.opps|num }} opportunities ({{ funnel.lead_to_opp|pct }}) -> {{ funnel.clients|num }} clients ({{ funnel.opp_to_client|pct }})
+
+WINS THAT WEEK
+{% for w in wins %}- {{ w.person }}: {{ w.what }} ({{ w.day|date:"D j M" }}){% if w.details %} — {{ w.details }}{% endif %}
+{% empty %}No wins logged that week.
+{% endfor %}
+SCORECARDS
+{% for c in scorecards %}- {{ c.person }}: {{ c.week_hours|num }} of {{ c.week_target|num }} h that week, {{ c.month_points|num }} of {{ c.month_target|num }} points this month, score {{ c.score|pct }}
+{% endfor %}
+NEEDS ATTENTION
+{% for r in risks %}- {{ r.person }}: {{ r.why|join:"; " }}
+{% empty %}Nothing — everyone logged their week and entered their results.
+{% endfor %}
+Open the dashboard: {{ link }}
+{% endautoescape %}

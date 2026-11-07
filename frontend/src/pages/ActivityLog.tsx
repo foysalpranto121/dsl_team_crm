@@ -43,6 +43,8 @@ function describe(i: Item): { what: string; more: string } {
     case "display.update": return { what: `Changed TV screen "${i.target}"`, more: pairs(d) };
     case "display.rotate": return { what: `Made a new link for TV screen "${i.target}"`, more: "the old link stopped working" };
     case "display.delete": return { what: `Deleted TV screen "${i.target}"`, more: "" };
+    case "huddle.focus": return { what: "Posted today's focus from the morning huddle", more: i.target };
+    case "digest.send": return { what: `Sent the weekly digest for ${i.target}`, more: `${d.recipients ?? "?"} people${d.automatic ? " · by the weekly schedule" : ""}` };
     case "import.workbook": return { what: d.replaced ? "Replaced all team data with an Excel import" : "Imported the Excel workbook", more: `${d.sheets} sheets · ${d.kpi_weeks} KPI weeks` };
     default: return { what: `${i.action} ${i.target}`, more: "" };
   }

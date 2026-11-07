@@ -4,27 +4,18 @@ shown — never a list of who is behind or who hasn't logged."""
 
 from datetime import timedelta
 
-from django.db.models import Q
 from django.utils import timezone
 
 from accounts.models import User
+from accounts.services import photo_of
 from team import calc
 from team import services as team
-from team.models import Sheet, SheetEntry, Task, TeamSettings
+from team.models import TeamSettings
 
 from .models import DisplayScreen
 
 WIN_DAYS = 30   # wins from the last 30 days
 MAX_WINS = 8
-
-
-def photo_of(user):
-    if user is None:
-        return None
-    profile = getattr(user, "profile", None)   # a missing profile raises an AttributeError subclass, so getattr's default applies
-    if profile is not None and profile.photo:
-        return profile.photo.url
-    return user.google_picture or None
 
 
 def _total(rows, key):
@@ -62,27 +53,12 @@ def progress(rows, cfg, on, show_values):
 
 
 def wins(on, show_values):
-    """Days in the last 30 where someone logged a task that counts as a win (e.g. Client Work Order Receiving),
-    newest first. One win per task per day, however many hour slots it took."""
-    names = dict(Task.objects.filter(counts_as_win=True).values_list("id", "name"))
-    if not names:
+    """Wins from the last 30 days, newest first (team.services.wins_between). Details only if the screen may show them."""
+    found = team.wins_between(on - timedelta(days=WIN_DAYS - 1), on, details=show_values)
+    if found is None:
         return {"configured": False, "items": []}
-    match = Q()
-    for task_id in names:
-        match |= Q(slots__contains=[task_id])
-    entries = (SheetEntry.objects
-               .filter(match, day__range=(on - timedelta(days=WIN_DAYS - 1), on), sheet__kind=Sheet.Kind.WORK, sheet__archived=False)
-               .select_related("sheet__owner__profile").order_by("-day", "-updated_at")[:MAX_WINS * 2])
-    items = []
-    for e in entries:
-        s = e.sheet
-        for task_id in dict.fromkeys(x for x in e.slots if x in names):
-            items.append({
-                "id": f"{e.pk}-{task_id}", "day": e.day, "today": e.day == on, "what": names[task_id],
-                "person": s.person or (s.owner.name if s.owner else s.name), "photo": photo_of(s.owner),
-                "details": (e.remarks.strip()[:160] or None) if show_values else None,
-            })
-    return {"configured": True, "items": items[:MAX_WINS]}
+    keep = ("id", "day", "what", "person", "photo", "details")
+    return {"configured": True, "items": [{**{k: w[k] for k in keep}, "today": w["day"] == on} for w in found[:MAX_WINS]]}
 
 
 def leaders(rows, perf, on, mode, count, people):

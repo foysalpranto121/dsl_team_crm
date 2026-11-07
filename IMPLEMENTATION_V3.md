@@ -358,12 +358,38 @@ The backend stays Django REST Framework (decision 9).
   - axe found no WCAG 2.1 A/AA issues on either new page.
 - **To use it locally:** run `python manage.py migrate` (Render runs it on deploy).
 
+### V2-A2 Morning huddle and weekly management digest (§14.9, FR-TM1 and FR-TM4): built
+
+- **Backend:** a new Django app, `ops`.
+  - `GET /api/ops/huddle/` covers:
+    - yesterday (the last working day): team hours against the daily target, points, how many logged, a shout-out for the day's top contributor;
+    - wins since yesterday;
+    - today's plan coverage (plan sheets, split by kind of work);
+    - what needs attention: missing weekly results, sign-ups waiting, and stuck deals from pipelines shared with admins only;
+    - one focus for today, worked out from the month metric furthest behind pace.
+  - `POST /api/ops/huddle/focus/` (admins) posts the focus as today's pinned announcement.
+  - `GET /api/ops/digest/` (admins and management) returns one finished week as the exact email: scorecards, the funnel, a forecast against target, wins and risks.
+  - `POST /api/ops/digest/send/` (admins) sends once per week, or again on request.
+  - `POST /api/ops/digest/run/` is for a weekly cron-job.org job. It needs the `X-Cron-Secret` header (`DIGEST_CRON_SECRET`), is idempotent and is rate-limited.
+  - `manage.py send_weekly_digest` does the same from the command line.
+  - The new table `ops_digestlog` records each send.
+- **Shared code:** `team.services.wins_between()` and `accounts.services.photo_of()` now serve both the TV and the huddle, so there's one definition of a win.
+- **Fairness (NFR-11):** the huddle names people only for good news. Members see only their own missing results, and stuck deals and approvals go to admins only. The digest, which names people, goes only to admins and management.
+- **Frontend:**
+  - `/huddle` is for everyone, with a full-screen presenter mode, a 10-minute timer and arrow keys.
+  - `/admin/digest` shows the email preview, the send history, recipients and schedule setup.
+- **Also fixed:** in local development, an email containing "→" crashed the Windows terminal's printout. The new `core.mail.ConsoleEmailBackend` now substitutes the characters the terminal can't show.
+- **Checks:**
+  - 9 new tests plus 1 for the email fix; 87 backend tests pass.
+  - A browser run against the real API on a throwaway database: the focus was posted and appeared on the dashboard; the digest was sent; the schedule refused wrong secrets and didn't send a week twice; the member view was checked.
+  - axe found no WCAG 2.1 A/AA issues on either page.
+- **Setup:** see DEPLOY.md step 8 for the weekly schedule.
+
 ### Next V2 candidates
 
 These come from SRS §14.1, Wave A first. Each needs the item in brackets before it can start:
 
 - AMC and renewal tracker (§14.6) [contract data, or an import from Odoo]
-- Morning huddle and weekly digest (§14.9) [email settings, already present]
 - AI daily briefs (§14.10) [an Anthropic API key; called from DRF]
 - WhatsApp logging bot (§14.3) [a WhatsApp Business provider account, OQ-V2-5]
 - Tender alerts (§14.2) [allowed tender sources, OQ-V2-1]
