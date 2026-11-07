@@ -9,8 +9,8 @@ import { Alert, Badge, Button, Card, EmptyState, PageHeader, Select, Spinner } f
 
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—");
 const ROLES: { value: Role; label: string; hint: string }[] = [
-  { value: "member", label: "Member", hint: "Fills in their own sheet" },
-  { value: "admin", label: "Admin", hint: "Manages people, sheets and targets" },
+  { value: "member", label: "Member", hint: "Fills in their own daily log" },
+  { value: "admin", label: "Admin", hint: "Manages people, daily logs and targets" },
   { value: "viewer", label: "Viewer", hint: "Can only look" },
 ];
 
@@ -25,7 +25,7 @@ function Request({ u, onApproved }: { u: AdminUser; onApproved: (msg: string) =>
       const who = u.name || u.email;
       if (action === "approve") onApproved(data.linked_sheets?.length
         ? `${who} is approved and linked to: ${data.linked_sheets.join(", ")}.`
-        : `${who} is approved. No sheet carries the name "${u.name}" — link one in Team setup → Edit → Filled in by.`);
+        : `${who} is approved. No daily log carries the name "${u.name}" — link one in Team setup → Edit → Filled in by.`);
     },
   });
   return (

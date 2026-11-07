@@ -8,7 +8,7 @@ import { BrandName, Logo, ThemeToggle } from "../components/Brand";
 import { Alert, Spinner } from "../components/ui";
 
 const features: { icon: ReactNode; title: string; text: string }[] = [
-  { icon: <Table2 />, title: "Daily work sheet", text: "An hour-by-hour log with the tasks of your job role. Hours and points add up as you go." },
+  { icon: <Table2 />, title: "Daily log", text: "An hour-by-hour log with the tasks of your job role. Hours and points add up as you go." },
   { icon: <Target />, title: "Personal targets", text: "Weekly hours, monthly points, leads, opportunities, clients and revenue, set for each person." },
   { icon: <BarChart3 />, title: "Live team dashboard", text: "See who is on pace and who needs help, with a role-weighted score for every month." },
   { icon: <LockKeyhole />, title: "Locked at midnight", text: "Each day locks at 12 at night, Dhaka time. Admin corrections are recorded with who and when." },

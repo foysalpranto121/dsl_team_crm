@@ -30,7 +30,7 @@ function SheetEditor({ sheet, people, roles, onDone }: { sheet: Sheet | null; pe
   const submit = (e: FormEvent) => { e.preventDefault(); save.mutate(); };
   return (
     <form onSubmit={submit} className="grid gap-4 border-t border-slate-200 bg-slate-50/60 p-5 sm:grid-cols-2 lg:grid-cols-4 dark:border-white/10 dark:bg-white/[0.02]">
-      <Field label="Sheet name *" hint="Shown on the sheet tabs"><Input value={f.name} onChange={(e) => set("name", e.target.value)} required maxLength={80} /></Field>
+      <Field label="Name *" hint="Shown in the Daily log and on dashboards"><Input value={f.name} onChange={(e) => set("name", e.target.value)} required maxLength={80} /></Field>
       <Field label="Kind" hint="Plans don't count in scores">
         <Select value={f.kind} onChange={(e) => set("kind", e.target.value as SheetForm["kind"])}><option value="work">Work log</option><option value="plan">Plan</option></Select>
       </Field>
@@ -54,7 +54,7 @@ function SheetEditor({ sheet, people, roles, onDone }: { sheet: Sheet | null; pe
         <Field key={k} label={label}><Input type="number" min="0" step={step} value={f[k]} onChange={(e) => set(k, e.target.value)} required className="num" /></Field>
       ))}
       <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
-        <Button type="submit" busy={save.isPending}>{sheet ? "Save sheet" : "Create sheet"}</Button>
+        <Button type="submit" busy={save.isPending}>{sheet ? "Save daily log" : "Create daily log"}</Button>
         <Button type="button" variant="ghost" onClick={onDone}>Cancel</Button>
         {save.error && <div className="w-full"><Alert>{errorText(save.error)}</Alert></div>}
       </div>
@@ -91,7 +91,7 @@ function RulesCard({ st }: { st: TeamSettings }) {
         <label className="flex items-start gap-2 text-sm sm:col-span-2"><input type="checkbox" className="mt-1" checked={f.lock_days} onChange={(e) => setF({ ...f, lock_days: e.target.checked })} />
           <span><b>Lock each day at midnight.</b> Members can only fill in today (plans: today and later). Admins can always correct.</span></label>
         <label className="flex items-start gap-2 text-sm sm:col-span-2"><input type="checkbox" className="mt-1" checked={f.count_weekend} onChange={(e) => setF({ ...f, count_weekend: e.target.checked })} />
-          <span><b>Count hours logged on weekend days</b> in weekly and monthly totals (the original sheet counted them).</span></label>
+          <span><b>Count hours logged on weekend days</b> in weekly and monthly totals (the original Excel workbook counted them).</span></label>
         <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
           <Button type="submit" busy={save.isPending}>Save rules</Button>
           {save.isSuccess && <span className="text-sm text-leaf-600" role="status">Saved</span>}
@@ -124,11 +124,11 @@ function BackupsCard({ onRestored }: { onRestored: () => void }) {
     <Card className="mb-6 overflow-hidden">
       <div className="flex flex-wrap items-start justify-between gap-3 px-5 pt-5">
         <div><h2 className="text-base font-bold">Backups</h2>
-          <p className="max-w-3xl text-xs text-slate-500">A copy of all sheets, days and weekly results is saved automatically before a sheet is deleted, all team data is deleted, or a workbook replaces the data. The newest 30 are kept.</p></div>
+          <p className="max-w-3xl text-xs text-slate-500">A copy of all daily logs, days and weekly results is saved automatically before a daily log is deleted, all team data is deleted, or a workbook replaces the data. The newest 30 are kept.</p></div>
         <Button variant="secondary" onClick={() => take.mutate()} busy={take.isPending}><Plus className="size-4" /> Back up now</Button>
       </div>
       {problem && <div className="px-5 pt-3"><Alert>{problem}</Alert></div>}
-      {backups.data?.length === 0 && <p className="px-5 py-5 text-sm text-slate-500">No backups yet. One is saved the next time you delete a sheet, delete all team data, or replace the data from a workbook.</p>}
+      {backups.data?.length === 0 && <p className="px-5 py-5 text-sm text-slate-500">No backups yet. One is saved the next time you delete a daily log, delete all team data, or replace the data from a workbook.</p>}
       {!!backups.data?.length && (
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[720px] text-sm">
@@ -140,7 +140,7 @@ function BackupsCard({ onRestored }: { onRestored: () => void }) {
                 <tr key={b.name} className="border-b border-slate-100 last:border-0 dark:border-white/5">
                   <td className="whitespace-nowrap px-5 py-3">{new Date(b.created).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}</td>
                   <td className="px-5 py-3">{b.reason}</td>
-                  <td className="num px-5 py-3">{b.sheets} sheets · {b.days} days · {b.kpi_weeks} weeks</td>
+                  <td className="num px-5 py-3">{b.sheets} daily logs · {b.days} days · {b.kpi_weeks} weeks</td>
                   <td className="px-5 py-3 text-right whitespace-nowrap">
                     {restoring === b.name
                       ? <span className="inline-flex flex-wrap items-center justify-end gap-2 text-xs">Type RESTORE to replace all team data with this backup:
@@ -187,8 +187,8 @@ export default function TeamSetup() {
 
   return (
     <>
-      <PageHeader title="Team setup" subtitle="Sheets, targets and team rules. Only admins see this page."
-        actions={<Button onClick={() => setEditing("new")}><Plus className="size-4" /> New sheet</Button>} />
+      <PageHeader title="Team setup" subtitle="Daily logs, targets and team rules. Only admins see this page."
+        actions={<Button onClick={() => setEditing("new")}><Plus className="size-4" /> New daily log</Button>} />
 
       {!!warnings.data?.length && (
         <div className="mb-6"><Alert tone="amber">
@@ -200,13 +200,13 @@ export default function TeamSetup() {
       {sheets.data!.length === 0 && <div className="mb-6"><ImportWorkbook highlight /></div>}
 
       <Card className="mb-6 overflow-hidden">
-        <div className="px-5 pt-5"><h2 className="text-base font-bold">Sheets</h2>
-          <p className="text-xs text-slate-500">One work log per person. Add a plan sheet if someone plans their week ahead.</p></div>
+        <div className="px-5 pt-5"><h2 className="text-base font-bold">Daily logs</h2>
+          <p className="text-xs text-slate-500">One work log per person. Add a plan if someone plans their week ahead.</p></div>
         {editing === "new" && <div className="mt-4"><SheetEditor sheet={null} people={people.data!} roles={roles.data!} onDone={() => setEditing(null)} /></div>}
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[820px] text-sm">
             <thead><tr className="border-y border-slate-200 bg-slate-50 text-left text-[11px] uppercase tracking-wider text-slate-500 dark:border-white/10 dark:bg-white/5">
-              {["Sheet", "Filled in by", "Job role", "Hours / week", "Points / month", "Leads", "Revenue", ""].map((h) => <th key={h} className="px-5 py-2.5 font-semibold">{h}</th>)}
+              {["Daily log", "Filled in by", "Job role", "Hours / week", "Points / month", "Leads", "Revenue", ""].map((h) => <th key={h} className="px-5 py-2.5 font-semibold">{h}</th>)}
             </tr></thead>
             <tbody>
               {sheets.data!.length === 0 && editing !== "new" && <tr><td colSpan={8} className="px-5 py-8 text-center text-slate-500">No sheets yet. Press <b>New sheet</b> to create the first one.</td></tr>}
@@ -222,13 +222,13 @@ export default function TeamSetup() {
                   <td className="num px-5 py-3">{s.kind === "work" ? (+s.target_revenue).toLocaleString("en-GB") : "—"}</td>
                   <td className="px-5 py-3 text-right whitespace-nowrap">
                     <Button variant="ghost" className="py-1.5" onClick={() => setEditing(editing === s.id ? null : s.id)}><Pencil className="size-4" /> Edit</Button>
-                    <Button variant="ghost" className="py-1.5" onClick={() => archive.mutate(s)} title={s.archived ? "Bring back" : "Hide from the sheet list; data is kept"}>
+                    <Button variant="ghost" className="py-1.5" onClick={() => archive.mutate(s)} title={s.archived ? "Bring back" : "Hide from the list; data is kept"}>
                       <Archive className="size-4" /> {s.archived ? "Restore" : "Archive"}</Button>
                     {confirmDel === s.id
                       ? <span className="ml-1 inline-flex items-center gap-1 text-xs">Delete with all its days? A backup is saved first.
                           <Button variant="danger" className="py-1 text-xs" onClick={() => del.mutate(s.id)} busy={del.isPending}>Delete</Button>
                           <Button variant="ghost" className="py-1 text-xs" onClick={() => setConfirmDel(null)}>Keep</Button></span>
-                      : <Button variant="ghost" className="py-1.5 text-accent-600" onClick={() => setConfirmDel(s.id)} title="Delete this sheet and all its days and KPIs"><Trash2 className="size-4" /> Delete</Button>}
+                      : <Button variant="ghost" className="py-1.5 text-accent-600" onClick={() => setConfirmDel(s.id)} title="Delete this daily log and all its days and KPIs"><Trash2 className="size-4" /> Delete</Button>}
                   </td>
                 </tr>,
                 editing === s.id ? <tr key={`e-${s.id}`}><td colSpan={8} className="p-0"><SheetEditor sheet={s} people={people.data!} roles={roles.data!} onDone={() => setEditing(null)} /></td></tr> : null,
@@ -255,7 +255,7 @@ export default function TeamSetup() {
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <Input value={resetText} onChange={(e) => setResetText(e.target.value)} placeholder='Type DELETE to confirm' className="w-56" aria-label="Type DELETE to confirm" />
           <Button variant="danger" disabled={resetText !== "DELETE"} busy={reset.isPending} onClick={() => reset.mutate()}><Trash2 className="size-4" /> Delete all team data</Button>
-          {reset.data && <Alert tone="green">Deleted {reset.data.sheets} sheets, {reset.data.days} days and {reset.data.kpi_weeks} KPI weeks. Backup saved: {reset.data.backup}.</Alert>}
+          {reset.data && <Alert tone="green">Deleted {reset.data.sheets} daily logs, {reset.data.days} days and {reset.data.kpi_weeks} KPI weeks. Backup saved: {reset.data.backup}.</Alert>}
           {(reset.error || del.error) && <Alert>{errorText(reset.error || del.error)}</Alert>}
         </div>
       </Card>

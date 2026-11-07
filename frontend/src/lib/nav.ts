@@ -1,6 +1,6 @@
 import {
-  Activity, BarChart3, Briefcase, CalendarCheck2, CalendarSync, ClipboardList, LayoutDashboard, ListTodo, Network, Newspaper, Palette, Settings, ShieldCheck,
-  Sunrise, Table2, Tv, UserRound, Users, type LucideIcon,
+  Activity, BarChart3, Briefcase, CalendarCheck2, CalendarSync, ClipboardList, LayoutDashboard, ListTodo, Network, Newspaper, NotebookPen, Settings,
+  ShieldCheck, Sunrise, Tv, UserRound, Users, type LucideIcon,
 } from "lucide-react";
 import type { Role } from "../api/types";
 
@@ -30,7 +30,7 @@ export const NAV: NavSection[] = [
     id: "team", title: "Team", items: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Team hours, points and results at a glance", keywords: "home overview" },
       { to: "/huddle", label: "Morning huddle", icon: Sunrise, description: "Yesterday, today's plan, what needs attention, one focus", keywords: "meeting standup daily focus" },
-      { to: "/sheets", label: "Sheets", icon: Table2, description: "The hour-by-hour work log", keywords: "log hours timesheet today fill" },
+      { to: "/log", label: "Daily log", icon: NotebookPen, description: "What you worked on, hour by hour, and your plan", keywords: "sheets sheet log hours timesheet today fill plan" },
       { to: "/kpi", label: "Weekly KPI", icon: CalendarCheck2, description: "Leads, opportunities, clients and revenue per week", keywords: "results" },
       { to: "/performance", label: "Performance", icon: BarChart3, description: "Monthly, quarterly and yearly scores", keywords: "score composite" },
       { to: "/team", label: "People", icon: Users, description: "Who's on the team", keywords: "directory members" },
@@ -50,7 +50,6 @@ export const NAV: NavSection[] = [
       { to: "/admin/tv", label: "TV screens", icon: Tv, description: "Team progress and wins on the office TV", keywords: "display office screen tv mode wins" },
       { to: "/admin/digest", label: "Weekly digest", icon: Newspaper, description: "The weekly email for admins and management", keywords: "email report management summary" },
       { to: "/admin/activity", label: "Activity log", icon: ClipboardList, description: "Every change, who made it and when", keywords: "audit history" },
-      { to: "/ui", label: "UI kit", icon: Palette, description: "Every component in both themes", keywords: "design system components" },
     ],
   },
 ];
@@ -71,7 +70,7 @@ export interface QuickAction {
 
 /** The global "New" menu (SRS FR-Q2). Each opens the exact screen for the job. */
 export const QUICK_ACTIONS: QuickAction[] = [
-  { id: "log", label: "Fill in today's hours", description: "Your sheet for today", to: "/sheets", icon: Table2, roles: ["admin", "member"] },
+  { id: "log", label: "Fill in today's hours", description: "Your daily log for today", to: "/log", icon: NotebookPen, roles: ["admin", "member"] },
   { id: "plan", label: "Today's plan", description: "Tick off your daily plan", to: "/tracker?tab=plan", icon: ListTodo },
   { id: "activity", label: "Log an activity", description: "Calls, emails, meetings…", to: "/tracker?tab=activity", icon: Activity },
   { id: "deal", label: "Update my pipeline", description: "Add a prospect or move a deal", to: "/tracker?tab=pipeline", icon: Briefcase },

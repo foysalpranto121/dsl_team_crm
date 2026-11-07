@@ -13,14 +13,21 @@ import Home from "./pages/Home";
 import KpiPage from "./pages/Kpi";
 import People from "./pages/People";
 import Performance from "./pages/Performance";
-import Sheets from "./pages/Sheets";
 import TeamPipelines from "./pages/TeamPipelines";
 import TeamSetup from "./pages/TeamSetup";
 import Tracker from "./pages/Tracker";
 
 // Loaded on demand so they never weigh on everyone else's download: the admin-only component showcase,
 // and Office TV mode (SRS v0.3 §14.5) — the public TV page and its admin settings.
-const UiKit = lazy(() => import("./pages/UiKit"));
+// The component showcase is a developer tool: only in `npm run dev`, never in the built site.
+const UiKit = import.meta.env.DEV ? lazy(() => import("./pages/UiKit")) : null;
+const DailyLog = lazy(() => import("./features/log/DailyLog"));
+
+/** The page used to be called Sheets; old links and bookmarks still work. */
+function ToDailyLog() {
+  const { search } = useLocation();
+  return <Navigate to={`/log${search}`} replace />;
+}
 const TvDisplay = lazy(() => import("./features/tv/TvDisplay"));
 const TvScreens = lazy(() => import("./features/tv/TvScreens"));
 // Team and management tools (SRS v0.3 §14.9): morning huddle and weekly digest.
@@ -73,7 +80,8 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/huddle" element={<Suspense fallback={<PageSkeleton />}><Huddle /></Suspense>} />
           <Route path="/renewals" element={<Suspense fallback={<PageSkeleton />}><Renewals /></Suspense>} />
-          <Route path="/sheets" element={<Sheets />} />
+          <Route path="/log" element={<Suspense fallback={<PageSkeleton />}><DailyLog /></Suspense>} />
+          <Route path="/sheets" element={<ToDailyLog />} />
           <Route path="/kpi" element={<KpiPage />} />
           <Route path="/performance" element={<Performance />} />
           <Route path="/team" element={<People />} />
@@ -86,7 +94,7 @@ export default function App() {
             <Route path="/admin/pipelines" element={<TeamPipelines />} />
             <Route path="/admin/tv" element={<Suspense fallback={<PageSkeleton />}><TvScreens /></Suspense>} />
             <Route path="/admin/digest" element={<Suspense fallback={<PageSkeleton />}><WeeklyDigest /></Suspense>} />
-            <Route path="/ui" element={<Suspense fallback={<PageSkeleton />}><UiKit /></Suspense>} />
+            {UiKit && <Route path="/ui" element={<Suspense fallback={<PageSkeleton />}><UiKit /></Suspense>} />}
           </Route>
         </Route>
       </Route>

@@ -9,7 +9,7 @@ type Detail = Record<string, unknown>;
 interface Item { id: number; created_at: string; actor: { name: string; email: string } | null; action: string; target: string; detail: Detail; flagged: boolean }
 interface Page { results: Item[]; page: number; has_more: boolean; flagged_count: number }
 
-const FILTERS = [["", "Everything"], ["entry.", "Sheet entries"], ["kpi.", "Weekly KPI"], ["user.", "People & access"],
+const FILTERS = [["", "Everything"], ["entry.", "Daily log entries"], ["kpi.", "Weekly KPI"], ["user.", "People & access"],
   ["sheet.", "Sheets & targets"], ["task.", "Tasks"], ["role.", "Job roles"], ["settings.", "Team rules"], ["announcement.", "Announcements"], ["import.", "Excel import"], ["renewal.", "Renewals"], ["contract.", "Contracts"]] as const;
 
 const hours = (v: unknown) => (Array.isArray(v) ? v.filter((x) => x != null).length : 0);
@@ -29,7 +29,7 @@ function describe(i: Item): { what: string; more: string } {
     case "kpi.save": return { what: `Weekly KPI for "${i.target}", week of ${day(d.week)}`, more: `leads ${d.leads ?? 0} · opps ${d.opps ?? 0} · clients ${d.clients ?? 0} · revenue ${d.revenue ?? 0}` };
     case "sheet.save": return { what: `Changed sheet "${i.target}"`, more: pairs(d) };
     case "sheet.delete": return { what: `Deleted sheet "${i.target}"`, more: `${d.days} days · ${d.kpi_weeks} KPI weeks removed` };
-    case "team.reset": return { what: "Deleted all team data", more: `${d.sheets} sheets · ${d.days} days · ${d.kpi_weeks} KPI weeks removed` };
+    case "team.reset": return { what: "Deleted all team data", more: `${d.sheets} daily logs · ${d.days} days · ${d.kpi_weeks} KPI weeks removed` };
     case "sheet.linked": return { what: `Linked sheet "${i.target}" to its person`, more: "the name matched" };
     case "settings.save": return { what: "Changed the team rules", more: Object.entries(d).map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`).join(" · ") };
     case "task.save": return { what: `Changed task "${i.target}"`, more: d.after ? pairs(d) : `points ${d.points ?? ""}` };
@@ -45,7 +45,7 @@ function describe(i: Item): { what: string; more: string } {
     case "display.delete": return { what: `Deleted TV screen "${i.target}"`, more: "" };
     case "huddle.focus": return { what: "Posted today's focus from the morning huddle", more: i.target };
     case "digest.send": return { what: `Sent the weekly digest for ${i.target}`, more: `${d.recipients ?? "?"} people${d.automatic ? " · by the weekly schedule" : ""}` };
-    case "import.workbook": return { what: d.replaced ? "Replaced all team data with an Excel import" : "Imported the Excel workbook", more: `${d.sheets} sheets · ${d.kpi_weeks} KPI weeks` };
+    case "import.workbook": return { what: d.replaced ? "Replaced all team data with an Excel import" : "Imported the Excel workbook", more: `${d.sheets} daily logs · ${d.kpi_weeks} KPI weeks` };
     case "contract.create": return { what: `Added the contract ${i.target}`, more: `ends ${day(d.ends)} · BDT ${d.value ?? "?"}` };
     case "contract.update": return { what: `Changed the contract ${i.target}`, more: pairs(d) };
     case "contract.delete": return { what: `Deleted the contract ${i.target}`, more: `ended ${day(d.ends)} · ${d.status}` };
@@ -84,7 +84,7 @@ export default function ActivityLog() {
         <select value={action} onChange={(e) => setAction(e.target.value)} aria-label="Type of change" className="input w-auto">
           {FILTERS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         </select>
-        <Input className="max-w-xs" placeholder="Search person or sheet" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search the log" />
+        <Input className="max-w-xs" placeholder="Search person or daily log" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search the log" />
       </div>
 
       {query.isLoading ? <Spinner /> : query.error ? <Alert>{errorText(query.error)}</Alert> : !items.length ? (

@@ -94,7 +94,7 @@ export default function KpiPage() {
       <p className="mb-4 text-sm text-slate-500">This week counts in <b>{monthName(d.counts_in_month)}</b>, the month that holds most of its days.
         {isCurrent ? " You can change your own row until the week ends." : " Past weeks are locked; admins can still correct them."}</p>
 
-      {d.rows.length === 0 ? <Card><EmptyState icon={<CalendarCheck2 />} title="No work sheets yet">Create sheets in Team setup first.</EmptyState></Card> : (
+      {d.rows.length === 0 ? <Card><EmptyState icon={<CalendarCheck2 />} title="No daily logs yet">Create daily logs in Team setup first.</EmptyState></Card> : (
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[860px] text-sm">

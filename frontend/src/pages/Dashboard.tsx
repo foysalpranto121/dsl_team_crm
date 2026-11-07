@@ -113,14 +113,14 @@ export default function Dashboard() {
     <>
       <PageHeader title={`${hello}, ${(user?.name || "").split(" ")[0] || "there"}`}
         subtitle={<>{dayFmt(t.today)} · Week {t.week_no} · times in {t.timezone.replace("_", " ")}</>}
-        actions={<Link to="/sheets"><Button><CalendarCheck2 className="size-4" /> Fill in today</Button></Link>} />
+        actions={<Link to="/log"><Button><CalendarCheck2 className="size-4" /> Fill in today</Button></Link>} />
 
       <Announcements />
 
       {t.lock_days && unfilled.length > 0 && (
         <div className="mb-6"><Alert tone="amber">
           <span className="inline-flex items-center gap-2 font-semibold"><AlarmClock className="size-4" /> You haven't filled in today yet.</span>{" "}
-          Today locks at midnight, in <b className="num">{countdown}</b>. <Link to="/sheets" className="font-semibold underline">Open your sheet</Link>
+          Today locks at midnight, in <b className="num">{countdown}</b>. <Link to="/log" className="font-semibold underline">Open your daily log</Link>
         </Alert></div>
       )}
 
@@ -135,9 +135,9 @@ export default function Dashboard() {
       )}
 
       {rows.length === 0 ? (
-        <Card><EmptyState icon={<LayoutDashboard />} title="No team sheets yet"
-          action={user?.role === "admin" ? <Link to="/admin/settings"><Button>Set up sheets</Button></Link> : undefined}>
-          {user?.role === "admin" ? "Create a sheet for each person, set their targets and job role, and the dashboard fills itself."
+        <Card><EmptyState icon={<LayoutDashboard />} title="No daily logs yet"
+          action={user?.role === "admin" ? <Link to="/admin/settings"><Button>Set up daily logs</Button></Link> : undefined}>
+          {user?.role === "admin" ? "Create a daily log for each person, set their targets and job role, and the dashboard fills itself."
             : "An admin needs to create the team's sheets. Once they do, everyone's numbers appear here."}
         </EmptyState></Card>
       ) : (

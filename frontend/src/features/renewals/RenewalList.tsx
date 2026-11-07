@@ -8,6 +8,7 @@ import { DataTable } from "@/components/data/data-table";
 import { EmptyState, ErrorState } from "@/components/data/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Segmented } from "@/components/ui/segmented";
 import { date, money } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { KEY, STAGE_TONE, endsText, urgency, type Renewal } from "./types";
@@ -15,22 +16,6 @@ import { KEY, STAGE_TONE, endsText, urgency, type Renewal } from "./types";
 type Show = "open" | "won" | "lost" | "all";
 const SHOWS: { key: Show; label: string }[] = [{ key: "open", label: "To renew" }, { key: "won", label: "Renewed" }, { key: "lost", label: "Not renewing" }, { key: "all", label: "All" }];
 const isOpen = (r: Renewal) => r.due !== null;
-
-export function FilterChips<K extends string>({ value, onChange, options, label }: {
-  value: K; onChange: (k: K) => void; options: { key: K; label: string; count?: number }[]; label: string;
-}) {
-  return (
-    <div className="inline-flex flex-wrap gap-1 rounded-lg bg-muted p-0.5" role="group" aria-label={label}>
-      {options.map((o) => (
-        <button key={o.key} type="button" aria-pressed={value === o.key} onClick={() => onChange(o.key)}
-          className={cn("inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
-            value === o.key && "bg-card text-foreground shadow-xs")}>
-          {o.label}{o.count != null && <span className="num text-muted-foreground">{o.count}</span>}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 function NextStep({ r }: { r: Renewal }) {
   if (r.stage === "won") return <span className="text-muted-foreground">Renewed {date(r.closed_on, "short")}</span>;
@@ -77,7 +62,7 @@ export function RenewalList({ seesAll, firstWindow, lastWindow, onOpen, onAddCon
     <DataTable label="Renewals" columns={columns} data={rows} getRowId={(r) => String(r.id)} loading={q.isLoading}
       onRowClick={(r) => onOpen(r.id)} searchPlaceholder="Search renewals…" exportName="renewals" pageSize={25}
       initialSorting={[{ id: "ends", desc: false }]}
-      toolbar={<FilterChips label="Show" value={show} onChange={setShow} options={SHOWS.map((s) => ({ ...s, count: q.data ? count(s.key) : undefined }))} />}
+      toolbar={<Segmented label="Show" value={show} onChange={setShow} options={SHOWS.map((s) => ({ ...s, count: q.data ? count(s.key) : undefined }))} />}
       empty={all.length === 0 ? (
         <EmptyState icon={<CalendarSync />} title="No renewals yet"
           action={onAddContracts && <Button onClick={onAddContracts}>Add contracts</Button>}>

@@ -18,7 +18,7 @@ import { Sheet, SheetBody, SheetClose, SheetContent, SheetDescription, SheetFoot
 import { toast } from "@/components/ui/toaster";
 import { date, money } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { FilterChips } from "./RenewalList";
+import { Segmented } from "@/components/ui/segmented";
 import { KEY, KINDS, STAGE_TONE, TEMPLATE_CSV, endsText, stateOf, type Contract, type ContractStatus, type ImportResult, type Kind } from "./types";
 
 /** Contracts for sold software, licences and AMCs (SRS FR-RN1). Admins add, edit and import them; everyone else reads. */
@@ -311,7 +311,7 @@ export function Contracts({ isAdmin, seesAll, onOpenRenewal, startAdding }: {
         onRowClick={(c) => setEditing({ contract: c })} searchPlaceholder="Search contracts…" exportName="contracts"
         initialSorting={[{ id: "end_date", desc: false }]}
         toolbar={<div className="flex flex-wrap items-center gap-2">
-          <FilterChips label="Show" value={show} onChange={setShow} options={SHOWS.map((s) => ({ ...s, count: q.data ? all.filter((c) => s.key === "all" || c.status === s.key).length : undefined }))} />
+          <Segmented label="Show" value={show} onChange={setShow} options={SHOWS.map((s) => ({ ...s, count: q.data ? all.filter((c) => s.key === "all" || c.status === s.key).length : undefined }))} />
           {isAdmin && <>
             <Button size="sm" variant="secondary" onClick={() => setImporting(true)}><FileUp /> Import CSV</Button>
             <Button size="sm" onClick={() => setEditing({ contract: null })}><Plus /> Add contract</Button>

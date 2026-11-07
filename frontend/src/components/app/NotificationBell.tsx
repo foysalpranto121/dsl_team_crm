@@ -26,7 +26,7 @@ export function NotificationBell() {
   const items: Item[] = [];
   const t = today.data;
   if (t?.lock_days && t.my_sheets.some((s) => s.kind === "work" && !s.filled_today)) {
-    items.push({ id: "unfilled", tone: "warning", icon: AlarmClock, title: "You haven't filled in today", body: `Today locks at midnight, in ${duration(t.seconds_to_lock)}.`, to: "/sheets" });
+    items.push({ id: "unfilled", tone: "warning", icon: AlarmClock, title: "You haven't filled in today", body: `Today locks at midnight, in ${duration(t.seconds_to_lock)}.`, to: "/log" });
   }
   const waiting = isAdmin ? pending.data?.length ?? 0 : 0;
   if (waiting) {

@@ -69,7 +69,7 @@ export default function Performance() {
           <span className="ml-2"><DownloadExcel year={y} label="Download team Excel" /></span>
         </div>} />
 
-      {rows.length === 0 ? <Card><EmptyState icon={<BarChart3 />} title="No work sheets yet">Import the Excel sheet or create sheets in Team setup.</EmptyState></Card> : (
+      {rows.length === 0 ? <Card><EmptyState icon={<BarChart3 />} title="No daily logs yet">Import the Excel workbook or create daily logs in Team setup.</EmptyState></Card> : (
         <>
           <Card className="mb-6 p-5">
             <h2 className="text-base font-bold">Composite score by month</h2>
