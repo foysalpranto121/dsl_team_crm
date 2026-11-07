@@ -2,6 +2,7 @@ import { Keyboard, LogOut, Moon, Sun, UserRound } from "lucide-react";
 import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/auth/AuthContext";
+import { useFeatures } from "@/lib/features";
 import { actionsFor, navFor } from "@/lib/nav";
 import { useTheme } from "@/lib/theme";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../ui/command";
@@ -12,6 +13,7 @@ import { useShell } from "./shell";
 export function CommandMenu({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
+  const features = useFeatures();
   const { resolved, toggle } = useTheme();
   const shell = useShell();
 
@@ -47,7 +49,7 @@ export function CommandMenu({ open, onOpenChange }: { open: boolean; onOpenChang
             </CommandItem>
           ))}
         </CommandGroup>
-        {navFor(user.role).map((s) => (
+        {navFor(user.role, features).map((s) => (
           <CommandGroup key={s.id} heading={s.title}>
             {s.items.map((i) => (
               <CommandItem key={i.to} value={`${i.label} ${i.keywords ?? ""} ${s.title}`} onSelect={() => run(() => navigate(i.to))}>

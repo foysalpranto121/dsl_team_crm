@@ -21,7 +21,7 @@ export default function People() {
                 <div className="min-w-0">
                   <div className="truncate font-bold">{u.name || u.email}</div>
                   <div className="truncate text-sm text-slate-500">{u.profile.position || "Team member"}</div>
-                  {u.role !== "member" && <Badge tone={u.role === "admin" ? "brand" : "slate"} className="mt-1 capitalize">{u.role}</Badge>}
+                  {u.role !== "member" && <Badge tone={u.role === "admin" ? "brand" : "slate"} className="mt-1 capitalize">{u.role === "viewer" ? "Management" : u.role}</Badge>}
                 </div>
               </div>
               {u.profile.bio && <p className="mt-4 line-clamp-3 text-sm text-slate-600 dark:text-slate-300">{u.profile.bio}</p>}

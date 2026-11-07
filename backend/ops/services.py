@@ -19,6 +19,7 @@ from django.utils import timezone
 from accounts.models import User
 from accounts.services import photo_of
 from core import audit
+from core.features import is_on
 from core.models import Announcement
 from team import calc
 from team import services as team
@@ -175,7 +176,7 @@ def huddle(user):
         "missing_results": [{"person": g["person"], "weeks": len(g["weeks"])} for g in team.missing_results(today, None if admin else user.pk)],
         "pending_people": User.objects.filter(status=User.Status.PENDING).count() if admin else None,
         "stuck": stuck_deals(today) if admin else None,
-        "renewals": renewals.huddle_block(user, today),
+        "renewals": renewals.huddle_block(user, today) if is_on("renewals") else None,
     }
 
     current = (Announcement.objects.filter(title=FOCUS_TITLE, expires_on=today).select_related("created_by").order_by("-created_at").first())
@@ -261,7 +262,7 @@ def digest(week_start):
         "wins": [{k: w[k] for k in WIN_FIELDS} for w in (team.wins_between(ws, we) or [])],
         "scorecards": cards,
         "risks": risks,
-        "renewals": renewals.digest_block(ws, we),
+        "renewals": renewals.digest_block(ws, we) if is_on("renewals") else None,
         "link": f"{settings.FRONTEND_URL}/dashboard",
     }
 

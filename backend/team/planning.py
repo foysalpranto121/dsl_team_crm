@@ -234,6 +234,14 @@ def log_details(user, work, day, slots, sent, entry, st):
             m["qty"] = int(m_in["qty"])
         if m_in.get("ref"):
             m["ref"] = str(m_in["ref"]).strip()[:200]
+        task_id = m_in.get("task") or (wm.get("task") if s == was else None)
+        if task_id:                                # logged from My Tasks (FR-MT5)
+            from mytasks.services import assigned_review
+            m["task"] = int(task_id)
+            if (s == was and wm.get("assigned")) or assigned_review(work, int(task_id), s):
+                m.update(assigned=True, review=APPROVED, **({"unplanned": True} if p is None else {}))   # assigned: pre-approved (FR-MT4)
+                out.append(m)
+                continue
         if p is not None and s != p:               # a deviation
             if not reason:
                 names = names or dict(Task.objects.values_list("id", "name"))
@@ -244,8 +252,9 @@ def log_details(user, work, day, slots, sent, entry, st):
             m["unplanned"] = True
             if reason:
                 m["reason"] = reason[:300]
-            if s == was and wm.get("review") in (APPROVED, REJECTED, FLAGGED):
-                m["review"] = wm["review"]
+            if s == was and was is not None:       # unchanged: keeps its state (a later switch to strict mode isn't retroactive)
+                if wm.get("review"):
+                    m["review"] = wm["review"]
             elif st.unplanned_mode == TeamSettings.Unplanned.STRICT:
                 m["review"] = PENDING
         elif s == was and wm.get("review") == FLAGGED:

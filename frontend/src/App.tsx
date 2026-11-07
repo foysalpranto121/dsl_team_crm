@@ -21,12 +21,14 @@ import Tracker from "./pages/Tracker";
 // and Office TV mode (SRS v0.3 §14.5) — the public TV page and its admin settings.
 // The component showcase is a developer tool: only in `npm run dev`, never in the built site.
 const UiKit = import.meta.env.DEV ? lazy(() => import("./pages/UiKit")) : null;
-const DailyLog = lazy(() => import("./features/log/DailyLog"));
+const MyDay = lazy(() => import("./features/myday/MyDay"));
+const MyTasks = lazy(() => import("./features/mytasks/MyTasks"));
+const TeamBoard = lazy(() => import("./features/board/TeamBoard"));
 
-/** The page used to be called Sheets; old links and bookmarks still work. */
-function ToDailyLog() {
+/** The page was called Sheets, then Daily log; old links and bookmarks still work (SRS v0.5 FR-G5: My Day). */
+function ToMyDay() {
   const { search } = useLocation();
-  return <Navigate to={`/log${search}`} replace />;
+  return <Navigate to={`/my-day${search}`} replace />;
 }
 const TvDisplay = lazy(() => import("./features/tv/TvDisplay"));
 const TvScreens = lazy(() => import("./features/tv/TvScreens"));
@@ -50,6 +52,12 @@ function RequireUser() {
 function RequireProfile({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   return user?.profile.is_complete ? <>{children}</> : <Navigate to="/welcome" replace />;
+}
+
+/** Supervisors and admins approve plans and hours (SRS v0.5 §3). */
+function RequireApprover() {
+  const { user } = useAuth();
+  return user?.role === "admin" || user?.role === "supervisor" ? <Outlet /> : <Navigate to="/dashboard" replace />;
 }
 
 function RequireAdmin() {
@@ -80,8 +88,13 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/huddle" element={<Suspense fallback={<PageSkeleton />}><Huddle /></Suspense>} />
           <Route path="/renewals" element={<Suspense fallback={<PageSkeleton />}><Renewals /></Suspense>} />
-          <Route path="/log" element={<Suspense fallback={<PageSkeleton />}><DailyLog /></Suspense>} />
-          <Route path="/sheets" element={<ToDailyLog />} />
+          <Route path="/my-day" element={<Suspense fallback={<PageSkeleton />}><MyDay /></Suspense>} />
+          <Route path="/my-tasks" element={<Suspense fallback={<PageSkeleton />}><MyTasks /></Suspense>} />
+          <Route path="/log" element={<ToMyDay />} />
+          <Route path="/sheets" element={<ToMyDay />} />
+          <Route element={<RequireApprover />}>
+            <Route path="/team-board" element={<Suspense fallback={<PageSkeleton />}><TeamBoard /></Suspense>} />
+          </Route>
           <Route path="/kpi" element={<KpiPage />} />
           <Route path="/performance" element={<Performance />} />
           <Route path="/team" element={<People />} />

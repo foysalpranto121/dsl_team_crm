@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "display",
     "ops",
     "renewals",
+    "mytasks",
 ]
 
 MIDDLEWARE = [

@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 
 from accounts.permissions import IsTeamAdmin
 from core import audit
+from core.features import gate
 
 from . import services
 from .authentication import DisplayTokenAuthentication, IsDisplayScreen
@@ -15,7 +16,7 @@ from .models import DisplayScreen
 from .serializers import DisplayScreenSerializer
 
 
-class DisplayScreenViewSet(viewsets.ModelViewSet):
+class DisplayScreenViewSet(gate("tv"), viewsets.ModelViewSet):
     """Admins manage the TV screens. A screen's link (with its secret token) is returned only when the screen is created
     or its link is replaced; after that only the first characters (token_hint) are shown."""
 
@@ -52,7 +53,7 @@ class DisplayScreenViewSet(viewsets.ModelViewSet):
         return Response({**self.get_serializer(screen).data, "token": token})
 
 
-class FeedView(APIView):
+class FeedView(gate("tv"), APIView):
     """Everything one TV shows, read-only. Signed in with the screen's token, never with a person's account."""
 
     authentication_classes = [DisplayTokenAuthentication]

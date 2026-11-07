@@ -35,8 +35,9 @@ interface HuddleData {
   plan: { people: number; planned: number; hours: number; target_hours: number; workday: boolean; by_type: { type: string; hours: number }[] };
   attention: { missing_results: { person: string; weeks: number }[]; pending_people: number | null;
     stuck: { items: StuckDeal[]; total: number; shared_pipelines: number } | null;
+    /** null while the renewal tracker is switched off (SRS v0.5 §0) */
     renewals: { days: number; total: number; expired: number;
-      items: { id: number; client: string; product: string; days_left: number; stage: string; owner: string | null }[] } };
+      items: { id: number; client: string; product: string; days_left: number; stage: string; owner: string | null }[] } | null };
   focus: { suggested: { metric: string | null; text: string }; current: { text: string; by: string | null; at: string } | null; can_set: boolean };
 }
 
@@ -150,7 +151,7 @@ function TodaysPlan({ h }: { h: HuddleData }) {
 
 function Attention({ h }: { h: HuddleData }) {
   const a = h.attention;
-  const nothing = !a.pending_people && a.missing_results.length === 0 && !(a.stuck && a.stuck.total) && !a.renewals.total;
+  const nothing = !a.pending_people && a.missing_results.length === 0 && !(a.stuck && a.stuck.total) && !a.renewals?.total;
   return (
     <Section icon={<AlertTriangle />} title="Needs attention">
       {nothing ? (
@@ -175,7 +176,7 @@ function Attention({ h }: { h: HuddleData }) {
               <Link to="/kpi" className="mt-2 inline-block text-sm font-semibold text-primary-text hover:underline">Enter weekly results</Link>
             </div>
           )}
-          {a.renewals.total > 0 && (
+          {a.renewals && a.renewals.total > 0 && (
             <div>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Renewals ending within {a.renewals.days} days{a.renewals.expired ? ` · ${a.renewals.expired} already ended` : ""}

@@ -1,4 +1,4 @@
-import { Briefcase, LayoutDashboard, Menu, NotebookPen, type LucideIcon } from "lucide-react";
+import { Briefcase, CalendarClock, LayoutDashboard, Menu, type LucideIcon } from "lucide-react";
 import { NavLink } from "react-router";
 import { cn } from "@/lib/utils";
 import { QuickAdd } from "./QuickAdd";
@@ -21,7 +21,7 @@ export function MobileTabBar() {
     <nav aria-label="Quick navigation" className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
       <ul className="mx-auto grid h-16 max-w-md grid-cols-5 items-center px-2">
         <li><Tab to="/dashboard" label="Dashboard" icon={LayoutDashboard} /></li>
-        <li><Tab to="/log" label="Log" icon={NotebookPen} /></li>
+        <li><Tab to="/my-day" label="My Day" icon={CalendarClock} /></li>
         <li className="flex justify-center"><QuickAdd variant="fab" /></li>
         <li><Tab to="/tracker" label="Pipeline" icon={Briefcase} /></li>
         <li>

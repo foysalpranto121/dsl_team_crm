@@ -172,7 +172,10 @@ def save_kpi(user, sheet, week_start, data):
 # ---------- numbers ----------
 
 def renewal_revenue(cfg):
-    """{(sheet id, week start): amount} from renewals won (SRS FR-RN4)."""
+    """{(sheet id, week start): amount} from renewals won (SRS FR-RN4), while the renewal tracker is switched on."""
+    from core.features import is_on
+    if not is_on("renewals"):
+        return {}
     from renewals.services import revenue_by_sheet_week   # renewals builds on team, so it's imported here, not at the top
     return revenue_by_sheet_week(cfg)
 

@@ -22,15 +22,15 @@ export function BrandName({ compact }: { compact?: boolean }) {
   if (compact) {
     return (
       <div className="min-w-0 border-l border-border pl-2.5 leading-none">
-        <div className="font-display text-[17px] font-extrabold tracking-tight text-accent-600 dark:text-accent-400">TOS</div>
-        <div className="mt-1 truncate text-[11px] font-medium text-muted-foreground">Team Operation System</div>
+        <div className="text-[17px] font-semibold tracking-tight text-primary-text">TOS</div>
+        <div className="mt-1 text-[11px] font-medium leading-tight text-muted-foreground">Team Operation System</div>
       </div>
     );
   }
   return (
     <div className="min-w-0 border-l border-border pl-3 leading-tight">
       <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Business Team</div>
-      <div className="font-display text-base font-extrabold text-foreground">Operation System <span className="text-accent-600 dark:text-accent-400">TOS</span></div>
+      <div className="text-base font-semibold text-foreground">Operation System <span className="text-primary-text">TOS</span></div>
     </div>
   );
 }

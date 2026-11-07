@@ -85,7 +85,7 @@ export default function Layout() {
 
         <div className="flex min-w-0 flex-col">
           <Topbar />
-          <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1400px] flex-1 px-4 pb-28 pt-6 outline-hidden sm:px-6 lg:px-8 lg:pb-16 lg:pt-8">
+          <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1200px] flex-1 px-4 pb-28 pt-6 outline-hidden sm:px-6 lg:px-8 lg:pb-16 lg:pt-8">
             <Outlet />
           </main>
         </div>

@@ -1,4 +1,5 @@
-export type Role = "admin" | "member" | "viewer";
+/** SRS v0.5 §3: Member · Supervisor / Team Leader (also approves) · Management (stored as "viewer") · Admin. */
+export type Role = "admin" | "supervisor" | "member" | "viewer";
 export type Status = "pending" | "approved" | "rejected" | "disabled";
 
 export interface Profile {
@@ -106,10 +107,28 @@ export interface Sheet {
 
 export type Slot = number | null;
 
+/** One logged hour's details (SRS v0.5 FR-T1–T3). review: undefined = counts; pending = waits for a supervisor. */
+export interface HourMeta {
+  status?: "done" | "partly" | "not_done";
+  qty?: number | null;
+  ref?: string;
+  reason?: string;
+  planned?: number | null;
+  unplanned?: boolean;
+  review?: "pending" | "approved" | "rejected" | "flagged";
+  note?: string;
+  /** logged from this My Tasks task; assigned ones are pre-approved */
+  task?: number;
+  assigned?: boolean;
+}
+
 export interface Entry {
   day: string;
   slots: Slot[];
+  meta: (HourMeta | Record<string, never>)[];
   remarks: string;
+  /** hours with a task logged; hours = output hours that count */
+  logged: number;
   hours: number;
   points: number;
   updated_by: string | null;
@@ -143,7 +162,14 @@ export interface EntriesResponse {
   lock_days: boolean;
   timezone: string;
   seconds_to_lock: number;
+  /** the approved task of each hour, per day (SRS v0.5 FR-T7) */
+  planned: Record<string, Slot[]>;
+  /** each week's plan status (week start → draft | submitted | approved | partial | rejected) */
+  plan_weeks: Record<string, string>;
+  unplanned_mode: "provisional" | "strict";
 }
+
+export type Feature = "tv" | "huddle" | "digest" | "renewals";
 
 export interface TeamSettings {
   name: string;
@@ -153,6 +179,14 @@ export interface TeamSettings {
   weekend_days: number[];
   count_weekend: boolean;
   currency: string;
+  /** SRS v0.5 FR-C8, D1, FR-P6 */
+  unplanned_mode: "provisional" | "strict";
+  plan_cutoff: "previous_day" | "same_day";
+  /** SRS v0.5 §0: V2 features, off until an admin switches them on */
+  feature_tv: boolean;
+  feature_huddle: boolean;
+  feature_digest: boolean;
+  feature_renewals: boolean;
   today: string;
   seconds_to_lock: number;
 }

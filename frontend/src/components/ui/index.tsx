@@ -36,7 +36,7 @@ export function PageHeader({ title, subtitle, actions }: { title: ReactNode; sub
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
       <div className="min-w-0">
-        <h1 className="text-[26px] font-bold leading-tight text-foreground">{title}</h1>
+        <h1 className="text-2xl font-semibold text-foreground">{title}</h1>   {/* v0.5 §10.2: page title 24/32 */}
         {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}

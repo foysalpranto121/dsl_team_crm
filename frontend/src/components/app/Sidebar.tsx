@@ -1,6 +1,7 @@
 import { ChevronsUpDown, Keyboard, LogOut, Monitor, Moon, PanelLeftClose, PanelLeftOpen, Sun, UserRound } from "lucide-react";
 import { Link, useMatch, useNavigate } from "react-router";
 import { useAuth } from "@/auth/AuthContext";
+import { useFeatures } from "@/lib/features";
 import { navFor, type BadgeKey, type NavItem } from "@/lib/nav";
 import { useTheme, type ThemePref } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -86,6 +87,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate, badges, inDra
   collapsed?: boolean; onToggle?: () => void; onNavigate?: () => void; badges: Badges; inDrawer?: boolean;
 }) {
   const { user } = useAuth();
+  const features = useFeatures();
   if (!user) return null;
   return (
     <div className="flex h-full flex-col">
@@ -94,7 +96,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate, badges, inDra
         {!collapsed && <BrandName compact />}
       </div>
       <nav aria-label="Main" className={cn("flex-1 overflow-y-auto py-4", collapsed ? "px-2" : "px-3")}>
-        {navFor(user.role).map((s, si) => (
+        {navFor(user.role, features).map((s, si) => (
           <div key={s.id} className="mb-5 last:mb-0">
             {collapsed
               ? si > 0 && <div className="mx-2 mb-3 h-px bg-border" aria-hidden />

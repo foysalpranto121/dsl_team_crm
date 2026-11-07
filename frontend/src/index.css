@@ -4,40 +4,45 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ──────────────────────────────────────────────────────────────────────────────
-   TOS design tokens (v3). Components use the semantic names below (bg-card,
-   text-muted-foreground, bg-primary, bg-success-soft …), never raw colours, so
-   light and dark mode change in one place.
-   DSL brand: blue #034EA1 = primary · green #00A550 = success / on target ·
-   red #EC1C24 = danger and the logo only (never a decorative accent).
+   TOS design tokens (SRS v0.5 §10). Components use the semantic names below (bg-card,
+   text-muted-foreground, bg-primary, bg-accent, bg-success-soft …), never raw colours,
+   so light and dark mode change in one place.
+   v0.5 tokens: bg, surface, border, text, muted, primary (action, links, focus),
+   accent (progress, positive highlight), success, warning, danger (sparingly).
+   Primary and accent are tenant brand colours; these are the v0.5 defaults.
+   Light muted text is #5a687e, not v0.5's #64748b: that measures 4.47:1 on the
+   background, under the 4.5:1 text contrast v0.5 requires.
    ────────────────────────────────────────────────────────────────────────────── */
 
 @theme {
-  --font-sans: "IBM Plex Sans", "Noto Sans Bengali", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-display: "Archivo", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  /* v0.5 §10.2: Inter for Latin text and numbers, Noto Sans Bengali for Bangla (Inter has no Bangla glyphs), system-ui last.
+     Weights 400 / 500 / 600 only: "bold" and "extrabold" resolve to 600. */
+  --font-sans: "Inter", "Noto Sans Bengali", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: var(--font-sans);
+  --font-mono: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+  --font-weight-bold: 600;
+  --font-weight-extrabold: 600;
+  --font-weight-black: 600;
 
-  /* Daffodil Software Ltd. colours, taken from the DSL logo: blue S (#034EA1), red D and L (#EC1C24), green swoosh (#00A550).
-     Kept for existing pages; new code uses the semantic tokens instead. */
-  --color-brand-50: #eef5fc;
-  --color-brand-100: #d6e6f7;
-  --color-brand-200: #adcbef;
-  --color-brand-300: #7aa9e2;
-  --color-brand-400: #4382cf;
-  --color-brand-500: #1c64bb;
-  --color-brand-600: #0b57ae;
-  --color-brand-700: #034ea1;
-  --color-brand-800: #053f80;
-  --color-brand-900: #072f5e;
-  --color-brand-950: #061a33;
+  /* Older pages use these ramps; they follow the v0.5 primary (brand), danger (accent-*) and success (leaf). */
+  --color-brand-50: #eef3f9;
+  --color-brand-100: #d9e5f2;
+  --color-brand-200: #b5cce5;
+  --color-brand-300: #8bafd5;
+  --color-brand-400: #6390c3;
+  --color-brand-500: #4a7db4;
+  --color-brand-600: #3f74ac;
+  --color-brand-700: #3a6ea5;
+  --color-brand-800: #2f5986;
+  --color-brand-900: #24456a;
+  --color-brand-950: #162a40;
 
-  --color-accent-300: #f7a3a6;
-  --color-accent-400: #f15a60;
-  --color-accent-500: #ec1c24;
-  --color-accent-600: #c8141b;
+  --color-accent-300: #e3a9a9;
+  --color-accent-500: #b84a4a;
 
-  --color-leaf-400: #2fbf73;
-  --color-leaf-500: #00a550;
-  --color-leaf-600: #008a43;
+  --color-leaf-400: #4e9e78;
+  --color-leaf-500: #2e7d5b;
+  --color-leaf-600: #266a4d;
 
   /* Elevation: soft levels. Hierarchy comes from surface tone first, shadows second. */
   --shadow-xs: 0 1px 2px 0 var(--shadow-tint);
@@ -54,40 +59,40 @@
 }
 
 :root {
-  --background: #f5f6f8;
-  --foreground: #0f1729;
+  --background: #f6f8fa;
+  --foreground: #1f2933;
   --card: #ffffff;
-  --card-foreground: #0f1729;
+  --card-foreground: #1f2933;
   --popover: #ffffff;
-  --popover-foreground: #0f1729;
+  --popover-foreground: #1f2933;
   --sidebar: #ffffff;
-  --muted: #eff1f5;
-  --muted-foreground: #586274;
-  --subtle-foreground: #687183;   /* ≥ 4.5:1 on background, card and sidebar */
-  --border: #e4e7ec;
-  --input: #d4d9e1;
-  --ring: #3a7bd5;
+  --muted: #eef1f5;
+  --muted-foreground: #5a687e;
+  --subtle-foreground: #5f6e84;   /* ≥ 4.5:1 on background, card and sidebar */
+  --border: #e3e8ee;
+  --input: #d3dae2;
+  --ring: #3a6ea5;
   --overlay: rgb(10 16 28 / 0.45);
 
-  --primary: #034ea1;
-  --primary-hover: #053f80;
+  --primary: #3a6ea5;
+  --primary-hover: #315e8d;
   --primary-foreground: #ffffff;
-  --primary-soft: #e9f1fb;
-  --primary-text: #0a4f9e;
+  --primary-soft: #ebf1f8;
+  --primary-text: #335f8e;
 
-  --success: #00a550;
-  --success-soft: #e5f6ec;
-  --success-text: #036b35;
-  --warning: #e8a10c;
-  --warning-soft: #fdf3dc;
-  --warning-text: #8a5600;
-  --danger: #d9161e;
-  --danger-hover: #b8121a;
-  --danger-soft: #fdeceb;
-  --danger-text: #b4141b;
-  --info: #2a78d6;
-  --info-soft: #e8f1fc;
-  --info-text: #1b5aa6;
+  --success: #2e7d5b;
+  --success-soft: #e7f3ee;
+  --success-text: #286e50;
+  --warning: #b7791f;
+  --warning-soft: #fbf1e1;
+  --warning-text: #7e5414;
+  --danger: #b84a4a;
+  --danger-hover: #a03f3f;
+  --danger-soft: #f9ebeb;
+  --danger-text: #a03f3f;
+  --info: #3a6ea5;
+  --info-soft: #ebf1f8;
+  --info-text: #335f8e;
 
   /* Chart series: the validated categorical order (dataviz validator, light surface #fff: all checks pass;
      slots 3–5 are under 3:1 on white, so charts using them show labels or the table view). Fixed order, never cycled. */
@@ -108,46 +113,50 @@
   --chart-grid: #e8ebf0;
   --chart-axis: #c9ced8;
 
+  --accent: #2a9d8f;
+  --accent-foreground: #ffffff;
+  --accent-soft: #e6f5f3;
+  --accent-text: #1f7368;
   --shadow-tint: rgb(16 24 40 / 0.06);
   --shadow-tint-strong: rgb(16 24 40 / 0.14);
 }
 
 .dark {
   color-scheme: dark;
-  --background: #0a0f1a;
-  --foreground: #e6eaf2;
-  --card: #0f1724;
-  --card-foreground: #e6eaf2;
-  --popover: #151e2e;
-  --popover-foreground: #e6eaf2;
-  --sidebar: #0c1220;
-  --muted: #1a2335;
-  --muted-foreground: #9ba6b9;
-  --subtle-foreground: #808ba0;   /* ≥ 4.5:1 on background, card, sidebar and popover */
-  --border: #222c3d;
-  --input: #2c374b;
-  --ring: #5b9ae6;
+  --background: #0f1720;
+  --foreground: #e6ebf0;
+  --card: #17212b;
+  --card-foreground: #e6ebf0;
+  --popover: #1c2733;
+  --popover-foreground: #e6ebf0;
+  --sidebar: #131c25;
+  --muted: #1f2b37;
+  --muted-foreground: #94a3b8;
+  --subtle-foreground: #8d9cb1;   /* ≥ 4.5:1 on background, card, sidebar and popover */
+  --border: #26323e;
+  --input: #33414f;
+  --ring: #6fa3d8;
   --overlay: rgb(0 0 0 / 0.6);
 
-  --primary: #2f6fd0;
-  --primary-hover: #2862bf;
-  --primary-foreground: #ffffff;
-  --primary-soft: #14284a;
-  --primary-text: #8cbaf2;
+  --primary: #6fa3d8;
+  --primary-hover: #85b3e0;
+  --primary-foreground: #0b1520;
+  --primary-soft: #1b2c40;
+  --primary-text: #8db8e4;
 
-  --success: #2fbf73;
-  --success-soft: #0e2a20;
-  --success-text: #6fdba2;
-  --warning: #f2b23a;
-  --warning-soft: #2d2410;
-  --warning-text: #f5c96e;
-  --danger: #cf2f35;
-  --danger-hover: #dc3a40;
-  --danger-soft: #33161a;
-  --danger-text: #f7898d;
-  --info: #4b9be8;
-  --info-soft: #12284a;
-  --info-text: #8fc1f3;
+  --success: #5bbe90;
+  --success-soft: #163027;
+  --success-text: #72cba2;
+  --warning: #e0a94a;
+  --warning-soft: #33280f;
+  --warning-text: #e7b865;
+  --danger: #e08a8a;
+  --danger-hover: #e59b9b;
+  --danger-soft: #3a1f22;
+  --danger-text: #eba0a0;
+  --info: #6fa3d8;
+  --info-soft: #1b2c40;
+  --info-text: #8db8e4;
 
   /* Same eight hues stepped for the dark surface (validated against #111a2b: all checks pass). */
   --chart-1: #3987e5;
@@ -164,11 +173,24 @@
   --chart-grid: #1f293a;
   --chart-axis: #334055;
 
+  --accent: #4cc3b4;
+  --accent-foreground: #0b1520;
+  --accent-soft: #15302e;
+  --accent-text: #6bd2c5;
   --shadow-tint: rgb(0 0 0 / 0.35);
   --shadow-tint-strong: rgb(0 0 0 / 0.55);
 }
 
 @theme inline {
+  /* Older pages still use raw Tailwind text colours. These point them at the v0.5 text tokens, so they keep 4.5:1 in light and
+     dark mode until each page is redesigned. (Background and border shades of slate are untouched.) */
+  --color-slate-400: var(--subtle-foreground);
+  --color-slate-500: var(--muted-foreground);
+  --color-slate-600: var(--muted-foreground);
+  --color-amber-600: var(--warning-text);
+  --color-accent-400: var(--danger-text);
+  --color-accent-600: var(--danger-text);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -188,6 +210,10 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-soft: var(--primary-soft);
   --color-primary-text: var(--primary-text);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-text: var(--accent-text);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-success-text: var(--success-text);
@@ -217,8 +243,8 @@
   *, ::before, ::after { border-color: var(--border); }
   html { -webkit-text-size-adjust: 100%; color-scheme: light; }
   html.dark { color-scheme: dark; }
-  body { @apply bg-background font-sans text-foreground antialiased; }
-  h1 { @apply font-display tracking-tight; }
+  body { @apply bg-background font-sans text-foreground antialiased; font-variant-numeric: tabular-nums; }   /* v0.5: tabular numerals for all figures */
+  h1 { @apply tracking-tight; }
   :focus-visible { @apply outline-2 outline-offset-2 outline-ring; }
   ::selection { background: color-mix(in oklab, var(--primary) 22%, transparent); }
   * { scrollbar-width: thin; scrollbar-color: var(--input) transparent; }
@@ -238,7 +264,7 @@
     background-size: 16px;
   }
   .label { @apply mb-1.5 block text-[13px] font-medium text-foreground; }
-  .num { @apply font-mono tabular-nums; }
+  .num { @apply tabular-nums; }
   .hero-glow {
     background:
       radial-gradient(60rem 30rem at 85% -10%, color-mix(in oklab, var(--color-brand-300) 22%, transparent), transparent),

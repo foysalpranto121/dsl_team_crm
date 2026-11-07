@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 
 from accounts.permissions import IsApproved, IsTeamAdmin
 from core import audit
+from core.features import gate
 from team import services as team
 
 from . import importer, services
@@ -33,7 +34,7 @@ class TodayContext:
         return {**super().get_serializer_context(), "on": team.today(), "first_window": RenewalSettings.load().ordered_windows[0]}
 
 
-class ContractViewSet(TodayContext, viewsets.ModelViewSet):
+class ContractViewSet(gate("renewals"), TodayContext, viewsets.ModelViewSet):
     """Contracts for sold software, licences and AMCs (SRS FR-RN1). Admins and management see every contract, members the
     ones they own. Only admins add, change, import and delete them."""
 
@@ -93,7 +94,7 @@ class ContractViewSet(TodayContext, viewsets.ModelViewSet):
             raise ValidationError({"detail": str(e)})
 
 
-class RenewalViewSet(TodayContext, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+class RenewalViewSet(gate("renewals"), TodayContext, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """Renewal opportunities (SRS FR-RN2). They open by themselves at the first reminder window; the account owner or an
     admin works them and records the outcome. Management reads."""
 
@@ -156,7 +157,7 @@ class RenewalViewSet(TodayContext, mixins.ListModelMixin, mixins.RetrieveModelMi
         return self._out(_call(services.reopen, request.user, self.get_object()))
 
 
-class SummaryView(APIView):
+class SummaryView(gate("renewals"), APIView):
     """The renewal dashboard (SRS FR-RN3): due by month, renewal rate, revenue at risk, upsell ideas."""
 
     @extend_schema(responses=OpenApiTypes.OBJECT)
@@ -164,7 +165,7 @@ class SummaryView(APIView):
         return Response(services.summary(request.user))
 
 
-class DueView(APIView):
+class DueView(gate("renewals"), APIView):
     """The signed-in person's renewals whose next step is due: the notification bell and the to-do list."""
 
     @extend_schema(responses=OpenApiTypes.OBJECT)
@@ -172,7 +173,7 @@ class DueView(APIView):
         return Response(services.due_for(request.user))
 
 
-class SettingsView(APIView):
+class SettingsView(gate("renewals"), APIView):
     """Reminder windows and how much renewal revenue counts in the Revenue KPI. Everyone reads; admins change."""
 
     def get_permissions(self):

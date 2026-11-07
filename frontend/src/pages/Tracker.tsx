@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { ChevronLeft, ChevronRight, Download, Plus, Trash2, Upload, X } from "lucide-react";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
-import { useSearchParams } from "react-router";
+import { Navigate, useSearchParams } from "react-router";
 import { api, downloadFile, errorText } from "../api/client";
 import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Spinner, Textarea } from "../components/ui";
 
@@ -22,14 +22,13 @@ interface Period { n: number; current: number; start: string; end: string; days:
 interface Summary { today: string; period: Period; targets: M; totals: M; weeks: Week[];
   funnel: { prospects: number; contacted: number; leads: number; opps: number; clients: number }; due: { id: number; company: string; next_follow_up: string; next_action: string; overdue: boolean }[];
   due_count: number; by_country: Row[]; by_channel: Row[] }
-interface PlanDay { date: string; tasks: { id: string; text: string; done: boolean }[]; note: string; edited: boolean; day: number; weekend: boolean }
 
 const STAGE_TONE: Record<string, "slate" | "brand" | "amber" | "green" | "red" | "accent"> = { prospect: "slate", contacted: "brand", lead: "amber", opp: "accent", client: "green", lost: "red" };
 const fmt = (s?: string | null) => (s ? new Date(s + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : "");
 const longDay = (s: string) => new Date(s + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 const nf = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 1 });
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "–");
-const TABS = [["overview", "Overview"], ["pipeline", "Pipeline"], ["plan", "Daily plan"], ["activity", "Activity log"], ["settings", "Settings"]] as const;
+const TABS = [["overview", "Overview"], ["pipeline", "Pipeline"], ["activity", "Activity log"], ["settings", "Settings"]] as const;
 const fmtY = (s: string) => new Date(s + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
 /** Step between periods. The current period (the one today falls in) is shown unless you pick another. */
@@ -93,16 +92,15 @@ function Overview({ s, go, setPeriod }: { s: Summary; go: (tab: string, id?: num
         <div className="px-5 pt-5"><h2 className="text-base font-bold">Weekly report</h2><p className="text-xs text-slate-500">Each cell is actual / target. A lead, opportunity or client counts in the week its stage date falls in.</p></div>
         <table className="mt-3 w-full min-w-[760px] text-sm">
           <thead><tr className="border-y border-slate-200 bg-slate-50 text-left text-[11px] uppercase tracking-wider text-slate-500 dark:border-white/10 dark:bg-white/5">
-            {["Week", "Dates", "Leads", "Opps", "Clients", "Points", "Plan tasks done"].map((h) => <th key={h} className="px-4 py-2">{h}</th>)}</tr></thead>
+            {["Week", "Dates", "Leads", "Opps", "Clients", "Points"].map((h) => <th key={h} className="px-4 py-2">{h}</th>)}</tr></thead>
           <tbody>
             {s.weeks.map((w) => {
               const c = (a: number, t: number) => <td className={clsx("num px-4 py-2", t > 0 && a >= t && "font-semibold text-leaf-600")}>{nf.format(a)} / {nf.format(t)}</td>;
               return <tr key={w.n} className="border-b border-slate-100 dark:border-white/5"><td className="px-4 py-2"><b>Week {w.n}</b><div className="text-xs text-slate-500">{w.focus}</div></td>
-                <td className="px-4 py-2 text-xs text-slate-500">{fmt(w.from)} – {fmt(w.to)}</td>{c(w.actual.leads, w.leads)}{c(w.actual.opps, w.opps)}{c(w.actual.clients, w.clients)}{c(w.actual.points, w.points)}
-                <td className="num px-4 py-2">{w.plan.done} / {w.plan.total}</td></tr>;
+                <td className="px-4 py-2 text-xs text-slate-500">{fmt(w.from)} – {fmt(w.to)}</td>{c(w.actual.leads, w.leads)}{c(w.actual.opps, w.opps)}{c(w.actual.clients, w.clients)}{c(w.actual.points, w.points)}</tr>;
             })}
             <tr className="bg-brand-50 font-semibold dark:bg-brand-400/10"><td className="px-4 py-2">Total</td><td className="px-4 py-2 text-xs">{fmt(p.start)} – {fmt(p.end)}</td>
-              {(["leads", "opps", "clients", "points"] as const).map((k) => <td key={k} className="num px-4 py-2">{nf.format(s.totals[k])} / {nf.format(Number(s.targets[k] || 0))}</td>)}<td /></tr>
+              {(["leads", "opps", "clients", "points"] as const).map((k) => <td key={k} className="num px-4 py-2">{nf.format(s.totals[k])} / {nf.format(Number(s.targets[k] || 0))}</td>)}</tr>
           </tbody>
         </table>
       </Card>
@@ -241,62 +239,6 @@ function Pipeline({ st, openId, clearOpen }: { st: Settings; openId: number | nu
   );
 }
 
-/* ---------- daily plan ---------- */
-function Plan({ period, setPeriod }: { period: number | null; setPeriod: (n: number | null) => void }) {
-  const qc = useQueryClient();
-  const q = useQuery({ queryKey: ["tracker", "plan", period], placeholderData: (prev) => prev,
-    queryFn: async () => (await api.get<{ days: PlanDay[]; weeks: Week[]; period: Period; today: string }>("/tracker/plan/", { params: { period: period ?? undefined } })).data });
-  const [week, setWeek] = useState<number | null>(null);
-  const save = useMutation({ mutationFn: async (d: PlanDay) => (await api.put(`/tracker/plan/${d.date}/`, { tasks: d.tasks, note: d.note })).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tracker"] }) });
-  const reset = useMutation({ mutationFn: async (date: string) => api.delete(`/tracker/plan/${date}/`), onSuccess: () => qc.invalidateQueries({ queryKey: ["tracker"] }) });
-  if (q.isLoading || !q.data) return <Spinner />;
-  const { days, weeks, today } = q.data;
-  const cur = Math.min(week ?? (weeks.find((w) => w.from <= today && today <= w.to)?.n ?? (today < weeks[0].from ? 1 : weeks.length)), weeks.length);
-  const w = weeks[cur - 1];
-  const shown = days.filter((d) => d.date >= w.from && d.date <= w.to);
-  const update = (d: PlanDay, fn: (x: PlanDay) => void) => { const c = { ...d, tasks: d.tasks.map((t) => ({ ...t })) }; fn(c); save.mutate(c); };
-  return (
-    <div className="grid gap-4">
-      <PeriodNav p={q.data.period} set={(n) => { setWeek(null); setPeriod(n); }} />
-      <div className="flex flex-wrap gap-2">{weeks.map((x) => {
-        const ds = days.filter((d) => d.date >= x.from && d.date <= x.to);
-        const done = ds.reduce((s, d) => s + d.tasks.filter((t) => t.done).length, 0), tot = ds.reduce((s, d) => s + d.tasks.length, 0);
-        return <button key={x.n} type="button" onClick={() => setWeek(x.n)} className={chip(x.n === cur)}>Week {x.n} <span className="num opacity-70">{done}/{tot}</span></button>;
-      })}</div>
-      {w.focus && <Card className="p-4"><div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Week {w.n} focus</div><div className="font-semibold">{w.focus}</div></Card>}
-      {save.error && <Alert>{errorText(save.error)}</Alert>}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {shown.map((d) => {
-          const done = d.tasks.filter((t) => t.done).length;
-          return (
-            <Card key={d.date} className={clsx("flex flex-col", d.date === today && "ring-2 ring-accent-500")}>
-              <div className={clsx("flex items-baseline justify-between rounded-t-2xl border-b border-slate-200 px-4 py-2.5 dark:border-white/10", d.weekend && "bg-orange-50 dark:bg-orange-400/10", d.date === today && "bg-accent-500/[0.07]")}>
-                <span className="font-semibold">{longDay(d.date)} <span className="text-xs font-normal text-slate-500">· Day {d.day}{d.weekend ? " · weekend" : ""}{d.date === today ? " · today" : ""}</span></span>
-                <span className="num text-xs text-slate-500">{done}/{d.tasks.length}</span></div>
-              <ul className="flex-1 px-3 py-2">{d.tasks.map((t, i) => (
-                <li key={`${t.id}-${t.text}`} className="group flex items-start gap-2 rounded-md px-1 py-1 hover:bg-slate-50 dark:hover:bg-white/5">
-                  <input type="checkbox" className="mt-1" checked={t.done} onChange={(e) => update(d, (c) => { c.tasks[i].done = e.target.checked; })} aria-label={`Done: ${t.text}`} />
-                  <textarea rows={1} defaultValue={t.text} aria-label="Task"
-                    className={clsx("min-w-0 flex-1 resize-none bg-transparent text-sm leading-snug [field-sizing:content] focus:outline-none", t.done && "text-slate-400 line-through")}
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } }}
-                    onBlur={(e) => { const v = e.target.value.trim(); if (v !== t.text) update(d, (c) => { if (v) c.tasks[i].text = v; else c.tasks.splice(i, 1); }); }} />
-                  <button type="button" onClick={() => update(d, (c) => { c.tasks.splice(i, 1); })} className="opacity-0 focus:opacity-100 group-hover:opacity-100" aria-label="Delete task"><X className="size-4 text-slate-400" /></button>
-                </li>))}{!d.tasks.length && <li className="px-1 py-1 text-sm text-slate-400">No tasks for this day.</li>}</ul>
-              <div className="grid gap-2 px-3 pb-3">
-                <input placeholder="+ Add a task and press Enter" aria-label={`Add a task for ${longDay(d.date)}`} className="rounded-md border border-dashed border-slate-300 bg-transparent px-2 py-1 text-sm dark:border-white/15"
-                  onKeyDown={(e) => { const el = e.currentTarget; if (e.key === "Enter" && el.value.trim()) { e.preventDefault(); const text = el.value.trim(); el.value = ""; update(d, (c) => { c.tasks.push({ id: "", text, done: false }); }); } }} />
-                <textarea defaultValue={d.note} placeholder="Notes for the day" aria-label={`Notes for ${longDay(d.date)}`} className="min-h-12 rounded-md border border-slate-200 bg-transparent px-2 py-1 text-sm dark:border-white/10"
-                  onBlur={(e) => { if (e.target.value !== d.note) update(d, (c) => { c.note = e.target.value; }); }} />
-                {d.edited && <button type="button" className="justify-self-end text-xs text-slate-500 underline" onClick={() => reset.mutate(d.date)}>Reset day to the template</button>}
-              </div>
-            </Card>);
-        })}
-      </div>
-    </div>
-  );
-}
-
 /* ---------- activity ---------- */
 function ActivityLog({ st }: { st: Settings }) {
   const qc = useQueryClient();
@@ -361,11 +303,9 @@ function TrackerSettings({ st }: { st: Settings }) {
         <Field label="Length (days)"><Input type="number" min={7} max={120} value={f.period_days} onChange={(e) => setF({ ...f, period_days: +e.target.value || 30 })} /></Field>
         {(["points", "leads", "opps", "clients"] as const).map((k) => <Field key={k} label={`Target: ${k === "opps" ? "opportunities" : k}`}><Input type="number" min={0} className="num" value={f.targets[k] ?? 0}
           onChange={(e) => setF({ ...f, targets: { ...f.targets, [k]: +e.target.value || 0 } })} /></Field>)}
-        <Field label="Daily plan template" className="sm:col-span-2"><Select value={f.plan_template} onChange={(e) => setF({ ...f, plan_template: e.target.value as Settings["plan_template"] })}>
-          <option value="blank">Blank: only my own tasks</option><option value="centralai">Central AI 30-day launch plan</option></Select></Field>
         <label className="flex items-start gap-2 text-sm sm:col-span-2"><input type="checkbox" className="mt-1" checked={f.share_with_admins} onChange={(e) => setF({ ...f, share_with_admins: e.target.checked })} />
           <span><b>Share my pipeline with admins.</b> They can see your prospects and funnel (read-only) on their Team pipelines page. Off = only you can see it.</span></label>
-      </div>, "The period repeats on its own. A start on the 1st with 28–31 days runs month by month; anything else repeats every set number of days. Weeks and the daily plan follow it.")}
+      </div>, "The period repeats on its own. A start on the 1st with 28–31 days runs month by month; anything else repeats every set number of days. Weekly targets follow it.")}
       {section("Weekly targets", <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-sm"><thead><tr className="text-left text-[11px] uppercase tracking-wider text-slate-500">
         {["Week", "Leads", "Opps", "Clients", "Points", "Focus"].map((h) => <th key={h} className="px-2 py-1">{h}</th>)}</tr></thead>
         <tbody>{weeks.map((w, i) => <tr key={i}><td className="px-2 py-1 font-semibold">Week {i + 1}</td>
@@ -400,20 +340,21 @@ export default function Tracker() {
   const [period, setPeriod] = useState<number | null>(null);   // null = the period today falls in
   const summary = useQuery({ queryKey: ["tracker", "summary", period], placeholderData: (prev) => prev, enabled: tab === "overview",
     queryFn: async () => (await api.get<Summary>("/tracker/summary/", { params: { period: period ?? undefined } })).data });
+  // The daily plan moved out of the pipeline into My Day (SRS v0.5 FR-G5: My Pipeline holds pipeline records only).
+  if (tab === "plan") return <Navigate to="/my-day?tab=plan" replace />;
   if (settings.isLoading) return <Spinner />;
   if (settings.error) return <Alert>{errorText(settings.error)}</Alert>;
   const st = settings.data!;
   const go = (t: string, id?: number) => { setParams({ tab: t }, { replace: true }); if (id) setOpenId(id); };
   return (
     <>
-      <PageHeader title={st.product ? `My tracker · ${st.product}` : "My tracker"} subtitle={st.tagline || "Your own pipeline, daily plan and activity. Only you can see it."} />
+      <PageHeader title={st.product ? `My tracker · ${st.product}` : "My tracker"} subtitle={st.tagline || "Your own pipeline and activity. Only you can see it. Plans are made in My Day."} />
       <div className="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-white/10" role="tablist">
         {TABS.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => go(k)}
           className={clsx("whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold", tab === k ? "border-accent-500 text-slate-900 dark:text-white" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200")}>{l}</button>)}
       </div>
       {tab === "overview" && (summary.isLoading ? <Spinner /> : summary.data ? <Overview s={summary.data} go={go} setPeriod={setPeriod} /> : <Alert>{errorText(summary.error)}</Alert>)}
       {tab === "pipeline" && <Pipeline st={st} openId={openId} clearOpen={() => setOpenId(null)} />}
-      {tab === "plan" && <Plan period={period} setPeriod={setPeriod} />}
       {tab === "activity" && <ActivityLog st={st} />}
       {tab === "settings" && <TrackerSettings key={st.updated_at} st={st} />}
     </>

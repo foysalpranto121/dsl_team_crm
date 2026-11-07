@@ -77,7 +77,7 @@ class SignInAndApprovalTests(TestCase):
         mail.outbox.clear()
         with self.captureOnCommitCallbacks(execute=True):
             done = self.client.post(link, {"role": "viewer"})
-        self.assertContains(done, "approved as viewer")
+        self.assertContains(done, "approved as management")   # the viewer role is called Management (SRS v0.5 §3)
         person = User.objects.get(email="new@example.com")
         self.assertEqual((person.status, person.role, person.approved_by.email), ("approved", "viewer", "boss@example.com"))
         self.assertEqual(mail.outbox[0].to, ["new@example.com"])

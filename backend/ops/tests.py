@@ -18,6 +18,7 @@ from tracker.services import settings_for
 
 from . import services
 from .models import DigestLog
+from core.features import switch_on
 
 NOW = datetime(2026, 10, 29, 4, 0, tzinfo=tz.utc)   # Thu 29 Oct 2026, 10:00 in Dhaka. Week: Sat 24 – Fri 30, Friday off.
 TODAY = date(2026, 10, 29)
@@ -28,6 +29,7 @@ class OpsTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        switch_on("huddle", "digest", "renewals")   # V2 features are off by default (SRS v0.5 §0)
         mk = lambda email, role, name, status="approved": User.objects.create_user(email, name=name, status=status, role=role)
         cls.admin, cls.boss = mk("admin@x.com", "admin", "Admin"), mk("boss@x.com", "viewer", "Boss")
         cls.nadia, cls.arif = mk("nadia@x.com", "member", "Nadia Rahman"), mk("arif@x.com", "member", "Arif Hossain")

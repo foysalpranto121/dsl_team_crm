@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlarmClock, Bell, CalendarClock, CalendarSync, CheckCircle2, ShieldCheck, type LucideIcon } from "lucide-react";
+import { AlarmClock, Bell, CalendarClock, CalendarSync, CalendarX2, CheckCircle2, LayoutGrid, ShieldCheck, type LucideIcon } from "lucide-react";
 import { Link } from "react-router";
-import { pendingUsersQuery, renewalsDueQuery, todayQuery, trackerSummaryQuery } from "@/api/queries";
+import { pendingUsersQuery, plansMineQuery, renewalsDueQuery, todayQuery, trackerSummaryQuery } from "@/api/queries";
+import { useFeatures } from "@/lib/features";
 import { useAuth } from "@/auth/AuthContext";
 import { duration } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -21,12 +22,14 @@ export function NotificationBell() {
   const today = useQuery(todayQuery);
   const pending = useQuery({ ...pendingUsersQuery, enabled: isAdmin });
   const follow = useQuery({ ...trackerSummaryQuery, staleTime: 5 * 60_000 });
-  const renewals = useQuery({ ...renewalsDueQuery, staleTime: 5 * 60_000, enabled: user?.role !== "viewer" });
+  const features = useFeatures();
+  const renewals = useQuery({ ...renewalsDueQuery, staleTime: 5 * 60_000, enabled: features.renewals && user?.role !== "viewer" });
+  const plans = useQuery({ ...plansMineQuery, staleTime: 2 * 60_000, enabled: !!user && user.role !== "viewer" });
 
   const items: Item[] = [];
   const t = today.data;
   if (t?.lock_days && t.my_sheets.some((s) => s.kind === "work" && !s.filled_today)) {
-    items.push({ id: "unfilled", tone: "warning", icon: AlarmClock, title: "You haven't filled in today", body: `Today locks at midnight, in ${duration(t.seconds_to_lock)}.`, to: "/log" });
+    items.push({ id: "unfilled", tone: "warning", icon: AlarmClock, title: "You haven't filled in today", body: `Today locks at midnight, in ${duration(t.seconds_to_lock)}.`, to: "/my-day" });
   }
   const waiting = isAdmin ? pending.data?.length ?? 0 : 0;
   if (waiting) {
@@ -38,7 +41,20 @@ export function NotificationBell() {
     items.push({ id: "follow", tone: overdue ? "danger" : "primary", icon: CalendarClock, title: `${dueCount} follow-up${dueCount === 1 ? "" : "s"} due`,
       body: overdue ? `${overdue} overdue · ${names}` : names, to: "/tracker" });
   }
-  const r = renewals.data;
+  const pm = plans.data;
+  if (pm?.to_review) {
+    items.push({ id: "review", tone: "primary", icon: LayoutGrid, title: `${pm.to_review} ${pm.to_review === 1 ? "hour waits" : "hours wait"} for your decision`,
+      body: "Plans, deviations and unplanned hours, on the Team Board.", to: "/team-board" });
+  }
+  if (pm?.this_week?.rejected) {
+    items.push({ id: "rejected", tone: "danger", icon: CalendarX2, title: `${pm.this_week.rejected} planned ${pm.this_week.rejected === 1 ? "hour was" : "hours were"} sent back`,
+      body: "Change them and submit the plan again.", to: "/my-day?tab=plan" });
+  }
+  if (pm?.next_week?.due && (!pm.next_week.status || pm.next_week.status === "draft")) {
+    items.push({ id: "plan-next", tone: "warning", icon: CalendarClock, title: "Plan next week", body: "Each day's plan closes at the end of the working day before it.",
+      to: `/my-day?tab=plan&day=${pm.next_week.start}` });
+  }
+  const r = features.renewals ? renewals.data : undefined;
   if (r?.count) {
     const late = r.items.filter((x) => x.overdue).length, first = r.items[0];
     items.push({ id: "renewals", tone: late || (first && first.days_left < 0) ? "danger" : "primary", icon: CalendarSync,

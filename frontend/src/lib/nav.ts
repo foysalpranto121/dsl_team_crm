@@ -1,11 +1,13 @@
 import {
-  Activity, BarChart3, Briefcase, CalendarCheck2, CalendarSync, ClipboardList, LayoutDashboard, ListTodo, Network, Newspaper, NotebookPen, Settings,
-  ShieldCheck, Sunrise, Tv, UserRound, Users, type LucideIcon,
+  Activity, BarChart3, Briefcase, CalendarCheck2, CalendarClock, CalendarSync, ClipboardList, LayoutDashboard, LayoutGrid, ListTodo, Network, Newspaper,
+  Settings, ShieldCheck, Sunrise, Tv, UserRound, Users, type LucideIcon,
 } from "lucide-react";
-import type { Role } from "../api/types";
+import type { Feature, Role } from "../api/types";
+import type { Features } from "./features";
 
 /** Every menu in the app comes from here: the sidebar, the phone tab bar, the command palette and the "New" menu.
-    v3 adds the member menu from SRS FR-G8 (Home · My Day · My Pipeline · My Progress · Learn) as those screens land. */
+    SRS v0.5 FR-G5: the member menu grows to Home · My Day · My Tasks · My Pipeline · My Progress as those screens land;
+    supervisor and admin items show only for those roles; V2 features only while switched on (§0). */
 
 export type BadgeKey = "pendingUsers";
 
@@ -16,6 +18,8 @@ export interface NavItem {
   description: string;
   badge?: BadgeKey;
   keywords?: string;
+  roles?: Role[];
+  feature?: Feature;
 }
 
 export interface NavSection {
@@ -25,30 +29,40 @@ export interface NavSection {
   items: NavItem[];
 }
 
+const WORKERS: Role[] = ["admin", "supervisor", "member"];
+
 export const NAV: NavSection[] = [
+  {
+    id: "mine", title: "My work", items: [
+      { to: "/my-day", label: "My Day", icon: CalendarClock, description: "Plan your week, then log each hour against the plan", roles: WORKERS,
+        keywords: "plan log hours timesheet today sheets daily log week approve" },
+      { to: "/my-tasks", label: "My Tasks", icon: ListTodo, description: "Your to-do list, with dates and tasks your supervisor assigned", roles: WORKERS,
+        keywords: "todo to-do reminders assigned due overdue checklist" },
+      { to: "/tracker", label: "My pipeline", icon: Briefcase, description: "Your own pipeline and activity", keywords: "tracker prospects deals follow-ups" },
+      { to: "/renewals", label: "Renewals", icon: CalendarSync, description: "AMCs, licences and software coming up for renewal", feature: "renewals",
+        keywords: "amc contract licence subscription expiry renew upsell" },
+    ],
+  },
   {
     id: "team", title: "Team", items: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Team hours, points and results at a glance", keywords: "home overview" },
-      { to: "/huddle", label: "Morning huddle", icon: Sunrise, description: "Yesterday, today's plan, what needs attention, one focus", keywords: "meeting standup daily focus" },
-      { to: "/log", label: "Daily log", icon: NotebookPen, description: "What you worked on, hour by hour, and your plan", keywords: "sheets sheet log hours timesheet today fill plan" },
+      { to: "/team-board", label: "Team Board", icon: LayoutGrid, description: "Approve plans, deviations and unplanned hours", roles: ["admin", "supervisor"],
+        keywords: "approve approvals plans board supervisor deviations" },
+      { to: "/huddle", label: "Morning huddle", icon: Sunrise, description: "Yesterday, today's plan, what needs attention, one focus", feature: "huddle",
+        keywords: "meeting standup daily focus" },
       { to: "/kpi", label: "Weekly KPI", icon: CalendarCheck2, description: "Leads, opportunities, clients and revenue per week", keywords: "results" },
       { to: "/performance", label: "Performance", icon: BarChart3, description: "Monthly, quarterly and yearly scores", keywords: "score composite" },
       { to: "/team", label: "People", icon: Users, description: "Who's on the team", keywords: "directory members" },
     ],
   },
   {
-    id: "mine", title: "My work", items: [
-      { to: "/tracker", label: "My pipeline", icon: Briefcase, description: "Your own pipeline, plan and activity", keywords: "tracker prospects deals follow-ups" },
-      { to: "/renewals", label: "Renewals", icon: CalendarSync, description: "AMCs, licences and software coming up for renewal", keywords: "amc contract licence subscription expiry renew upsell" },
-    ],
-  },
-  {
     id: "admin", title: "Admin", roles: ["admin"], items: [
       { to: "/admin/approvals", label: "Approvals", icon: ShieldCheck, badge: "pendingUsers", description: "Approve new people and change access", keywords: "users sign-up" },
-      { to: "/admin/settings", label: "Team setup", icon: Settings, description: "Sheets, targets, tasks, job roles and rules", keywords: "settings config" },
+      { to: "/admin/settings", label: "Team setup", icon: Settings, description: "Daily logs, targets, tasks, roles, approval policy and features", keywords: "settings config features policy" },
       { to: "/admin/pipelines", label: "Team pipelines", icon: Network, description: "Pipelines people have shared with admins" },
-      { to: "/admin/tv", label: "TV screens", icon: Tv, description: "Team progress and wins on the office TV", keywords: "display office screen tv mode wins" },
-      { to: "/admin/digest", label: "Weekly digest", icon: Newspaper, description: "The weekly email for admins and management", keywords: "email report management summary" },
+      { to: "/admin/tv", label: "TV screens", icon: Tv, description: "Team progress and wins on the office TV", feature: "tv", keywords: "display office screen tv mode wins" },
+      { to: "/admin/digest", label: "Weekly digest", icon: Newspaper, description: "The weekly email for admins and management", feature: "digest",
+        keywords: "email report management summary" },
       { to: "/admin/activity", label: "Activity log", icon: ClipboardList, description: "Every change, who made it and when", keywords: "audit history" },
     ],
   },
@@ -70,14 +84,21 @@ export interface QuickAction {
 
 /** The global "New" menu (SRS FR-Q2). Each opens the exact screen for the job. */
 export const QUICK_ACTIONS: QuickAction[] = [
-  { id: "log", label: "Fill in today's hours", description: "Your daily log for today", to: "/log", icon: NotebookPen, roles: ["admin", "member"] },
-  { id: "plan", label: "Today's plan", description: "Tick off your daily plan", to: "/tracker?tab=plan", icon: ListTodo },
+  { id: "log", label: "Log today's hours", description: "Confirm your planned hours, log the rest", to: "/my-day", icon: CalendarClock, roles: WORKERS },
+  { id: "plan", label: "Plan my week", description: "Plan the hours and send them for approval", to: "/my-day?tab=plan", icon: LayoutGrid, roles: WORKERS },
+  { id: "task", label: "Add a task", description: "Put something on your to-do list", to: "/my-tasks?new=1", icon: ListTodo, roles: WORKERS },
   { id: "activity", label: "Log an activity", description: "Calls, emails, meetings…", to: "/tracker?tab=activity", icon: Activity },
   { id: "deal", label: "Update my pipeline", description: "Add a prospect or move a deal", to: "/tracker?tab=pipeline", icon: Briefcase },
-  { id: "kpi", label: "Enter weekly KPI", description: "This week's leads, opportunities and revenue", to: "/kpi", icon: CalendarCheck2, roles: ["admin", "member"] },
+  { id: "kpi", label: "Enter weekly KPI", description: "This week's leads, opportunities and revenue", to: "/kpi", icon: CalendarCheck2, roles: WORKERS },
 ];
 
-export const navFor = (role: Role) => NAV.filter((s) => !s.roles || s.roles.includes(role));
+const allowed = (item: { roles?: Role[]; feature?: Feature }, role: Role, features?: Features) =>
+  (!item.roles || item.roles.includes(role)) && (!item.feature || !!features?.[item.feature]);
+
+export const navFor = (role: Role, features?: Features) =>
+  NAV.filter((s) => !s.roles || s.roles.includes(role))
+    .map((s) => ({ ...s, items: s.items.filter((i) => allowed(i, role, features)) }))
+    .filter((s) => s.items.length > 0);
 export const actionsFor = (role: Role) => QUICK_ACTIONS.filter((a) => !a.roles || a.roles.includes(role));
 
 /** Which section and page a path belongs to, for the breadcrumb. */

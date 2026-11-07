@@ -14,9 +14,10 @@ from accounts.models import User
 from core.models import AuditLog
 from team import services as team_services
 from team.exporter import build_workbook
-from team.models import JobRole, KpiEntry, Sheet
+from team.models import JobRole, KpiEntry, Sheet, TeamSettings
 
 from .models import Contract, Renewal
+from core.features import switch_on
 
 NOW = datetime(2026, 10, 29, 4, 0, tzinfo=tz.utc)   # Thu 29 Oct 2026, 10:00 in Dhaka
 TODAY = date(2026, 10, 29)
@@ -30,6 +31,7 @@ def ends_in(n):
 class RenewalTests(TestCase):
     @classmethod
     def setUpTestData(cls):
+        switch_on("renewals", "huddle", "digest")   # V2 features are off by default (SRS v0.5 §0)
         mk = lambda e, role, name: User.objects.create_user(e, name=name, status="approved", role=role)  # noqa: E731
         cls.admin = mk("a@x.com", "admin", "Admin")
         cls.member = mk("m@x.com", "member", "Mina Rahman")
@@ -227,6 +229,19 @@ class RenewalTests(TestCase):
         self.assertEqual(s["warnings"], {"unowned": 0, "no_sheet": ["Other Person"]})
         mine = self.api(self.member).get("/api/renewals/summary/").data
         self.assertEqual((mine["scope"], mine["contracts"]["total"], mine["warnings"]), ("mine", 5, {}))
+
+    # ----- SRS v0.5 §0: a V2 feature switched off -----
+    def test_switched_off_the_tracker_answers_404_and_renewals_stop_counting_as_revenue(self):
+        c = self.contract(20, value=100000)
+        rid = self.opportunities(self.member)["Acme Ltd"]["id"]
+        self.api(self.member).post(f"/api/renewals/opportunities/{rid}/renew/", {"start_date": str(c.end_date + timedelta(days=1)),
+                                   "end_date": str(c.end_date + timedelta(days=365)), "value": "120000"}, format="json")
+        revenue = lambda: next(x for x in self.api(self.admin).get("/api/team/dashboard/").data["rows"] if x["id"] == self.sheet.pk)["kpi_month"]["revenue"]  # noqa: E731
+        self.assertEqual(revenue(), 120000)
+        TeamSettings.objects.filter(pk=1).update(feature_renewals=False)
+        r = self.api(self.admin).get("/api/renewals/summary/")
+        self.assertEqual((r.status_code, str(r.data["detail"])), (404, "The renewal tracker is switched off. An admin can switch it on in Team setup → Features."))
+        self.assertEqual(revenue(), 0)
 
     # ----- the huddle and the weekly digest -----
     def test_huddle_and_digest_include_renewals(self):

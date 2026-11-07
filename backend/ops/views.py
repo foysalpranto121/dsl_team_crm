@@ -12,6 +12,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from accounts.permissions import IsTeamAdmin
+from core.features import gate
 from team import calc
 from team import services as team
 from team.models import TeamSettings
@@ -51,7 +52,7 @@ def _sent(log):
             "by": (log.sent_by.name or log.sent_by.email) if log.sent_by else None}
 
 
-class HuddleView(APIView):
+class HuddleView(gate("huddle"), APIView):
     """The morning huddle (SRS FR-TM1). Admins also see names of missing results, stuck deals and people waiting for approval."""
 
     @extend_schema(responses=OpenApiTypes.OBJECT)
@@ -63,7 +64,7 @@ class FocusSerializer(serializers.Serializer):
     text = serializers.CharField(min_length=3, max_length=300)
 
 
-class HuddleFocusView(APIView):
+class HuddleFocusView(gate("huddle"), APIView):
     """Post the huddle's one focus for today. It becomes a pinned announcement on everyone's dashboard until midnight."""
 
     permission_classes = [IsTeamAdmin]
@@ -76,7 +77,7 @@ class HuddleFocusView(APIView):
         return Response({"text": a.body, "by": request.user.name or request.user.email, "at": a.created_at}, status=status.HTTP_201_CREATED)
 
 
-class DigestView(APIView):
+class DigestView(gate("digest"), APIView):
     """One week's management digest (SRS FR-TM4): the email exactly as it is sent, its numbers, recipients and send history."""
 
     permission_classes = [IsAdminOrManagement]
@@ -95,7 +96,7 @@ class DigestView(APIView):
         })
 
 
-class DigestSendView(APIView):
+class DigestSendView(gate("digest"), APIView):
     """Admins send a week's digest now. A week that already went out needs force=true ("Send again")."""
 
     permission_classes = [IsTeamAdmin]
@@ -117,7 +118,7 @@ class DigestSendView(APIView):
         return Response({"sent": _sent(sent)})
 
 
-class DigestRunView(APIView):
+class DigestRunView(gate("digest"), APIView):
     """For the weekly schedule, e.g. a cron-job.org job: POST with the header X-Cron-Secret: <DIGEST_CRON_SECRET>.
     Sends last week's digest if it hasn't gone out yet, so calling it more than once is harmless. No secret set = off."""
 

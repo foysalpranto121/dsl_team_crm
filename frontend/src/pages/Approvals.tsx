@@ -11,7 +11,8 @@ const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("en-GB"
 const ROLES: { value: Role; label: string; hint: string }[] = [
   { value: "member", label: "Member", hint: "Fills in their own daily log" },
   { value: "admin", label: "Admin", hint: "Manages people, daily logs and targets" },
-  { value: "viewer", label: "Viewer", hint: "Can only look" },
+  { value: "supervisor", label: "Supervisor", hint: "Approves plans and hours; plans and logs their own work" },
+  { value: "viewer", label: "Management", hint: "Reads every dashboard and report" },
 ];
 
 function Request({ u, onApproved }: { u: AdminUser; onApproved: (msg: string) => void }) {

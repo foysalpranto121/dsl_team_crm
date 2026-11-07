@@ -2,15 +2,15 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export type MeterTone = "primary" | "success" | "warning" | "danger";
-const fill: Record<MeterTone, string> = { primary: "bg-primary", success: "bg-success", warning: "bg-warning", danger: "bg-danger" };
+const fill: Record<MeterTone, string> = { primary: "bg-accent", success: "bg-success", warning: "bg-warning", danger: "bg-danger" };
 // The unfilled track is a lighter step of the same colour, so the state reads across the whole bar.
-const track: Record<MeterTone, string> = { primary: "bg-primary-soft", success: "bg-success-soft", warning: "bg-warning-soft", danger: "bg-danger-soft" };
-const ringFill: Record<MeterTone, string> = { primary: "stroke-primary", success: "stroke-success", warning: "stroke-warning", danger: "stroke-danger" };
-const ringTrack: Record<MeterTone, string> = { primary: "stroke-primary-soft", success: "stroke-success-soft", warning: "stroke-warning-soft", danger: "stroke-danger-soft" };
+const track: Record<MeterTone, string> = { primary: "bg-accent-soft", success: "bg-success-soft", warning: "bg-warning-soft", danger: "bg-danger-soft" };
+const ringFill: Record<MeterTone, string> = { primary: "stroke-accent", success: "stroke-success", warning: "stroke-warning", danger: "stroke-danger" };
+const ringTrack: Record<MeterTone, string> = { primary: "stroke-accent-soft", success: "stroke-success-soft", warning: "stroke-warning-soft", danger: "stroke-danger-soft" };
 
 const clamp = (v: number, max: number) => (max > 0 ? Math.max(0, Math.min(100, (v / max) * 100)) : 0);
 
-/** The colour for progress against a target: met → green, otherwise blue (warning and danger are for real problems). */
+/** The colour for progress against a target (v0.5: accent = progress): met → green, otherwise the accent (warning and danger are for real problems). */
 export const toneForRatio = (ratio: number | null | undefined): MeterTone => (ratio != null && ratio >= 1 ? "success" : "primary");
 
 export function Progress({ value, max = 100, tone = "primary", size = "md", label, className }: {

@@ -14,7 +14,8 @@ class TeamSettingsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TeamSettings
-        fields = ["name", "timezone", "lock_days", "week_start_dow", "weekend_days", "count_weekend", "currency",
+        fields = ["name", "timezone", "lock_days", "week_start_dow", "weekend_days", "count_weekend", "currency", "unplanned_mode", "plan_cutoff",
+                  "feature_tv", "feature_huddle", "feature_digest", "feature_renewals",
                   "today", "seconds_to_lock", "updated_at"]
         read_only_fields = ["updated_at"]
 
@@ -116,6 +117,7 @@ class HourMetaSerializer(serializers.Serializer):
     qty = serializers.IntegerField(min_value=0, max_value=100000, required=False, allow_null=True)
     ref = serializers.CharField(max_length=200, required=False, allow_blank=True)
     reason = serializers.CharField(max_length=300, required=False, allow_blank=True)
+    task = serializers.IntegerField(required=False, allow_null=True, min_value=1, help_text="The My Tasks task this hour was logged from.")
 
 
 class EntryWriteSerializer(serializers.Serializer):

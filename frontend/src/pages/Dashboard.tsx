@@ -113,14 +113,14 @@ export default function Dashboard() {
     <>
       <PageHeader title={`${hello}, ${(user?.name || "").split(" ")[0] || "there"}`}
         subtitle={<>{dayFmt(t.today)} · Week {t.week_no} · times in {t.timezone.replace("_", " ")}</>}
-        actions={<Link to="/log"><Button><CalendarCheck2 className="size-4" /> Fill in today</Button></Link>} />
+        actions={<Link to="/my-day"><Button><CalendarCheck2 className="size-4" /> Fill in today</Button></Link>} />
 
       <Announcements />
 
       {t.lock_days && unfilled.length > 0 && (
         <div className="mb-6"><Alert tone="amber">
           <span className="inline-flex items-center gap-2 font-semibold"><AlarmClock className="size-4" /> You haven't filled in today yet.</span>{" "}
-          Today locks at midnight, in <b className="num">{countdown}</b>. <Link to="/log" className="font-semibold underline">Open your daily log</Link>
+          Today locks at midnight, in <b className="num">{countdown}</b>. <Link to="/my-day" className="font-semibold underline">Open My Day</Link>
         </Alert></div>
       )}
 

@@ -14,7 +14,7 @@ from accounts.models import User
 from accounts.permissions import IsAdminOrReadOnly, IsApproved, IsTeamAdmin
 from core import audit
 
-from . import calc, services, snapshots
+from . import calc, planning, services, snapshots
 from .exporter import build_workbook
 from .importer import WorkbookError, import_workbook
 from .models import JobRole, KpiEntry, Sheet, SheetEntry, Task, TeamSettings
@@ -135,6 +135,10 @@ class SheetViewSet(viewsets.ModelViewSet):
         return Response({"from": frm, "to": to, "today": t, "editable": editable, "blocked": blocked,
                          "entries": EntrySerializer(rows, many=True, context={"pts": task_points()}).data,
                          "plan_weeks": {str(k): v for k, v in plans.items()},
+                         # the approved task of each hour, so the log can show the plan and pre-fill it (SRS v0.5 FR-T7)
+                         "planned": {str(k): v for k, v in planning.approved_plans(sheet, frm, to, services.cfg_of(st)).items()}
+                         if sheet.kind == Sheet.Kind.WORK else {},
+                         "unplanned_mode": st.unplanned_mode,
                          **services.sheet_summary(sheet, frm, to, st)})
 
     @extend_schema(request=EntryWriteSerializer, responses=EntrySerializer)
