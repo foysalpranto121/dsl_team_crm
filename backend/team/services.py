@@ -9,7 +9,7 @@ from accounts.models import User
 from core import audit
 
 from . import calc
-from .models import SLOTS, JobRole, KpiEntry, Sheet, SheetEntry, Task, TeamSettings
+from .models import SLOTS, JobRole, KpiEntry, Sheet, SheetEntry, Task, TeamSettings, WeekPlan
 
 
 class Locked(Exception):
@@ -31,12 +31,31 @@ def cfg_of(st):
 
 # ---------- who may change what ----------
 
-def entry_block(user, sheet, day, st=None):
-    """None if the person may change this sheet on this day, otherwise the reason they can't."""
+def plan_statuses(sheet, frm, to, cfg):
+    """{week start: weekly-plan status} for the weeks from frm to to. For a plan sheet, its own weeks; for a work log, the
+    weeks of its owner's plan (the plan that opens the work)."""
+    if sheet.kind == Sheet.Kind.PLAN:
+        qs = WeekPlan.objects.filter(sheet=sheet)
+    elif sheet.owner_id:
+        qs = WeekPlan.objects.filter(sheet__owner_id=sheet.owner_id, sheet__kind=Sheet.Kind.PLAN, sheet__archived=False)
+    elif sheet.person:
+        qs = WeekPlan.objects.filter(sheet__owner__isnull=True, sheet__kind=Sheet.Kind.PLAN, sheet__person__iexact=sheet.person)
+    else:
+        return {}
+    out = {}
+    for ws, status in qs.filter(week_start__range=(calc.week_start_of(frm, cfg), to)).values_list("week_start", "status"):
+        if out.get(ws) != WeekPlan.Status.APPROVED:   # with two plan sheets, an approved one wins
+            out[ws] = status
+    return out
+
+
+def entry_block(user, sheet, day, st=None, plans=None):
+    """None if the person may change this sheet on this day, otherwise the reason they can't.
+    plans: plan_statuses() for the weeks around `day`, when the caller checks many days at once."""
     if user.is_team_admin:
         return None
-    if not (user.is_approved and user.role == User.Role.MEMBER):
-        return "Viewers can look at sheets but not change them."
+    if not user.does_own_work:
+        return "Management can look at sheets but not change them."
     if sheet.archived:
         return "This sheet is archived."
     if sheet.owner_id != user.pk:
@@ -47,7 +66,12 @@ def entry_block(user, sheet, day, st=None):
         if day < t:
             return f"This day is locked. Days lock at midnight ({st.timezone} time). Ask an admin if it needs a correction."
         if sheet.kind == Sheet.Kind.WORK and day > t:
-            return "You can only fill in today. Use your plan sheet to plan ahead."
+            return "You can only log today. Plan ahead in My Day → Plan."
+    # Plans close at the cut-off (SRS v0.5 FR-P6). Which hours of a plan may still change is decided per hour when saving:
+    # submitted and approved hours are locked (FR-P2, FR-P3). Logging work is never blocked by the plan (D1, FR-T3).
+    if sheet.kind == Sheet.Kind.PLAN:
+        from .planning import plan_closed   # planning builds on this module, so it's imported here
+        return plan_closed(day, st)
     return None
 
 
@@ -59,8 +83,8 @@ def kpi_block(user, sheet, week_start, st=None):
         return "Weekly results go on work-log sheets, not plans."
     if user.is_team_admin:
         return None
-    if not (user.is_approved and user.role == User.Role.MEMBER):
-        return "Viewers can look at results but not change them."
+    if not user.does_own_work:
+        return "Management can look at results but not change them."
     if sheet.archived:
         return "This sheet is archived."
     if sheet.owner_id != user.pk:
@@ -96,7 +120,14 @@ def clean_slots(user, sheet, slots, previous):
 
 
 @transaction.atomic
-def save_entry(user, sheet, day, slots, remarks):
+def save_entry(user, sheet, day, slots, remarks, meta=None):
+    """Save one day of a sheet.
+    Plan: submitted and approved hours stay as they are; a rejected hour that's changed becomes a draft (SRS v0.5 FR-P2/P3).
+    Work log: each hour is compared with the approved plan (FR-T1–T3, §6). A different task is a deviation: it needs a
+    reason and counts zero until a supervisor approves it. An unplanned hour counts provisionally (or waits for approval in
+    strict mode). An approved hour can be marked Not done, with a reason."""
+    from . import planning   # planning builds on this module, so it's imported here
+
     st = TeamSettings.load()
     reason = entry_block(user, sheet, day, st)
     if reason:
@@ -104,17 +135,23 @@ def save_entry(user, sheet, day, slots, remarks):
     entry = SheetEntry.objects.select_for_update().filter(sheet=sheet, day=day).first()
     slots = clean_slots(user, sheet, slots, entry.slots if entry else None)
     remarks = (remarks or "").strip()[:2000]
+    if sheet.kind == Sheet.Kind.PLAN:
+        planning.guard_plan_change(user, sheet, day, entry.slots if entry else [], slots)
+        details = []
+    else:
+        slots, details = planning.log_details(user, sheet, day, slots, meta, entry, st)
     correction = user.is_team_admin and st.lock_days and day < today(st)   # an admin changing a locked day
-    if not calc.filled(slots) and not remarks:
+    if not calc.filled(slots) and not remarks and not details:
         if entry:
             entry.delete()
             audit.log(user, "entry.clear", sheet, flagged=correction, day=str(day))
         return None
     before = entry.slots if entry else []
     entry = entry or SheetEntry(sheet=sheet, day=day)
-    entry.slots, entry.remarks, entry.updated_by = slots, remarks, user
+    entry.slots, entry.meta, entry.remarks, entry.updated_by = slots, details, remarks, user
     entry.save()
-    audit.log(user, "entry.save", sheet, flagged=correction, day=str(day), before=before, after=slots)
+    pending = sum(1 for m in details if m and m.get("review") == "pending")
+    audit.log(user, "entry.save", sheet, flagged=correction, day=str(day), before=before, after=slots, **({"pending": pending} if pending else {}))
     return entry
 
 
@@ -161,7 +198,7 @@ def _snapshot(sheets_qs, renewals=True):
     pts = {t.id: float(t.points) for t in Task.objects.all()}
     sheets = list(sheets_qs.select_related("owner", "role").prefetch_related("entries", "kpis"))
     extra = renewal_revenue(cfg) if renewals else None
-    data = [(s, [calc.Day(e.day, e.slots) for e in s.entries.all()], kpi_rows(s, extra)) for s in sheets]
+    data = [(s, [calc.Day(e.day, e.counted_slots()) for e in s.entries.all()], kpi_rows(s, extra)) for s in sheets]
     return st, cfg, pts, data
 
 
@@ -203,7 +240,7 @@ def sheet_summary(sheet, frm, to, st=None):
     cfg = cfg_of(st)
     pts = {t.id: float(t.points) for t in Task.objects.all()}
     first, last = calc.week_start_of(frm, cfg), calc.week_start_of(to, cfg) + timedelta(days=6)
-    days = [calc.Day(e.day, e.slots) for e in sheet.entries.filter(day__range=(first, last))]
+    days = [calc.Day(e.day, e.counted_slots()) for e in sheet.entries.filter(day__range=(first, last))]
     weeks, ws = [], first
     while ws <= to:
         we = ws + timedelta(days=6)
@@ -243,7 +280,7 @@ def wins_between(a, b, details=True):
     out = []
     for e in entries:
         s = e.sheet
-        for task_id in dict.fromkeys(x for x in e.slots if x in names):
+        for task_id in dict.fromkeys(x for x in e.counted_slots() if x in names):
             out.append({"id": f"{e.pk}-{task_id}", "day": e.day, "what": names[task_id], "owner_id": s.owner_id,
                         "person": s.person or (s.owner.name if s.owner else s.name), "photo": photo_of(s.owner),
                         "details": (e.remarks.strip()[:160] or None) if details else None})
@@ -286,7 +323,7 @@ def link_unowned_sheets(user):
 
 
 def entry_numbers(entry, pts):
-    return {"hours": calc.day_hours(entry.slots), "points": calc.day_points(entry.slots, pts)}
+    return {"hours": calc.day_hours(entry.counted_slots()), "points": calc.day_points(entry.counted_slots(), pts)}
 
 
 def parse_day(value, default=None):

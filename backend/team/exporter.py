@@ -75,7 +75,7 @@ def build_workbook(year, sheet_ids=None):
     for s in sheets:
         if s.kind != Sheet.Kind.WORK:
             continue
-        days = [calc.Day(e.day, e.slots) for e in s.entries.all()]
+        days = [calc.Day(e.day, e.counted_slots()) for e in s.entries.all()]
         d = calc.dashboard(s.targets, days, services.kpi_rows(s, renewal_rev), cfg, pts, on)
         h, p = calc.totals(days, first, last, cfg, pts)
         for c, v in enumerate([s.name, s.person, s.role.name if s.role else "", h, p, float(s.target_hours), d["avg_week_hours"],
@@ -92,7 +92,7 @@ def build_workbook(year, sheet_ids=None):
                f"Weekly target {float(s.target_hours):g} h · monthly points target {float(s.target_points):g} · counting from {s.start_date or '—'}")
         _header(ws, 4, heads, [11, 6] + [22] * SLOTS + [28, 8, 8, 6, 6, 9, 9])
         entries = {e.day: e for e in s.entries.filter(day__range=(first - timedelta(days=6), last + timedelta(days=6)))}
-        days = [calc.Day(d, e.slots) for d, e in entries.items()]
+        days = [calc.Day(d, e.counted_slots()) for d, e in entries.items()]
         week_cache, month_cache = {}, {}
         row, d = 5, first
         while d <= last:

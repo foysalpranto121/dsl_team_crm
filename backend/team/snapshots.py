@@ -29,7 +29,7 @@ def _sheet_data(s):
     return {"name": s.name, "kind": s.kind, "owner_id": s.owner_id, "person": s.person, "role": s.role.name if s.role else None,
             "targets": {f: str(getattr(s, f)) for f in TARGET_FIELDS}, "start_date": s.start_date.isoformat() if s.start_date else None,
             "position": s.position, "archived": s.archived,
-            "entries": [{"day": e.day.isoformat(), "slots": e.slots, "remarks": e.remarks} for e in s.entries.all()],
+            "entries": [{"day": e.day.isoformat(), "slots": e.slots, "meta": e.meta, "remarks": e.remarks} for e in s.entries.all()],
             "kpis": [_kpi_data(k) for k in s.kpis.all()]}
 
 
@@ -83,7 +83,7 @@ def restore(name, actor):
             s = Sheet.objects.create(name=d["name"], kind=d["kind"], owner_id=d["owner_id"] if d["owner_id"] in users else None,
                                      person=d["person"], role=roles.get(d["role"]), start_date=parse_date(d["start_date"] or ""),
                                      position=d["position"], archived=d["archived"], **{f: Decimal(v) for f, v in d["targets"].items()})
-            SheetEntry.objects.bulk_create([SheetEntry(sheet=s, day=parse_date(e["day"]), slots=e["slots"], remarks=e["remarks"]) for e in d["entries"]])
+            SheetEntry.objects.bulk_create([SheetEntry(sheet=s, day=parse_date(e["day"]), slots=e["slots"], meta=e.get("meta") or [], remarks=e["remarks"]) for e in d["entries"]])
             KpiEntry.objects.bulk_create([KpiEntry(sheet=s, week_start=parse_date(k["week_start"]), revenue=Decimal(k["revenue"]), notes=k["notes"], counts_in=k.get("counts_in", ""),
                                                    **{f: k[f] for f in KPI_FIELDS}) for k in d["kpis"]])
     audit.log(actor, "team.restore", name, flagged=True, backup_before=before, **data["counts"])

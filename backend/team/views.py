@@ -124,15 +124,17 @@ class SheetViewSet(viewsets.ModelViewSet):
         if to < frm or (to - frm).days > 400:
             raise ValidationError("Ask for up to about a year at a time.")
         rows = sheet.entries.filter(day__range=(frm, to)).select_related("updated_by")
+        plans = services.plan_statuses(sheet, frm, to, services.cfg_of(st))   # one query for every week in the range
         editable, blocked, d = {}, {}, frm
         while d <= to:   # which days this person may change, by the server's clock, and why not
-            reason = services.entry_block(request.user, sheet, d, st)
+            reason = services.entry_block(request.user, sheet, d, st, plans)
             editable[d.isoformat()] = reason is None
             if reason:
                 blocked[d.isoformat()] = reason
             d += timedelta(days=1)
         return Response({"from": frm, "to": to, "today": t, "editable": editable, "blocked": blocked,
                          "entries": EntrySerializer(rows, many=True, context={"pts": task_points()}).data,
+                         "plan_weeks": {str(k): v for k, v in plans.items()},
                          **services.sheet_summary(sheet, frm, to, st)})
 
     @extend_schema(request=EntryWriteSerializer, responses=EntrySerializer)
@@ -146,7 +148,7 @@ class SheetViewSet(viewsets.ModelViewSet):
                 return Response(status=status.HTTP_204_NO_CONTENT)
             ser = EntryWriteSerializer(data=request.data)
             ser.is_valid(raise_exception=True)
-            e = services.save_entry(request.user, sheet, d, ser.validated_data["slots"], ser.validated_data.get("remarks"))
+            e = services.save_entry(request.user, sheet, d, ser.validated_data["slots"], ser.validated_data.get("remarks"), ser.validated_data.get("meta"))
         except services.Locked as err:
             return locked(err)
         if e is None:

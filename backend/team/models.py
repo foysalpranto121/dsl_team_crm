@@ -30,6 +30,26 @@ class TeamSettings(models.Model):
     week_start_dow = models.PositiveSmallIntegerField(choices=DAYS, default=6)
     weekend_days = models.JSONField(default=list, validators=[validate_days])
     count_weekend = models.BooleanField(default=True, help_text="Count hours logged on weekend days in totals.")
+
+    # Approval policy (SRS v0.5 FR-C8, D1, FR-P6)
+    class Unplanned(models.TextChoices):
+        PROVISIONAL = "provisional", "Count provisionally; a supervisor can flag them later"
+        STRICT = "strict", "Count zero until a supervisor approves them"
+
+    class Cutoff(models.TextChoices):
+        PREVIOUS_DAY = "previous_day", "By the end of the previous working day"
+        SAME_DAY = "same_day", "Up to the day itself"
+
+    unplanned_mode = models.CharField(max_length=12, choices=Unplanned.choices, default=Unplanned.PROVISIONAL,
+                                      help_text="Hours logged without an approved plan (SRS D1, FR-T3).")
+    plan_cutoff = models.CharField(max_length=12, choices=Cutoff.choices, default=Cutoff.PREVIOUS_DAY,
+                                   help_text="Until when a day's plan can be made and submitted (SRS FR-P6).")
+
+    # SRS v0.5 §0: only [MVP] features are on by default; these V2 features stay off until an admin switches them on.
+    feature_tv = models.BooleanField(default=False, help_text="Office TV mode (V2).")
+    feature_huddle = models.BooleanField(default=False, help_text="Morning huddle screen (V2).")
+    feature_digest = models.BooleanField(default=False, help_text="Weekly management digest (V2).")
+    feature_renewals = models.BooleanField(default=False, help_text="AMC and renewal tracker (V2).")
     currency = models.CharField(max_length=8, default="BDT")
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -136,10 +156,25 @@ class Sheet(models.Model):
         return t
 
 
+NOT_COUNTED = ("pending", "rejected", "flagged")
+
+
+def slot_counts(slot, meta):
+    """SRS v0.5 §6: a logged hour counts unless it was marked Not done, or it is waiting for approval (a deviation, or an
+    unplanned hour in strict mode), was rejected, or was flagged by a supervisor."""
+    if slot is None:
+        return False
+    m = meta or {}
+    return m.get("status") != "not_done" and m.get("review") not in NOT_COUNTED
+
+
 class SheetEntry(models.Model):
     sheet = models.ForeignKey(Sheet, on_delete=models.CASCADE, related_name="entries")
     day = models.DateField()
     slots = models.JSONField(default=list)          # up to 10 task ids (or null for an empty hour)
+    # Work logs, per hour (SRS v0.5 FR-T1–T3): {status: done|partly|not_done, qty, ref, reason, planned: the approved
+    # task at the time, review: None (counts) | pending | approved | rejected | flagged}. Empty for old entries and plans.
+    meta = models.JSONField(default=list, blank=True)
     remarks = models.TextField(max_length=2000, blank=True)
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
     updated_at = models.DateTimeField(auto_now=True)
@@ -148,6 +183,13 @@ class SheetEntry(models.Model):
         constraints = [models.UniqueConstraint(fields=["sheet", "day"], name="one_entry_per_sheet_day")]
         indexes = [models.Index(fields=["day"])]
         ordering = ["day"]
+
+    def meta_at(self, i):
+        return self.meta[i] if self.meta and i < len(self.meta) and self.meta[i] else {}
+
+    def counted_slots(self):
+        """The hours that count for hours and points (output hours); the others become empty."""
+        return [s if slot_counts(s, self.meta_at(i)) else None for i, s in enumerate(self.slots)]
 
 
 class KpiEntry(models.Model):
@@ -165,6 +207,56 @@ class KpiEntry(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=["sheet", "week_start"], name="one_kpi_per_sheet_week")]
         ordering = ["week_start"]
+
+
+class WeekPlan(models.Model):
+    """A person's plan for one week (SRS v0.5 §5.2, §6). Each planned hour has its own state: draft → submitted → approved
+    or rejected (a rejected hour goes back to draft when the person changes it). The week's status follows from its hours:
+    Draft, Submitted, Approved, Partially approved or Rejected; "In execution" and "Closed" follow from the dates.
+    The planned tasks are the plan sheet's entries for those days. Kept for every week, so past weeks stay on record."""
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        SUBMITTED = "submitted", "Submitted"
+        APPROVED = "approved", "Approved"
+        PARTIAL = "partial", "Partially approved"
+        REJECTED = "rejected", "Rejected"
+
+    sheet = models.ForeignKey(Sheet, on_delete=models.CASCADE, related_name="week_plans", help_text="The person's plan sheet.")
+    week_start = models.DateField()
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.DRAFT, db_index=True)
+    slot_states = models.JSONField(default=dict, blank=True)   # {"2026-11-08": [null | "submitted" | "approved" | "rejected", …]}
+    goals = models.TextField(max_length=1000, blank=True, help_text="What the person wants to achieve this week.")
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    submitted_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    review_note = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-week_start"]
+        constraints = [models.UniqueConstraint(fields=["sheet", "week_start"], name="one_plan_per_sheet_week")]
+
+    def __str__(self):
+        return f"{self.sheet} · week of {self.week_start}"
+
+
+class PlanTemplate(models.Model):
+    """A reusable week of planned hours (SRS v0.5 FR-P4): the tasks of each weekday, by its place in the week (0–6)."""
+
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="plan_templates")
+    name = models.CharField(max_length=80)
+    days = models.JSONField(default=dict)            # {"0": [task ids…], "1": […], …}
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+        constraints = [models.UniqueConstraint(fields=["owner", "name"], name="one_template_name_per_owner")]
+
+    def __str__(self):
+        return self.name
 
 
 class Backup(models.Model):

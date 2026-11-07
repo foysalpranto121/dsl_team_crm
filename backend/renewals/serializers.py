@@ -19,7 +19,7 @@ class ContractSerializer(serializers.ModelSerializer):
     """Context: `on` (today in the team's time zone) and `first_window` (days)."""
 
     owner = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.filter(status=User.Status.APPROVED, is_active=True, role__in=[User.Role.ADMIN, User.Role.MEMBER]),
+        queryset=User.objects.filter(status=User.Status.APPROVED, is_active=True, role__in=[User.Role.ADMIN, User.Role.SUPERVISOR, User.Role.MEMBER]),
         allow_null=True, required=False)
     owner_info = serializers.SerializerMethodField()
     kind_label = serializers.CharField(source="get_kind_display", read_only=True)

@@ -143,7 +143,7 @@ def huddle(user):
 
     # Yesterday (the last working day): team numbers and the day's top contributor.
     logged = {e.sheet_id: e for e in SheetEntry.objects.filter(sheet__in=work, day=prev)}
-    done = [(s, calc.day_hours(logged[s.id].slots), calc.day_points(logged[s.id].slots, pts)) for s in work if s.id in logged]
+    done = [(s, calc.day_hours(logged[s.id].counted_slots()), calc.day_points(logged[s.id].counted_slots(), pts)) for s in work if s.id in logged]
     star = max(done, key=lambda x: x[2], default=None)
     yesterday = {
         "day": prev, "people": len(work), "logged": sum(1 for _, h, _ in done if h > 0), "target_hours": day_target,

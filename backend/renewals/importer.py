@@ -127,7 +127,7 @@ def read(raw):
 
 
 def _owners():
-    users = list(User.objects.filter(status=User.Status.APPROVED, is_active=True, role__in=[User.Role.ADMIN, User.Role.MEMBER]))
+    users = list(User.objects.filter(status=User.Status.APPROVED, is_active=True, role__in=[User.Role.ADMIN, User.Role.SUPERVISOR, User.Role.MEMBER]))
     names = {}
     for u in users:
         if u.name:

@@ -37,7 +37,7 @@ class Invalid(Exception):
 # ---------- who sees what ----------
 
 def sees_all(user):
-    return user.is_approved and user.role in (User.Role.ADMIN, User.Role.VIEWER)
+    return user.is_approved and user.role in (User.Role.ADMIN, User.Role.SUPERVISOR, User.Role.VIEWER)
 
 
 def contracts_for(user):
@@ -52,7 +52,7 @@ def renewals_for(user):
 
 def can_work(user, renewal):
     """The account owner (a member) or an admin may work a renewal. Management only reads."""
-    return user.is_team_admin or (user.is_approved and user.role == User.Role.MEMBER and renewal.contract.owner_id == user.pk)
+    return user.is_team_admin or (user.does_own_work and renewal.contract.owner_id == user.pk)
 
 
 def person(user):

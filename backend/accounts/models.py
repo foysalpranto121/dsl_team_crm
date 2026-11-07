@@ -39,9 +39,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         DISABLED = "disabled", "Disabled"
 
     class Role(models.TextChoices):
+        """SRS v0.5 §3: Member does the work; Supervisor / Team Leader also approves plans and deviations; Management
+        (stored as "viewer") reads everything; Admin configures."""
         ADMIN = "admin", "Admin"
+        SUPERVISOR = "supervisor", "Supervisor"
         MEMBER = "member", "Member"
-        VIEWER = "viewer", "Viewer"
+        VIEWER = "viewer", "Management"
 
     email = models.EmailField(unique=True)
     name = models.CharField(max_length=150, blank=True)
@@ -78,6 +81,16 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def is_team_admin(self):
         return self.is_approved and self.role == self.Role.ADMIN
+
+    @property
+    def does_own_work(self):
+        """Plans and logs their own hours (members and supervisors)."""
+        return self.is_approved and self.role in (self.Role.MEMBER, self.Role.SUPERVISOR)
+
+    @property
+    def can_approve(self):
+        """Approves plans, deviations and unplanned hours (SRS v0.5 §3): supervisors and admins, never their own."""
+        return self.is_approved and self.role in (self.Role.SUPERVISOR, self.Role.ADMIN)
 
 
 def photo_path(instance, filename):

@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from . import views
+from . import plan_views, views
 
 router = DefaultRouter()
 router.register("tasks", views.TaskViewSet, basename="team-tasks")
@@ -22,4 +22,11 @@ urlpatterns = [
     path("snapshots/", views.SnapshotView.as_view(), name="team-snapshots"),
     path("snapshots/<str:name>/", views.SnapshotFileView.as_view(), name="team-snapshot-file"),
     path("snapshots/<str:name>/restore/", views.SnapshotRestoreView.as_view(), name="team-snapshot-restore"),
+    # Weekly plans: plan the week → an admin approves → log the work (SRS §5.2, §6)
+    path("plans/week/", plan_views.PlanWeekView.as_view(), name="team-plan-week"),
+    path("plans/action/", plan_views.PlanActionView.as_view(), name="team-plan-action"),
+    path("plans/copy/", plan_views.PlanCopyView.as_view(), name="team-plan-copy"),
+    path("plans/queue/", plan_views.PlanQueueView.as_view(), name="team-plan-queue"),
+    path("plans/history/", plan_views.PlanHistoryView.as_view(), name="team-plan-history"),
+    path("plans/mine/", plan_views.PlanMineView.as_view(), name="team-plan-mine"),
 ] + router.urls

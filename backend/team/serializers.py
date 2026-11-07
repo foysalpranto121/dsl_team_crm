@@ -14,7 +14,8 @@ class TeamSettingsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TeamSettings
-        fields = ["name", "timezone", "lock_days", "week_start_dow", "weekend_days", "count_weekend", "currency", "today", "seconds_to_lock", "updated_at"]
+        fields = ["name", "timezone", "lock_days", "week_start_dow", "weekend_days", "count_weekend", "currency",
+                  "today", "seconds_to_lock", "updated_at"]
         read_only_fields = ["updated_at"]
 
     def get_today(self, obj):
@@ -90,21 +91,37 @@ class EntrySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SheetEntry
-        fields = ["day", "slots", "remarks", "hours", "points", "updated_by", "updated_at"]
+        fields = ["day", "slots", "meta", "remarks", "logged", "hours", "points", "updated_by", "updated_at"]
 
-    def get_hours(self, obj):
+    logged = serializers.SerializerMethodField()
+
+    def get_logged(self, obj):
+        """Hours with a task logged, counted or not (hours and points count only output hours)."""
         return calc.day_hours(obj.slots)
 
+    def get_hours(self, obj):
+        return calc.day_hours(obj.counted_slots())
+
     def get_points(self, obj):
-        return calc.day_points(obj.slots, self.context["pts"])
+        return calc.day_points(obj.counted_slots(), self.context["pts"])
 
     def get_updated_by(self, obj):
         return (obj.updated_by.name or obj.updated_by.email) if obj.updated_by else None
 
 
+class HourMetaSerializer(serializers.Serializer):
+    """One logged hour's details (SRS v0.5 FR-T1): how it went, quantity, output reference, and the reason for a deviation
+    or a Not done."""
+    status = serializers.ChoiceField(choices=["done", "partly", "not_done"], required=False, allow_null=True)
+    qty = serializers.IntegerField(min_value=0, max_value=100000, required=False, allow_null=True)
+    ref = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    reason = serializers.CharField(max_length=300, required=False, allow_blank=True)
+
+
 class EntryWriteSerializer(serializers.Serializer):
     slots = serializers.ListField(child=serializers.IntegerField(allow_null=True, min_value=1), max_length=10, allow_empty=True)
     remarks = serializers.CharField(max_length=2000, allow_blank=True, required=False, default="")
+    meta = serializers.ListField(child=HourMetaSerializer(allow_null=True), max_length=10, required=False, allow_null=True)
 
 
 class KpiSerializer(serializers.ModelSerializer):
