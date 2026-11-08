@@ -556,11 +556,11 @@ def record_win(user, record):
 def withdraw_win(user, record, why=""):
     """The win is no longer verified, or the record left Won: its points go with it, and its post on the win feed."""
     from recognition.services import win_withdrawn       # recognition builds on scoring, so it's imported here
-    win_withdrawn(record=record)
     for ev in EventLog.objects.filter(record=record, status=EV.VERIFIED).select_related("sheet", "activity"):
         ev.status, ev.decided_by, ev.decided_at, ev.decision_note = EV.REJECTED, user if getattr(user, "pk", None) else None, timezone.now(), why[:300]
         ev.save(update_fields=["status", "decided_by", "decided_at", "decision_note", "updated_at"])
         _sync_event(ev)
+    win_withdrawn(record=record)     # after the points have gone: it checks whether any win is left
 
 
 def events_for(user, scope="mine", status=None, sheet=None, frm=None, to=None):

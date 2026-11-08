@@ -25,7 +25,7 @@ export const feedQuery = queryOptions({
 });
 
 export interface Unseen {
-  wins: { id: number; company: string; value: number | null; currency: string; message: string; by: string | null; what: string }[];
+  wins: { id: number; title: string; company: string; value: number | null; currency: string; message: string; by: string | null; what: string }[];
   badges: { id: number; name: string; why: string }[];
 }
 export const celebrateQuery = queryOptions({

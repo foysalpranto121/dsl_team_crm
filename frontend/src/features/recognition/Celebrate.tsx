@@ -44,8 +44,8 @@ export function Celebrate() {
             {BITS.map((b, i) => <span key={i} className="win-bit absolute -top-3 rounded-[2px]" style={{ left: b.left, width: b.size, height: b.size, background: b.colour, animationDelay: b.delay }} />)}
           </div>
           <div className="win-pop mx-auto grid size-14 place-items-center rounded-full bg-success-soft text-success-text"><Trophy className="size-7" aria-hidden /></div>
-          <DialogTitle className="mt-4 text-xl">{win.company ? `${win.company} is verified` : "Your win is verified"}</DialogTitle>
-          <DialogDescription className="mt-1">{win.value != null ? `${money(win.value, { currency: win.currency })} on your numbers. ` : ""}Congratulations.</DialogDescription>
+          <DialogTitle className="mt-4 text-xl">{win.title}</DialogTitle>
+          <DialogDescription className="mt-1">Verified. {win.value != null ? `${money(win.value, { currency: win.currency })} now counts towards your revenue.` : "It now counts towards your numbers."}</DialogDescription>
           {win.message && <blockquote className="mt-4 rounded-lg bg-muted px-4 py-3 text-sm">{win.message}{win.by && <span className="mt-1 block text-xs text-muted-foreground">{win.by}</span>}</blockquote>}
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             <Button onClick={close}>Thank you</Button>

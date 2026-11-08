@@ -103,9 +103,10 @@ def weeks_of(work, st, t, cal, leave):
 
 # ---------- badges (FR-MO3) ----------
 
-def _first_win(owner_id):
+def _first_win(owner_id, but=None):
+    """The day of this person's first verified win. `but` leaves out a record whose win is being withdrawn: it's still stamped verified at that point."""
     a = ScoreLedger.objects.filter(sheet__owner_id=owner_id, activity__counts_as_win=True).aggregate(d=Min("day"))["d"]
-    b = Prospect.objects.filter(owner_id=owner_id, won_verified_at__isnull=False).aggregate(d=Min("stage_since"))["d"]
+    b = Prospect.objects.filter(owner_id=owner_id, won_verified_at__isnull=False).exclude(pk=but).aggregate(d=Min("stage_since"))["d"]
     return min((x for x in (a, b) if x), default=None)
 
 
@@ -215,8 +216,13 @@ def win_verified(user, record=None, event=None, message=""):
 
 
 def win_withdrawn(record=None, event=None):
-    """The win no longer stands: the post goes, with its reactions."""
+    """The win no longer stands: the post goes, with its reactions. If it was the person's only win, the First Work Order badge goes too, so the feed doesn't keep
+    claiming it. Called once the win's points have left the ledger."""
     FeedPost.objects.filter(kind=P.WIN, **({"record": record} if record else {"event": event})).delete()
+    owner_id = record.owner_id if record else event.sheet.owner_id
+    if owner_id and _first_win(owner_id, but=record.pk if record else None) is None:
+        BadgeAward.objects.filter(owner_id=owner_id, badge="first_work_order").delete()
+        FeedPost.objects.filter(owner_id=owner_id, kind=P.BADGE, badge="first_work_order").delete()
 
 
 def _post(p, user, conf, currency, mine_reactions, counts):
@@ -224,7 +230,9 @@ def _post(p, user, conf, currency, mine_reactions, counts):
     show_client = conf["show_client"] or privileged
     show_value = conf["show_value"] or privileged
     who = _name(p.owner)
-    if p.kind == P.WIN:
+    if p.kind == P.WIN and not p.record_id:      # a win logged as an event: its "company" is the evidence note, which doesn't read as a client's name
+        title = f"{who}: {p.what}"
+    elif p.kind == P.WIN:
         title = f"{who} won {p.company}" if show_client and p.company else f"{who} won a new client"
     elif p.kind == P.BADGE:
         title = f"{who} earned {p.what}"
@@ -269,7 +277,7 @@ def celebrate(user):
     evaluate(user.pk, st)
     wins = FeedPost.objects.filter(owner=user, kind=P.WIN, seen_at__isnull=True).select_related("by") if conf["wins"] else []
     badges = BadgeAward.objects.filter(owner=user, seen_at__isnull=True) if conf["badges"] else []
-    return {"wins": [{"id": p.id, "company": p.company, "value": float(p.value) if p.value is not None else None, "currency": st.currency, "message": p.message, "by": _name(p.by) or None, "what": p.what} for p in wins],
+    return {"wins": [{"id": p.id, "title": f"You won {p.company}" if p.record_id and p.company else f"{p.what}: verified", "company": p.company, "value": float(p.value) if p.value is not None else None, "currency": st.currency, "message": p.message, "by": _name(p.by) or None, "what": p.what} for p in wins],
             "badges": [{"id": b.id, "name": BADGES[b.badge][0], "why": BADGES[b.badge][1]} for b in badges if b.badge in BADGES]}
 
 

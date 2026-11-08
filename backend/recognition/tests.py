@@ -149,6 +149,28 @@ class RecognitionTests(TestCase):
         self.api().patch(f"/api/tracker/prospects/{p['id']}/", {"stage": "negotiation", "next_action": "Again", "next_follow_up": "2026-11-10"}, format="json")
         self.assertFalse(FeedPost.objects.filter(kind="win").exists())
 
+    def test_the_first_win_badge_goes_when_the_only_win_does(self):
+        has = lambda: (BadgeAward.objects.filter(owner=self.member, badge="first_work_order").exists(), FeedPost.objects.filter(owner=self.member, kind="badge", badge="first_work_order").exists())   # noqa: E731
+        again = {"stage": "negotiation", "next_action": "Again", "next_follow_up": "2026-11-10"}
+        ways = {
+            "left Won": lambda p: self.api().patch(f"/api/tracker/prospects/{p['id']}/", again, format="json"),
+            "sent back": lambda p: self.api(self.sup).post(f"/api/tracker/reviews/wins/{p['id']}/", {"verified": False, "note": "Not signed yet"}, format="json"),
+            "deleted": lambda p: self.api().delete(f"/api/tracker/prospects/{p['id']}/"),
+        }
+        for name, undo in ways.items():
+            with self.subTest(name):
+                p = self.win(f"Client {name}")
+                self.api().get("/api/recognition/celebrate/")
+                self.assertEqual(has(), (True, True))
+                self.assertIn(undo(p).status_code, (200, 204))
+                self.assertEqual(has(), (False, False))
+        # With another win still standing, it stays.
+        first = self.win("Walton")
+        self.win("Akij")
+        self.api().get("/api/recognition/celebrate/")
+        self.api().delete(f"/api/tracker/prospects/{first['id']}/")
+        self.assertEqual(has(), (True, True))
+
     def test_a_win_logged_as_an_event_when_kpis_are_typed(self):
         TeamSettings.objects.filter(pk=1).update(kpi_mode="manual")
         order = Task.objects.get(name="Client Work Order Receiving")
@@ -158,6 +180,9 @@ class RecognitionTests(TestCase):
         self.assertFalse(FeedPost.objects.exists())
         self.api(self.sup).post(f"/api/scoring/events/{r.data['id']}/decide/", {"verified": True}, format="json")
         self.assertEqual(FeedPost.objects.get(kind="win").company, "WO-114")
+        # The evidence note isn't a client's name, so neither the feed nor the moment reads it as one.
+        self.assertEqual(self.api(self.other).get("/api/recognition/feed/").data["posts"][0]["title"], "Mina: Client Work Order Receiving")
+        self.assertEqual(self.api().get("/api/recognition/celebrate/").data["wins"][0]["title"], "Client Work Order Receiving: verified")
         self.api(self.sup).post(f"/api/scoring/events/{r.data['id']}/decide/", {"verified": False, "note": "Wrong one"}, format="json")
         self.assertFalse(FeedPost.objects.exists())
         self.assertEqual(EventLog.objects.get(pk=r.data["id"]).status, "rejected")

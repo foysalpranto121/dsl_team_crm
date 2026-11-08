@@ -41,7 +41,7 @@ function LeaveDialog({ open, onClose, d }: { open: boolean; onClose: () => void;
           <DialogHeader><DialogTitle>Days off</DialogTitle><DialogDescription>Leave and holidays never break a streak.</DialogDescription></DialogHeader>
           <DialogBody className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-[auto_1fr]">
-              <Field label="Day" required><DatePicker value={f.day} onChange={(v) => setF({ ...f, day: v })} aria-label="Day off" /></Field>
+              <Field label="Day" required><DatePicker value={f.day} onChange={(v) => setF({ ...f, day: v })} aria-label={f.day ? `Day off: ${date(f.day, "medium")}` : "Choose the day off"} /></Field>
               <Field label="Reason"><Input value={f.reason} maxLength={120} onChange={(e) => setF({ ...f, reason: e.target.value })} placeholder="Optional" /></Field>
             </div>
             {add.error && <p className="text-sm text-danger-text" role="alert">{errorText(add.error)}</p>}

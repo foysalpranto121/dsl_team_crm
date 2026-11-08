@@ -453,7 +453,7 @@ export default function Playbook() {
           <h1 className="text-2xl font-semibold">{hello}, {(user?.name || "").split(" ")[0] || "there"}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{date(d.day, "weekday")}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3"><Phases d={d} />{streak >= 2 && <Badge tone="outline"><Flame aria-hidden /><span className="tabular-nums">{streak}</span>-day streak</Badge>}{started && <Stopwatch seconds={d.elapsed_seconds} running={d.running} />}</div>
+        <div className="flex flex-wrap items-center gap-3"><Phases d={d} />{streak >= 2 && <Badge tone="outline"><Flame aria-hidden /><span className="tabular-nums">{streak}-day streak</span></Badge>}{started && <Stopwatch seconds={d.elapsed_seconds} running={d.running} />}</div>
       </header>
 
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,720px)_20rem]">
