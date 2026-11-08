@@ -198,6 +198,7 @@ def import_workbook(fileobj, actor, dry_run=False, replace=False):
                     people_years[short.lower()] = years.most_common(1)[0][0]
 
         # ---- weekly KPI (KPI_Weekly_Input: A name, C week no, D month no, E..H values, I notes) ----
+        last_kpi_week = None
         if "KPI_Weekly_Input" in wb.sheetnames:
             sheets = {s.name.lower(): s for s in Sheet.objects.filter(kind=Sheet.Kind.WORK)}
             default_year = Counter(people_years.values()).most_common(1)[0][0] if people_years else calc.today_in(st.timezone).year
@@ -213,6 +214,8 @@ def import_workbook(fileobj, actor, dry_run=False, replace=False):
                 year = people_years.get(name.lower(), default_year)
                 ws0 = calc.week_start_of(date(year, 1, 1), cal) + timedelta(days=7 * (int(wk) - 1))
                 k, _ = KpiEntry.objects.get_or_create(sheet=sheet, week_start=ws0)
+                k.source = KpiEntry.Source.TYPED
+                last_kpi_week = max(last_kpi_week or ws0, ws0)
                 k.leads, k.opps, k.clients = (int(_num(v)) for v in values[:3])
                 k.revenue, k.notes, k.updated_by = _num(values[3]), notes[:2000], actor
                 # The workbook's month number decides which month the week counts in (the sheet types it by hand, so it
@@ -224,6 +227,12 @@ def import_workbook(fileobj, actor, dry_run=False, replace=False):
                 if month and calc.month_of_week(ws0) != (int(k.counts_in[:4]), month):
                     report["kpi"]["month_differs"] += 1
 
+        # SRS v0.5 FR-K2: weeks typed in the workbook stay as typed; the pipeline takes over from the week after the last one.
+        if last_kpi_week and st.kpi_mode == TeamSettings.KpiMode.DERIVED and (st.kpi_from is None or st.kpi_from <= last_kpi_week):
+            st.kpi_from = last_kpi_week + timedelta(days=7)
+            st.save(update_fields=["kpi_from", "updated_at"])
+            warn(f"Weekly KPIs up to the week of {last_kpi_week:%d %b %Y} keep the workbook's numbers; from {st.kpi_from:%d %b %Y} on they are "
+                 "worked out from the pipeline.")
         if report["kpi"]["month_differs"]:
             warn(f'{report["kpi"]["month_differs"]} weekly KPI row(s) count in the workbook\'s month, which is not the month holding most of that '
                  "week's days. The dashboard and performance follow the workbook.")

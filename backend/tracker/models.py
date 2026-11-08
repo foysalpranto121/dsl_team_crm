@@ -2,9 +2,56 @@ from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
-from .template import STAGES
-
 Owner = settings.AUTH_USER_MODEL
+
+
+class PipelineStage(models.Model):
+    """The team's sales process (SRS v0.5 FR-K9). Records move through the open stages and end Won or Lost."""
+
+    class Kind(models.TextChoices):
+        OPEN = "open", "Open"
+        WON = "won", "Won"
+        LOST = "lost", "Lost"
+
+    key = models.SlugField(max_length=20, unique=True)
+    name = models.CharField(max_length=60)
+    kind = models.CharField(max_length=4, choices=Kind.choices, default=Kind.OPEN)
+    position = models.PositiveSmallIntegerField(default=0)
+    expected_days = models.PositiveSmallIntegerField(null=True, blank=True, validators=[MaxValueValidator(365)],
+                                                     help_text="How many days a record usually stays here (deal health, FR-K10).")
+    probability = models.PositiveSmallIntegerField(default=0, validators=[MaxValueValidator(100)])
+    exit_criteria = models.CharField(max_length=300, blank=True, help_text="What must be true to move a record on.")
+    value_required = models.BooleanField(default=False, help_text="A record needs an expected value to be in this stage (FR-K1).")
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["position", "id"]
+
+    def __str__(self):
+        return self.name
+
+
+class KpiType(models.Model):
+    """The weekly KPIs and the stage event each one counts (SRS v0.5 FR-C6, FR-K2): a record counts once per KPI, in the week
+    it first reaches the bound stage."""
+
+    class Key(models.TextChoices):
+        LEADS = "leads", "Qualified leads"
+        OPPS = "opps", "Opportunities"
+        CLIENTS = "clients", "Clients"
+        REVENUE = "revenue", "Revenue"
+
+    key = models.CharField(max_length=10, choices=Key.choices, unique=True)
+    name = models.CharField(max_length=60)
+    definition = models.CharField(max_length=300, blank=True)
+    stage = models.ForeignKey(PipelineStage, on_delete=models.PROTECT, related_name="kpi_types")
+    verified_only = models.BooleanField(default=False, help_text="Count only wins a supervisor verified (work order received).")
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return self.name
 
 
 class TrackerSettings(models.Model):
@@ -41,7 +88,21 @@ class Prospect(models.Model):
     industry = models.CharField(max_length=80, blank=True)
     channel = models.CharField(max_length=60, blank=True)
     plan = models.CharField(max_length=60, blank=True)
-    stage = models.CharField(max_length=10, choices=STAGES, default="prospect", db_index=True)
+    requirement = models.CharField(max_length=300, blank=True, help_text="What the client needs.")
+    segment = models.CharField(max_length=80, blank=True, help_text="Segment or product, e.g. Tender, Corporate, SaaS.")
+    stage = models.CharField(max_length=20, default="lead", db_index=True, help_text="A PipelineStage key.")
+    stage_since = models.DateField(null=True, blank=True)
+    value = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0)],
+                                help_text="Expected value in the team's currency (FR-K8).")
+    deal_currency = models.CharField(max_length=3, blank=True, help_text="Only if the deal is priced in another currency.")
+    deal_value = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0)])
+    tender_deadline = models.DateField(null=True, blank=True)
+    odoo_ref = models.CharField(max_length=300, blank=True, help_text="Odoo ID or link (FR-K6).")
+    won_verified_at = models.DateTimeField(null=True, blank=True, help_text="A supervisor confirmed the work order (FR-K2).")
+    won_verified_by = models.ForeignKey(Owner, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    win_loss_why = models.CharField(max_length=300, blank=True)
+    win_loss_competitor = models.CharField(max_length=120, blank=True)
+    win_loss_lesson = models.CharField(max_length=300, blank=True)
     last_contacted = models.DateField(null=True, blank=True)
     next_follow_up = models.DateField(null=True, blank=True, db_index=True)
     next_action = models.CharField(max_length=200, blank=True)
@@ -59,6 +120,60 @@ class Prospect(models.Model):
 
     def __str__(self):
         return self.company
+
+
+class StageEvent(models.Model):
+    """A record's stage change (SRS v0.5 FR-K2). Weekly KPIs are counted from these, so nobody types counters."""
+
+    class Review(models.TextChoices):
+        NONE = "", "Not needed"
+        FLAGGED = "flagged", "Needs review"
+        OK = "ok", "Reviewed"
+
+    record = models.ForeignKey(Prospect, on_delete=models.CASCADE, related_name="events")
+    owner = models.ForeignKey(Owner, on_delete=models.CASCADE, related_name="+", help_text="Whose KPIs the event counts for.")
+    from_stage = models.CharField(max_length=20, blank=True)
+    to_stage = models.CharField(max_length=20)
+    day = models.DateField(db_index=True)
+    backward = models.BooleanField(default=False)
+    baseline = models.BooleanField(default=False, help_text="Imported at this stage: the stages up to here count as reached, but not as this "
+                                                            "period's KPIs.")
+    review = models.CharField(max_length=8, choices=Review.choices, default=Review.NONE, blank=True)
+    review_note = models.CharField(max_length=300, blank=True)
+    reviewed_by = models.ForeignKey(Owner, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    by = models.ForeignKey(Owner, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["day", "id"]
+        indexes = [models.Index(fields=["owner", "day"])]
+
+
+class ClientLogEntry(models.Model):
+    """A record's timeline (SRS v0.5 FR-CL1): calls, emails, visits and notes, plus stage changes written automatically."""
+
+    class Type(models.TextChoices):
+        CALL = "call", "Call"
+        EMAIL = "email", "Email"
+        WHATSAPP = "whatsapp", "WhatsApp"
+        VISIT = "visit", "Visit"
+        MEETING = "meeting", "Meeting"
+        NOTE = "note", "Note"
+        STAGE = "stage", "Stage change"
+
+    record = models.ForeignKey(Prospect, on_delete=models.CASCADE, related_name="log")
+    type = models.CharField(max_length=10, choices=Type.choices)
+    outcome = models.CharField(max_length=120, blank=True)
+    note = models.CharField(max_length=1000, blank=True)
+    day = models.DateField()
+    next_date = models.DateField(null=True, blank=True)
+    by = models.ForeignKey(Owner, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-day", "-id"]
+        verbose_name_plural = "client log entries"
 
 
 class Activity(models.Model):

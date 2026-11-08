@@ -21,6 +21,10 @@ def validate_days(value):
         raise ValidationError("Use a list of day numbers 0 (Sunday) to 6 (Saturday).")
 
 
+def default_lost_reasons():
+    return ["Price", "Chose a competitor", "No budget", "No decision", "Requirement changed", "Timing", "Lost the tender", "Other"]
+
+
 class TeamSettings(models.Model):
     """One row. 'Today' and the midnight lock use this time zone, not the visitor's computer."""
 
@@ -50,6 +54,15 @@ class TeamSettings(models.Model):
     feature_huddle = models.BooleanField(default=False, help_text="Morning huddle screen (V2).")
     feature_digest = models.BooleanField(default=False, help_text="Weekly management digest (V2).")
     feature_renewals = models.BooleanField(default=False, help_text="AMC and renewal tracker (V2).")
+
+    # Weekly KPIs (SRS v0.5 FR-K2, FR-K5, FR-K7)
+    class KpiMode(models.TextChoices):
+        DERIVED = "derived", "Worked out from the pipeline"
+        MANUAL = "manual", "Typed in each week (unevidenced; not recommended)"
+
+    kpi_mode = models.CharField(max_length=8, choices=KpiMode.choices, default=KpiMode.DERIVED)
+    kpi_from = models.DateField(null=True, blank=True, help_text="Weeks starting before this keep the numbers typed in. Empty = every week.")
+    lost_reasons = models.JSONField(default=default_lost_reasons, blank=True)
     currency = models.CharField(max_length=8, default="BDT")
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -201,6 +214,21 @@ class KpiEntry(models.Model):
     revenue = models.DecimalField(max_digits=14, decimal_places=2, default=0, validators=[MinValueValidator(0)])
     notes = models.TextField(max_length=2000, blank=True)
     counts_in = models.CharField(max_length=7, blank=True, help_text="Month this week counts in, as YYYY-MM. Empty = the month holding most of its days.")
+
+    # SRS v0.5 FR-K2/K3: worked out from the pipeline, adjusted by a supervisor (with a note), confirmed by the member.
+    class Source(models.TextChoices):
+        TYPED = "typed", "Typed in"
+        DERIVED = "derived", "From the pipeline"
+
+    source = models.CharField(max_length=8, choices=Source.choices, default=Source.TYPED)
+    derived = models.JSONField(default=dict, blank=True, help_text="What the pipeline gave, before adjustments.")
+    adjust = models.JSONField(default=dict, blank=True, help_text="A supervisor's changes to the derived numbers: {metric: +/- amount}.")
+    adjust_note = models.CharField(max_length=300, blank=True)
+    adjusted_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    adjusted_at = models.DateTimeField(null=True, blank=True)
+    confirmed = models.JSONField(default=dict, blank=True, help_text="The numbers the member confirmed.")
+    confirmed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    confirmed_at = models.DateTimeField(null=True, blank=True)
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
     updated_at = models.DateTimeField(auto_now=True)
 

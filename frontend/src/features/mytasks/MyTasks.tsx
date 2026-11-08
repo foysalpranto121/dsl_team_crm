@@ -144,7 +144,7 @@ function QuickAdd({ tasks, focus }: { tasks: Task[]; focus: boolean }) {
   });
   return (
     <form className="card p-4" onSubmit={(e) => { e.preventDefault(); if (title.trim()) add.mutate(); }}>
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-start gap-3">
         <Field label="New task" className="min-w-56 flex-[3]"><Input ref={ref} value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Send the proposal to BRAC" /></Field>
         <Field label="When" className="min-w-36 flex-1" hint={preview.data ? fmt(preview.data.date, { weekday: "short", day: "numeric", month: "short" }) : preview.isError ? "Try today, tomorrow, Sun or 15 Nov" : " "}>
           <Input value={when} maxLength={40} onChange={(e) => setWhen(e.target.value)} placeholder="today" aria-invalid={preview.isError || undefined} />
@@ -155,7 +155,8 @@ function QuickAdd({ tasks, focus }: { tasks: Task[]; focus: boolean }) {
           <Combobox value={activity} onChange={setActivity} aria-label="Activity type" placeholder="No activity" searchPlaceholder="Search activities…" clearable
             options={tasks.filter((t) => t.active).map((t) => ({ value: String(t.id), label: t.name, hint: ptsText(+t.points), group: t.type || "Tasks" }))} />
         </Field>
-        <Button type="submit" busy={add.isPending} disabled={!title.trim() || preview.isError} className="mb-[22px]"><Plus /> Add</Button>
+        <div><span className="label" aria-hidden>&nbsp;</span>
+          <Button type="submit" busy={add.isPending} disabled={!title.trim() || preview.isError}><Plus /> Add</Button></div>
       </div>
     </form>
   );
@@ -289,9 +290,11 @@ export default function MyTasks() {
               {groups.map(([d, items]) => (
                 <div key={d} onDragOver={(e) => { e.preventDefault(); setOver(d); }} onDragLeave={() => setOver((o) => (o === d ? null : o))} onDrop={drop(d)}
                   className={cn("border-b border-border last:border-0", over === d && "bg-primary-soft/60")}>
-                  <h3 className="px-5 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{d === addDays(today, 1) ? "Tomorrow" : fmt(d, { weekday: "long", day: "numeric", month: "short" })}</h3>
-                  {items.length ? <ul className="divide-y divide-border">{items.map((t) => <TaskRow key={t.id} t={t} today={today} onDrop={setDropping} />)}</ul>
-                    : <p className="px-5 pb-3 text-xs text-subtle-foreground">—</p>}
+                  <div className={cn("flex items-baseline justify-between gap-3 px-5", items.length ? "pb-1 pt-3" : "py-2.5")}>
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{d === addDays(today, 1) ? "Tomorrow" : fmt(d, { weekday: "long", day: "numeric", month: "short" })}</h3>
+                    {!items.length && <span className="text-xs text-subtle-foreground">Nothing yet</span>}
+                  </div>
+                  {items.length > 0 && <ul className="divide-y divide-border">{items.map((t) => <TaskRow key={t.id} t={t} today={today} onDrop={setDropping} />)}</ul>}
                 </div>
               ))}
             </div>

@@ -8,8 +8,9 @@ from django.db import transaction
 
 from team import services as team_services
 
+from . import pipeline
 from . import template as T
-from .models import Activity, PlanDay, Prospect, TrackerSettings
+from .models import Activity, PipelineStage, PlanDay, Prospect, TrackerSettings
 
 FRIDAY = 4   # Python weekday(): Friday, the weekend day in the plan
 
@@ -86,23 +87,6 @@ def weeks(st, n=None):
     return out
 
 
-# ---------- prospects ----------
-
-def apply_stage(p, stage, on=None):
-    """Moving forward stamps the date a prospect first became a lead, opportunity or client (dates are never wiped)."""
-    on = on or today()
-    p.stage = stage
-    r = T.RANK.get(stage, 0)
-    if r >= 2 and not p.lead_date:
-        p.lead_date = on
-    if r >= 3 and not p.opp_date:
-        p.opp_date = on
-    if r >= 4 and not p.client_date:
-        p.client_date = on
-    if r >= 1 and not p.last_contacted:
-        p.last_contacted = on
-
-
 # ---------- numbers ----------
 
 def act_points(st, a):
@@ -158,8 +142,9 @@ def summary(user, n=None):
     plan_stat = lambda a, b: {"done": sum(1 for d in plan if a <= d["date"] <= b for x in d["tasks"] if x.get("done")),
                               "total": sum(len(d["tasks"]) for d in plan if a <= d["date"] <= b)}
     wk = [{**w, "actual": metrics(st, prospects, activities, w["from"], w["to"]), "plan": plan_stat(w["from"], w["to"])} for w in weeks(st, info["n"])]
-    contacted = sum(1 for p in prospects if p.stage != "prospect")
-    open_ = [p for p in prospects if p.stage not in ("client", "lost")]
+    contacted = sum(1 for p in prospects if p.last_contacted)
+    closed = set(PipelineStage.objects.exclude(kind=PipelineStage.Kind.OPEN).values_list("key", flat=True))
+    open_ = [p for p in prospects if p.stage not in closed]
     due = sorted((p for p in open_ if p.next_follow_up and p.next_follow_up <= t), key=lambda p: p.next_follow_up)
 
     def breakdown(field):
@@ -183,7 +168,12 @@ def summary(user, n=None):
 # ---------- CSV ----------
 
 COLUMNS = {
-    "company": ["company", "company name", "organization", "organisation", "account name", "company name for emails"],
+    "company": ["company", "company name", "organization", "organisation", "account name", "company name for emails", "customer", "partner"],
+    "requirement": ["requirement", "need", "opportunity", "description"],
+    "segment": ["segment", "product", "sales team"],
+    "value": ["expected revenue", "expected value", "value", "amount", "revenue"],
+    "odoo_ref": ["odoo id", "odoo link", "external id", "id"],
+    "next_action": ["next action", "next activity"],
     "website": ["website", "company website", "domain", "url"],
     "contact": ["contact", "name", "full name", "contact name", "person"],
     "first": ["first name", "firstname"], "last": ["last name", "lastname", "surname"],
@@ -200,9 +190,18 @@ COLUMNS = {
 }
 
 
+def _money(v):
+    try:
+        return round(max(0.0, float(str(v).replace(",", "").strip())), 2) if str(v).strip() else None
+    except ValueError:
+        return None
+
+
 @transaction.atomic
 def import_csv(user, text):
-    """Apollo, Hunter, Snov or Sales Navigator exports work directly. Rows repeating a company + email already here are skipped."""
+    """Apollo, Hunter, Snov or Sales Navigator exports, or an Odoo opportunity export (SRS v0.5 FR-K6), work directly. Stages
+    are matched by name; imported records count as having reached their stage, not as this week's KPIs. Rows repeating a
+    company + email already here are skipped."""
     rows = list(csv.reader(io.StringIO(text.lstrip("﻿"))))
     rows = [r for r in rows if any(c.strip() for c in r)]
     if len(rows) < 2:
@@ -212,8 +211,10 @@ def import_csv(user, text):
     if idx["company"] is None:
         raise ValueError('The CSV needs a "Company" column.')
     seen = {(p.company.lower(), p.email.lower()) for p in Prospect.objects.filter(owner=user)}
-    stages = {k: k for k, _ in T.STAGES} | {label.lower(): k for k, label in T.STAGES}
-    added, skipped = 0, 0
+    stages, first, t = pipeline.stage_map(active_only=True), pipeline.first_stage(), today()
+    if first is None:
+        raise ValueError("Set up the team's pipeline stages first (Team setup).")
+    added, skipped, unknown = 0, 0, set()
     for r in rows[1:]:
         g = lambda k: (r[idx[k]].strip() if idx[k] is not None and idx[k] < len(r) else "")
         company, email = g("company"), g("email")
@@ -226,28 +227,38 @@ def import_csv(user, text):
             nxt = date.fromisoformat(nxt) if nxt else None
         except ValueError:
             nxt = None
+        stage = pipeline.resolve(g("stage"), stages)
+        if g("stage") and stage is None:
+            unknown.add(g("stage")[:60])
+        stage = stage or first
+        is_open = stage.kind == PipelineStage.Kind.OPEN
         p = Prospect(owner=user, company=company[:200], website=g("website")[:200], contact=(g("contact") or " ".join(x for x in (g("first"), g("last")) if x))[:150],
                      role=g("role")[:150], email=email[:200], phone=g("phone")[:60], linkedin=g("linkedin")[:300], country=(g("country") or "Other")[:80],
-                     industry=(g("industry") or "Other")[:80], channel=(g("channel") or "Email")[:60], plan="Not known", notes=g("notes")[:5000], next_follow_up=nxt)
-        st = stages.get(g("stage").lower(), "prospect")
-        if st != "prospect":
-            apply_stage(p, st)
+                     industry=(g("industry") or "Other")[:80], channel=(g("channel") or "Email")[:60], plan="Not known", notes=g("notes")[:5000],
+                     requirement=g("requirement")[:300], segment=g("segment")[:80], value=_money(g("value")), odoo_ref=g("odoo_ref")[:300], stage=stage.key,
+                     # FR-CL3: an open record always has a next step
+                     next_follow_up=nxt or (t if is_open else None), next_action=(g("next_action") or ("First contact" if is_open else ""))[:200])
         p.save()
+        pipeline.move(p, stage.key, user, on=t, initial=True, baseline=True, refresh=False)
         added += 1
-    return {"added": added, "skipped": skipped}
+    return {"added": added, "skipped": skipped, "unknown_stages": sorted(unknown)}
 
 
-EXPORT_HEAD = ["Company", "Website", "Contact", "Job title", "Email", "Phone", "LinkedIn", "Country", "Industry", "Channel", "Plan", "Stage",
-               "Last contacted", "Next follow-up", "Next action", "Lead date", "Opportunity date", "Client date", "Lost reason", "Notes"]
-EXPORT_FIELDS = ["company", "website", "contact", "role", "email", "phone", "linkedin", "country", "industry", "channel", "plan", "stage",
-                 "last_contacted", "next_follow_up", "next_action", "lead_date", "opp_date", "client_date", "lost_reason", "notes"]
+EXPORT_HEAD = ["Company", "Requirement", "Segment", "Stage", "Expected value", "Deal currency", "Deal value", "Tender deadline", "Odoo ID",
+               "Website", "Contact", "Job title", "Email", "Phone", "LinkedIn", "Country", "Industry", "Lead source", "Plan",
+               "Last contacted", "Next follow-up", "Next action", "Lead date", "Opportunity date", "Client date", "Lost reason",
+               "Why won or lost", "Competitor", "Lesson", "Notes"]
+EXPORT_FIELDS = ["company", "requirement", "segment", "stage", "value", "deal_currency", "deal_value", "tender_deadline", "odoo_ref",
+                 "website", "contact", "role", "email", "phone", "linkedin", "country", "industry", "channel", "plan",
+                 "last_contacted", "next_follow_up", "next_action", "lead_date", "opp_date", "client_date", "lost_reason",
+                 "win_loss_why", "win_loss_competitor", "win_loss_lesson", "notes"]
 
 
 def export_csv(user):
     out = io.StringIO()
     w = csv.writer(out)
     w.writerow(EXPORT_HEAD)
-    labels = dict(T.STAGES)
+    labels = {s.key: s.name for s in PipelineStage.objects.all()}
     for p in Prospect.objects.filter(owner=user).order_by("company"):
         w.writerow([labels.get(p.stage, p.stage) if f == "stage" else (getattr(p, f) or "") for f in EXPORT_FIELDS])
     return "﻿" + out.getvalue()
@@ -283,19 +294,28 @@ def import_backup(user, data):
     st.plan_template = TrackerSettings.Template.CENTRAL_AI
     st.save()
     seen = {(p.company.lower(), p.email.lower()) for p in Prospect.objects.filter(owner=user)}
+    stages, first, t = pipeline.stage_map(), pipeline.first_stage(), today()
     leads = 0
     for l in data.get("leads") or []:
         if not isinstance(l, dict) or not l.get("company") or (str(l["company"]).lower(), str(l.get("email", "")).lower()) in seen:
             continue
-        Prospect.objects.create(owner=user, company=str(l["company"])[:200], website=str(l.get("website", ""))[:200], contact=str(l.get("contact", ""))[:150],
+        stage = stages.get(pipeline.LEGACY.get(str(l.get("stage") or ""), "")) or first
+        p = Prospect.objects.create(owner=user, company=str(l["company"])[:200], website=str(l.get("website", ""))[:200], contact=str(l.get("contact", ""))[:150],
                                 role=str(l.get("role", ""))[:150], email=str(l.get("email", ""))[:200], phone=str(l.get("phone", ""))[:60],
                                 linkedin=str(l.get("linkedin", ""))[:300], country=str(l.get("country", ""))[:80], industry=str(l.get("niche", ""))[:80],
                                 channel=str(l.get("channel", ""))[:60], plan=str(l.get("plan", ""))[:60],
-                                stage=l.get("stage") if l.get("stage") in T.RANK else "prospect", last_contacted=_d(l.get("last")),
+                                stage=stage.key, stage_since=t, last_contacted=_d(l.get("last")),
                                 next_follow_up=_d(l.get("next")), next_action=str(l.get("action", ""))[:200], lead_date=_d(l.get("leadDate")),
                                 opp_date=_d(l.get("oppDate")), client_date=_d(l.get("clientDate")), lost_reason=str(l.get("lost", ""))[:200],
                                 notes=str(l.get("notes", ""))[:5000])
+        if stage.kind == PipelineStage.Kind.OPEN and not (p.next_follow_up and p.next_action):   # FR-CL3: every open record has a next step
+            p.next_follow_up, p.next_action = p.next_follow_up or t, p.next_action or "Follow up"
+            p.save(update_fields=["next_follow_up", "next_action"])
+        if not pipeline.replay_dates(p, user):   # its old lead/opportunity/client dates keep their KPI history
+            pipeline.move(p, stage.key, user, on=t, initial=True, baseline=True, refresh=False)
         leads += 1
+    from . import kpis
+    kpis.refresh(user.pk)
     acts = 0
     for a in data.get("acts") or []:
         if isinstance(a, dict) and _d(a.get("date")):

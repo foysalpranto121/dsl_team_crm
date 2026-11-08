@@ -75,12 +75,23 @@ def entry_block(user, sheet, day, st=None, plans=None):
     return None
 
 
+def kpi_derived(st, week_start=None):
+    """SRS v0.5 FR-K2/K5: weekly KPIs are worked out from the pipeline (unless the team switched to typing them in); weeks
+    before the cut-over date keep the numbers typed in."""
+    if st.kpi_mode != TeamSettings.KpiMode.DERIVED:
+        return False
+    return week_start is None or st.kpi_from is None or week_start >= st.kpi_from
+
+
 def kpi_block(user, sheet, week_start, st=None):
+    """Why the signed-in person can't type this week's numbers (None = they can)."""
     st = st or TeamSettings.load()
     if calc.dow(week_start) != st.week_start_dow:
         return "A week must start on the team's first day of the week."
     if sheet.kind != Sheet.Kind.WORK:
         return "Weekly results go on work-log sheets, not plans."
+    if kpi_derived(st, week_start):
+        return "Worked out from the pipeline: move records through the stages. A supervisor can adjust the week with a note."
     if user.is_team_admin:
         return None
     if not user.does_own_work:
@@ -163,7 +174,7 @@ def save_kpi(user, sheet, week_start, data):
     kpi, _ = KpiEntry.objects.select_for_update().get_or_create(sheet=sheet, week_start=week_start)
     for k, v in data.items():
         setattr(kpi, k, v)
-    kpi.updated_by = user
+    kpi.updated_by, kpi.source = user, KpiEntry.Source.TYPED
     kpi.save()
     audit.log(user, "kpi.save", sheet, week=str(week_start), **{k: str(v) for k, v in data.items()})
     return kpi
