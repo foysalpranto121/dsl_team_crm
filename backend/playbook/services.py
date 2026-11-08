@@ -513,6 +513,7 @@ def _lens(c):
     """Approvals due, who hasn't closed yesterday, overloaded members, stuck deals, recognition prompts. Completion %, never private task contents."""
     if not c.user.can_approve:
         return None
+    from recognition.services import prompts       # recognition builds on the Playbook's models, so it's imported here
     _, rows = team.dashboard_rows(c.t)
     prev = planning.previous_working_day(c.t, c.cfg)
     owners = [r["owner_id"] for r in rows if r["owner_id"] and r["owner_id"] != c.user.pk]
@@ -524,7 +525,7 @@ def _lens(c):
         if e and p.stage_since and (c.t - p.stage_since).days > e:
             stuck[p.owner_id] = stuck.get(p.owner_id, 0) + 1
     flags = {f.owner_id: f for f in fw.OverloadFlag.objects.filter(owner_id__in=owners, cleared_at__isnull=True)}
-    people, prompts = [], []
+    people = []
     for r in rows:
         o = r["owner_id"]
         if not o or o == c.user.pk:
@@ -533,11 +534,9 @@ def _lens(c):
         today, before = days.get((o, c.t)), days.get((o, prev))
         people.append({"id": o, "name": name, "work": r["id"], "started": bool(today and today.opened_at), "closed": bool(today and today.closed_at), "pct": (today.snapshot or {}).get("pct") if today else None,
                        "yesterday_closed": bool(before and before.closed_at), "overloaded": o in flags, "stuck": stuck.get(o, 0)})
-        if r["last_week_status"]["key"] == "met":
-            prompts.append(f"{name} hit last week's hours target. Send a word of thanks?")
     n = planning.mine(c.user).get("to_review") or 0
     return {"approvals": n + EventLog.objects.filter(status=EventLog.Status.PENDING).exclude(sheet__owner=c.user).count(), "people": people, "unclosed": sum(1 for p in people if not p["yesterday_closed"]), "yesterday": prev,
-            "overloaded": sum(1 for p in people if p["overloaded"]), "stuck": sum(stuck.values()), "prompts": prompts[:3]}
+            "overloaded": sum(1 for p in people if p["overloaded"]), "stuck": sum(stuck.values()), "prompts": prompts(c.user, rows)}
 
 
 # ---------- the day ----------

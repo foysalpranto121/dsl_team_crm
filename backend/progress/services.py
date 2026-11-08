@@ -473,13 +473,16 @@ def me(user, work_id=None):
         c = playbook._ctx(user)
         suggestions = playbook._suggestions(c)
     last_ws = ws - timedelta(days=7)
+    from recognition.services import config as recognition   # recognition builds on these modules, so it's imported here
+    shown = recognition(st)
+    rings = {"day": {"value": today_n["hours"], "target": calc.r2(row["week_target"] / wd_week) if wd_week else 0, "unit": "h"}, "week": {"value": row["week_hours"], "target": row["week_target"], "unit": "h"},
+             "month": {"value": row["month_points"], "target": row["month_target"], "unit": "pts"}}
     return {
         "person": planning.person_of(work), "work": work.id, "mine": mine, "today": t, "month": f"{t:%B}", "currency": st.currency,
-        "rings": {"day": {"value": today_n["hours"], "target": calc.r2(row["week_target"] / wd_week) if wd_week else 0, "unit": "h"}, "week": {"value": row["week_hours"], "target": row["week_target"], "unit": "h"},
-                  "month": {"value": row["month_points"], "target": row["month_target"], "unit": "pts"}},
+        "rings": rings if shown["rings"] else None,
         "score": score, "version": month.get("version"), "forecast": forecast, "metrics": lines, "biggest_gap": biggest, "coach": coach,
         "catch_up": _catch_up(work, row, stages, st, t) if coach else None, "analysis": _analysis(work, t, st) if coach else None, "suggested": suggestions,
-        "recap": recap(work, last_ws, st), "review": {"week_start": ws, "submitted": WeeklyReview.objects.filter(owner_id=work.owner_id, week_start=ws, submitted_at__isnull=False).exists(),
+        "recap": recap(work, last_ws, st) if shown["recap"] else None, "review": {"week_start": ws, "submitted": WeeklyReview.objects.filter(owner_id=work.owner_id, week_start=ws, submitted_at__isnull=False).exists(),
                                                       "due": t == _last_working_day(ws, cfg, t)},
     }
 

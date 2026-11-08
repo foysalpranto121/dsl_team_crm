@@ -17,7 +17,7 @@ export interface ClosingItem { key: string; label: string; done: boolean; to: st
 export interface Suggestion { id: number; title: string; why: string; action: string; to: string; feedback: "" | "useful" | "not_useful" }
 export interface Reminder { key: string; icon: string; title: string; to: string }
 export interface LensPerson { id: number; name: string; work: number; started: boolean; closed: boolean; pct: number | null; yesterday_closed: boolean; overloaded: boolean; stuck: number }
-export interface Lens { approvals: number; people: LensPerson[]; unclosed: number; yesterday: string; overloaded: number; stuck: number; prompts: string[] }
+export interface Lens { approvals: number; people: LensPerson[]; unclosed: number; yesterday: string; overloaded: number; stuck: number; prompts: { owner: number; work: number; name: string; text: string }[] }
 export interface Day {
   day: string; phase: "morning" | "execute" | "close" | "closed"; phase_labels: { morning: string; execute: string; close: string };
   primary: { kind: "open" | "item" | "close"; label: string; item?: string } | null;

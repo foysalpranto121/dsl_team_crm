@@ -11,6 +11,7 @@ import { PageSkeleton } from "@/components/ui/skeleton";
 import { date, money, num } from "@/lib/format";
 import { addDays } from "../log/util";
 import { SuggestionCard } from "../playbook/Playbook";
+import { StreaksCard } from "../recognition/StreaksCard";
 import { monthRange, type DrillTarget, type KpiMetric } from "../scoring/api";
 import { Drill, LedgerDrawer } from "../scoring/LedgerDrawer";
 import { PILL, progressQuery, type Analysis, type Metric, type Progress, type Recap } from "./api";
@@ -143,7 +144,7 @@ export default function MyProgress() {
         actions={d.mine ? <Button variant="secondary" asChild><Link to="/weekly-review"><CalendarCheck2 /> {d.review.submitted ? "This week's review" : "Weekly Review"}</Link></Button> : undefined} />
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="space-y-5">
-          <section className="card p-5" aria-label="Your rings">
+          {d.rings && <section className="card p-5" aria-label="Your rings">
             <div className="flex flex-wrap gap-x-8 gap-y-4">
               <Ring label="Today" {...d.rings.day} /><Ring label="This week" {...d.rings.week} /><Ring label={`${d.month} points`} {...d.rings.month} />
             </div>
@@ -154,7 +155,7 @@ export default function MyProgress() {
               </div>
               {top?.to && <Button asChild><Link to={top.to}>Open suggested action <ArrowRight /></Link></Button>}
             </div>
-          </section>
+          </section>}
 
           <section className="card overflow-hidden" aria-labelledby="gaps-title">
             <h2 id="gaps-title" className="border-b border-border px-5 py-3 text-sm font-semibold">Your numbers, in plain words</h2>
@@ -178,7 +179,8 @@ export default function MyProgress() {
               {d.suggested.length > 0 && <ul className="divide-y divide-border">{d.suggested.map((s) => <SuggestionCard key={s.id} s={s} />)}</ul>}
             </section>
           )}
-          <RecapCard r={d.recap} />
+          <StreaksCard work={work} />
+          {d.recap && <RecapCard r={d.recap} />}
           {d.mine && d.review.due && !d.review.submitted && (
             <div className="rounded-xl border border-primary/30 bg-primary-soft p-4 text-sm"><p className="font-medium">Your Weekly Review is due today.</p><p className="mt-0.5 text-muted-foreground">Ten minutes to wrap up the week.</p>
               <Button size="sm" className="mt-2" asChild><Link to="/weekly-review">Start it</Link></Button></div>

@@ -8,6 +8,7 @@ import TasksRoles from "../components/TasksRoles";
 import { CalendarAndLoad } from "../features/setup/CalendarAndLoad";
 import { PlaybookSettings } from "../features/setup/PlaybookSettings";
 import { PolicyAndFeatures } from "../features/setup/PolicyAndFeatures";
+import { RecognitionSettings } from "../features/setup/RecognitionSettings";
 import { SalesProcess } from "../features/setup/SalesProcess";
 import { ScoringVersions } from "../features/setup/ScoringVersions";
 import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select, Spinner } from "../components/ui";
@@ -249,6 +250,7 @@ export default function TeamSetup() {
       <div className="mb-6"><PolicyAndFeatures st={st.data!} /></div>
       <div className="mb-6"><CalendarAndLoad st={st.data!} /></div>
       <div className="mb-6"><PlaybookSettings st={st.data!} /></div>
+      <div className="mb-6"><RecognitionSettings st={st.data!} /></div>
       <div className="mb-6"><SalesProcess st={st.data!} /></div>
       <div className="mb-6"><ScoringVersions /></div>
 

@@ -277,6 +277,13 @@
   }
 }
 
+@keyframes win-pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes win-fall { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(280px) rotate(320deg); opacity: 0; } }
+.win-pop { animation: win-pop 200ms ease-out both; }
+.win-bit { animation: win-fall 1500ms ease-out both; opacity: 0; }
+
 @media (prefers-reduced-motion: reduce) {
+  .win-bit { display: none; }
+
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }

@@ -1,6 +1,6 @@
 import {
   Activity, BarChart3, Briefcase, CalendarCheck2, CalendarClock, CalendarSync, ClipboardList, House, LayoutDashboard, LayoutGrid, ListTodo, Network, Newspaper,
-  ListChecks, Settings, ShieldCheck, Sunrise, TrendingUp, Tv, UserRound, Users, Workflow, type LucideIcon,
+  ListChecks, Settings, ShieldCheck, Sunrise, TrendingUp, Trophy, Tv, UserRound, Users, Workflow, type LucideIcon,
 } from "lucide-react";
 import type { Feature, Role } from "../api/types";
 import type { Features } from "./features";
@@ -60,6 +60,7 @@ export const NAV: NavSection[] = [
         keywords: "meeting standup daily focus" },
       { to: "/kpi", label: "Weekly KPI", icon: CalendarCheck2, description: "Leads, opportunities, clients and revenue per week", keywords: "results" },
       { to: "/performance", label: "Performance", icon: BarChart3, description: "Monthly, quarterly and yearly scores", keywords: "score composite" },
+      { to: "/wins", label: "Wins", icon: Trophy, description: "Verified wins, badges and words of thanks", keywords: "win feed celebrate reactions kudos thanks badges" },
       { to: "/team", label: "People", icon: Users, description: "Who's on the team", keywords: "directory members" },
     ],
   },

@@ -1,4 +1,5 @@
 import type { PlaybookConfig } from "../features/playbook/api";
+import type { RecognitionConfig } from "../features/recognition/api";
 import type { ScoreEvent } from "../features/scoring/api";
 
 /** SRS v0.5 §3: Member · Supervisor / Team Leader (also approves) · Management (stored as "viewer") · Admin. */
@@ -210,6 +211,8 @@ export interface TeamSettings {
   overload_days: number;
   /** SRS v0.5 FR-DP11 */
   playbook: PlaybookConfig;
+  /** SRS v0.5 NFR-10, D11 */
+  recognition: RecognitionConfig;
   today: string;
   seconds_to_lock: number;
 }

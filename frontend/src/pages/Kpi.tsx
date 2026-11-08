@@ -39,7 +39,7 @@ const shift = (s: string, n: number) => { const d = new Date(s + "T00:00:00Z"); 
 const monthName = (ym: string) => new Date(ym + "-01T00:00:00Z").toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" });
 const val = (k: Kpi | null, key: KpiKey) => (k ? (key === "revenue" ? +k.revenue : k[key]) : 0);
 const fmtVal = (key: KpiKey, v: number) => (key === "revenue" ? money(v, { currency: null }) : String(v));
-const invalidate = (qc: ReturnType<typeof useQueryClient>) => ["kpi-week", "kpi-evidence", "dashboard", "performance", "pipeline-reviews", "tracker"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+const invalidate = (qc: ReturnType<typeof useQueryClient>) => ["kpi-week", "kpi-evidence", "dashboard", "performance", "pipeline-reviews", "tracker", "recognition", "playbook"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
 
 /** A typed week (manual mode, or before the cut-over): the old inline editing, labelled as unevidenced. */
 function TypedCells({ row, week }: { row: KpiRow; week: string }) {
@@ -163,12 +163,13 @@ function ReviewPanel() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["pipeline-reviews"], queryFn: async () => (await api.get<Reviews>("/tracker/reviews/")).data });
   const [rejecting, setRejecting] = useState<{ id: number; company: string } | null>(null);
+  const [verifying, setVerifying] = useState<{ id: number; company: string; person: string } | null>(null);
   const [note, setNote] = useState("");
   const act = useMutation({
     mutationFn: async (a: { kind: "move" | "win" | "stage"; id: number; verified?: boolean; note?: string }) =>
       api.post(a.kind === "move" ? `/tracker/reviews/moves/${a.id}/` : a.kind === "stage" ? `/frameworks/reviews/${a.id}/` : `/tracker/reviews/wins/${a.id}/`,
         { verified: a.verified, note: a.note ?? "" }),
-    onSuccess: (_, a) => { invalidate(qc); setRejecting(null); setNote("");
+    onSuccess: (_, a) => { invalidate(qc); setRejecting(null); setVerifying(null); setNote("");
       if (a.kind === "stage") qc.invalidateQueries({ queryKey: ["frameworks"] });
       toast.success(a.kind !== "win" ? "Marked as reviewed" : a.verified ? "Win verified" : "Sent back", { description: a.kind === "win" && a.verified ? "It now counts as a client and as revenue." : undefined }); },
     onError: (e) => toast.error("Couldn't save that", { description: errorText(e) }),
@@ -185,7 +186,7 @@ function ReviewPanel() {
             <div className="min-w-0 flex-1"><div className="font-medium">{w.company} won <span className="font-normal text-muted-foreground">· {w.person}{w.value != null ? ` · ${money(w.value, { currency: null })}` : ""}</span></div>
               <div className="truncate text-xs text-muted-foreground">{w.requirement}{w.why ? ` · Why: ${w.why}` : ""}</div></div>
             <Button size="sm" variant="secondary" onClick={() => setRejecting({ id: w.id, company: w.company })}>Not verified</Button>
-            <Button size="sm" onClick={() => act.mutate({ kind: "win", id: w.id, verified: true })}>Verify work order</Button>
+            <Button size="sm" onClick={() => setVerifying({ id: w.id, company: w.company, person: w.person })}>Verify work order</Button>
           </li>
         ))}
         {d.moves.map((m) => (
@@ -205,6 +206,15 @@ function ReviewPanel() {
           </li>
         ))}
       </ul>
+      <Dialog open={!!verifying} onOpenChange={(o) => !o && setVerifying(null)}>
+        <DialogContent size="sm">
+          <form onSubmit={(e) => { e.preventDefault(); if (verifying) act.mutate({ kind: "win", id: verifying.id, verified: true, note }); }}>
+            <DialogHeader><DialogTitle>Verify {verifying?.company}'s work order?</DialogTitle><DialogDescription>It counts as a client and as revenue, and goes on the win feed.</DialogDescription></DialogHeader>
+            <DialogBody><Field label={`A word for ${verifying?.person}`} hint="Optional. They see it with the celebration."><Textarea value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} className="min-h-16" placeholder="e.g. Great work staying with this one" /></Field></DialogBody>
+            <DialogFooter><Button type="button" variant="secondary" onClick={() => setVerifying(null)}>Cancel</Button><Button type="submit" busy={act.isPending}>Verify work order</Button></DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       <Dialog open={!!rejecting} onOpenChange={(o) => !o && setRejecting(null)}>
         <DialogContent size="sm">
           <form onSubmit={(e) => { e.preventDefault(); if (rejecting) act.mutate({ kind: "win", id: rejecting.id, verified: false, note }); }}>

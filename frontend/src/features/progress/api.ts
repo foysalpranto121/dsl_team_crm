@@ -18,9 +18,9 @@ export interface Analysis {
   adherence: number | null; logged_hours: number; deviations: number; deviation_rate: number | null; calls_per_lead: number | null; calls: number; flags: { kind: string; day: string; text: string }[];
 }
 export interface Progress {
-  person: string; work: number; mine: boolean; today: string; month: string; currency: string; rings: Record<"day" | "week" | "month", { value: number; target: number; unit: string }>; score: number | null; version: number | null;
+  person: string; work: number; mine: boolean; today: string; month: string; currency: string; rings: Record<"day" | "week" | "month", { value: number; target: number; unit: string }> | null; score: number | null; version: number | null;
   forecast: { key: string | null; units: number; text: string } | null; metrics: Metric[]; biggest_gap: { key: string; text: string } | null; coach: boolean;
-  catch_up: { chain: string[]; text: string; basis: string; average_deal: number | null } | null; analysis: Analysis | null; suggested: Suggestion[]; recap: Recap;
+  catch_up: { chain: string[]; text: string; basis: string; average_deal: number | null } | null; analysis: Analysis | null; suggested: Suggestion[]; recap: Recap | null;
   review: { week_start: string; submitted: boolean; due: boolean };
 }
 export const progressQuery = (work: string | null) => queryOptions({

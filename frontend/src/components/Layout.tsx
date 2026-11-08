@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, useLocation } from "react-router";
+import { Celebrate } from "../features/recognition/Celebrate";
 import { pendingUsersQuery, todayQuery } from "../api/queries";
 import { useAuth } from "../auth/AuthContext";
 import { useLocalState } from "../lib/use-local-state";
@@ -87,6 +88,7 @@ export default function Layout() {
           <Topbar />
           <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1200px] flex-1 px-4 pb-28 pt-6 outline-hidden sm:px-6 lg:px-8 lg:pb-16 lg:pt-8">
             <Outlet />
+            <Celebrate />
           </main>
         </div>
       </div>

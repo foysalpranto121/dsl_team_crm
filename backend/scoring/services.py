@@ -517,6 +517,12 @@ def decide_event(user, ev, verified, note=""):
     ev.save(update_fields=["status", "decided_by", "decided_at", "decision_note", "updated_at"])
     _sync_event(ev)
     audit.log(user, "event.verify" if verified else "event.reject", ev.activity.name, person=person_of(ev.sheet), day=str(ev.day), note=note[:200])
+    if ev.activity.counts_as_win:                         # a win logged as an event (typed KPIs): the feed follows it too (FR-MO4)
+        from recognition import services as recognition
+        if verified:
+            recognition.win_verified(user, event=ev, message=note)
+        else:
+            recognition.win_withdrawn(event=ev)
     return ev
 
 
@@ -548,7 +554,9 @@ def record_win(user, record):
 
 
 def withdraw_win(user, record, why=""):
-    """The win is no longer verified, or the record left Won: its points go with it."""
+    """The win is no longer verified, or the record left Won: its points go with it, and its post on the win feed."""
+    from recognition.services import win_withdrawn       # recognition builds on scoring, so it's imported here
+    win_withdrawn(record=record)
     for ev in EventLog.objects.filter(record=record, status=EV.VERIFIED).select_related("sheet", "activity"):
         ev.status, ev.decided_by, ev.decided_at, ev.decision_note = EV.REJECTED, user if getattr(user, "pk", None) else None, timezone.now(), why[:300]
         ev.save(update_fields=["status", "decided_by", "decided_at", "decision_note", "updated_at"])

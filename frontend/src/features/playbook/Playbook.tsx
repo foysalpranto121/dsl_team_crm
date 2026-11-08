@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
-import { AlertCircle, BellRing, CalendarClock, Check, ChevronDown, ChevronRight, Circle, ClipboardCheck, Clock, History, Lightbulb, Plus, Sparkles, ThumbsDown, ThumbsUp, Timer, Users, X } from "lucide-react";
+import { AlertCircle, BellRing, CalendarClock, Check, ChevronDown, ChevronRight, Circle, ClipboardCheck, Clock, Flame, History, Lightbulb, Plus, Sparkles, ThumbsDown, ThumbsUp, Timer, Users, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router";
 import { api, errorText } from "@/api/client";
@@ -21,6 +21,7 @@ import { date } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { CompleteStepDialog } from "../frameworks/StepsPanel";
 import { recordsQuery } from "../pipeline/api";
+import { recognitionQuery } from "../recognition/api";
 import { MorningBrief } from "../progress/Coach";
 import { playbookHistoryQuery, playbookQuery, refreshPlaybook, type Day, type PlaybookItem, type Suggestion } from "./api";
 
@@ -348,8 +349,32 @@ function Trend() {
 
 /* ---------- FR-DP9: the supervisor's lens ---------- */
 
+function ThanksDialog({ to, onClose }: { to: { work: number; name: string } | null; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [message, setMessage] = useState("");
+  useEffect(() => { if (to) setMessage(""); }, [to]);
+  const send = useMutation({
+    mutationFn: async () => api.post("/recognition/thanks/", { work: to!.work, message }),
+    onSuccess: () => { ["playbook", "recognition"].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); onClose(); toast.success(`Sent to ${to?.name}`, { description: "It's on the win feed." }); },
+  });
+  if (!to) return null;
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent size="sm">
+        <form onSubmit={(e) => { e.preventDefault(); send.mutate(); }}>
+          <DialogHeader><DialogTitle>A word for {to.name}</DialogTitle><DialogDescription>It goes on the win feed, for the whole team to see.</DialogDescription></DialogHeader>
+          <DialogBody><Field label="Your message" required><Textarea value={message} maxLength={500} className="min-h-16" onChange={(e) => setMessage(e.target.value)} autoFocus required /></Field>
+            {send.error && <p className="mt-2 text-sm text-danger-text" role="alert">{errorText(send.error)}</p>}</DialogBody>
+          <DialogFooter><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" busy={send.isPending} disabled={message.trim().length < 3}>Send</Button></DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function LensCard({ d }: { d: Day }) {
   const l = d.lens!;
+  const [thanking, setThanking] = useState<{ work: number; name: string } | null>(null);
   const tiles: [string, number, string | null][] = [["Approvals due", l.approvals, "/team-board"], ["Didn't close yesterday", l.unclosed, null], ["Overloaded", l.overloaded, "/frameworks"], ["Stuck deals", l.stuck, null]];
   return (
     <Section id="lens-title" title={<span className="inline-flex items-center gap-2"><Users className="size-4 text-muted-foreground" aria-hidden />Team today</span>}>
@@ -372,7 +397,10 @@ function LensCard({ d }: { d: Day }) {
             </tr>))}</tbody>
         </table>
       </div>}
-      {l.prompts.length > 0 && <ul className="space-y-1 border-t border-border px-4 py-2.5 text-sm">{l.prompts.map((p) => <li key={p} className="flex gap-2"><Sparkles className="mt-0.5 size-4 shrink-0 text-accent-text" aria-hidden />{p}</li>)}</ul>}
+      {l.prompts.length > 0 && <ul className="divide-y divide-border border-t border-border text-sm">{l.prompts.map((p) => (
+        <li key={p.owner} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2"><Sparkles className="size-4 shrink-0 text-accent-text" aria-hidden /><span className="min-w-0 flex-1 basis-48">{p.text}</span>
+          <Button size="sm" variant="secondary" className={TAP} onClick={() => setThanking({ work: p.work, name: p.name })}>Send a word</Button></li>))}</ul>}
+      <ThanksDialog to={thanking} onClose={() => setThanking(null)} />
     </Section>
   );
 }
@@ -384,6 +412,7 @@ export default function Playbook() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const q = useQuery(playbookQuery);
+  const streak = useQuery(recognitionQuery(null)).data?.streaks?.days.current ?? 0;
   const { set } = useDay();
   const [doing, setDoing] = useState<PlaybookItem | null>(null);
   const [notDone, setNotDone] = useState<PlaybookItem | null>(null);
@@ -424,7 +453,7 @@ export default function Playbook() {
           <h1 className="text-2xl font-semibold">{hello}, {(user?.name || "").split(" ")[0] || "there"}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{date(d.day, "weekday")}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3"><Phases d={d} />{started && <Stopwatch seconds={d.elapsed_seconds} running={d.running} />}</div>
+        <div className="flex flex-wrap items-center gap-3"><Phases d={d} />{streak >= 2 && <Badge tone="outline"><Flame aria-hidden /><span className="tabular-nums">{streak}</span>-day streak</Badge>}{started && <Stopwatch seconds={d.elapsed_seconds} running={d.running} />}</div>
       </header>
 
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,720px)_20rem]">

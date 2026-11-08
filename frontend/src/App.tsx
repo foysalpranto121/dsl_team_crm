@@ -27,6 +27,7 @@ const TeamBoard = lazy(() => import("./features/board/TeamBoard"));
 const FrameworkStudio = lazy(() => import("./features/frameworks/FrameworkStudio"));
 const Playbook = lazy(() => import("./features/playbook/Playbook"));
 const MyProgress = lazy(() => import("./features/progress/MyProgress"));
+const WinFeed = lazy(() => import("./features/recognition/WinFeed"));
 const WeeklyReview = lazy(() => import("./features/progress/WeeklyReview"));
 const TeamReview = lazy(() => import("./features/progress/TeamReview"));
 
@@ -97,6 +98,7 @@ export default function App() {
         <Route path="/welcome" element={<Welcome />} />
         <Route element={<RequireProfile><Layout /></RequireProfile>}>
           <Route path="/home" element={<Suspense fallback={<PageSkeleton />}><HomeRoute /></Suspense>} />
+          <Route path="/wins" element={<Suspense fallback={<PageSkeleton />}><WinFeed /></Suspense>} />
           <Route path="/my-progress" element={<Suspense fallback={<PageSkeleton />}><MyProgress /></Suspense>} />
           <Route path="/weekly-review" element={<Suspense fallback={<PageSkeleton />}><WeeklyReview /></Suspense>} />
           <Route path="/team-review" element={<Suspense fallback={<PageSkeleton />}><TeamReview /></Suspense>} />

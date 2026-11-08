@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "scoring",
     "playbook",
     "progress",
+    "recognition",
 ]
 
 MIDDLEWARE = [
