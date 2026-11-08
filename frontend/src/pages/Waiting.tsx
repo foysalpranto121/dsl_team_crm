@@ -3,10 +3,11 @@ import { Navigate } from "react-router";
 import { useAuth } from "../auth/AuthContext";
 import { BrandName, Logo } from "../components/Brand";
 import { Button } from "../components/ui";
+import { homeFor } from "../lib/nav";
 
 export default function Waiting() {
   const { session, signOut } = useAuth();
-  if (session.phase === "signedIn") return <Navigate to="/dashboard" replace />;
+  if (session.phase === "signedIn") return <Navigate to={homeFor(session.user.role)} replace />;
   if (session.phase !== "waiting") return <Navigate to="/login" replace />;
 
   const view = {

@@ -54,6 +54,8 @@ INSTALLED_APPS = [
     "mytasks",
     "frameworks",
     "scoring",
+    "playbook",
+    "progress",
 ]
 
 MIDDLEWARE = [

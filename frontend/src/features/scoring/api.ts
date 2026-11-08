@@ -64,7 +64,7 @@ export interface RecalcPreview { from: string; rows: { person: string; month: st
 
 /** After anything that moves a score: every screen that shows one. */
 export function refreshScores(qc: QueryClient) {
-  ["dashboard", "performance", "leaderboard", "entries", "plan-history", "board", "score-ledger", "score-events", "score-versions"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+  ["dashboard", "performance", "leaderboard", "entries", "plan-history", "board", "score-ledger", "score-events", "score-versions", "playbook"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");

@@ -25,6 +25,7 @@ const MyDay = lazy(() => import("./features/myday/MyDay"));
 const MyTasks = lazy(() => import("./features/mytasks/MyTasks"));
 const TeamBoard = lazy(() => import("./features/board/TeamBoard"));
 const FrameworkStudio = lazy(() => import("./features/frameworks/FrameworkStudio"));
+const Playbook = lazy(() => import("./features/playbook/Playbook"));
 
 /** The page was called Sheets, then Daily log; old links and bookmarks still work (SRS v0.5 FR-G5: My Day). */
 function ToMyDay() {
@@ -66,6 +67,12 @@ function RequireAdmin() {
   return user?.role === "admin" ? <Outlet /> : <Navigate to="/dashboard" replace />;
 }
 
+/** SRS v0.5 §5.8: the Daily Playbook is home for people who do the work; management goes to the Dashboard. */
+function HomeRoute() {
+  const { user } = useAuth();
+  return user?.role === "viewer" ? <Navigate to="/dashboard" replace /> : <Playbook />;
+}
+
 function MyProfile() {
   return (
     <>
@@ -86,6 +93,7 @@ export default function App() {
       <Route element={<RequireUser />}>
         <Route path="/welcome" element={<Welcome />} />
         <Route element={<RequireProfile><Layout /></RequireProfile>}>
+          <Route path="/home" element={<Suspense fallback={<PageSkeleton />}><HomeRoute /></Suspense>} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/huddle" element={<Suspense fallback={<PageSkeleton />}><Huddle /></Suspense>} />
           <Route path="/renewals" element={<Suspense fallback={<PageSkeleton />}><Renewals /></Suspense>} />

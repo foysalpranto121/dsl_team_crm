@@ -78,7 +78,7 @@ export const previewQuery = (id: number) => queryOptions({
 
 /** After a step or framework changes: the frameworks, and the pipeline whose next steps they set. */
 export function refreshFrameworks(qc: QueryClient) {
-  ["frameworks", "tracker", "pipeline-config", "pipeline-reviews", "kpi-week"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+  ["frameworks", "tracker", "pipeline-config", "pipeline-reviews", "kpi-week", "playbook"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
 }
 
 export const newKey = () => Math.random().toString(36).slice(2, 10).padEnd(8, "0");

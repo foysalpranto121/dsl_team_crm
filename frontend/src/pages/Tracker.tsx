@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { ChevronLeft, ChevronRight, Upload } from "lucide-react";
-import { lazy, Suspense, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { Navigate, useSearchParams } from "react-router";
 import { api, errorText } from "../api/client";
 import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Spinner, Textarea } from "../components/ui";
@@ -211,7 +211,9 @@ export default function Tracker() {
   const settings = useQuery({ queryKey: ["tracker", "settings"], queryFn: async () => (await api.get<Settings>("/tracker/settings/")).data });
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") ?? "pipeline";
-  const [openId, setOpenId] = useState<number | null>(null);
+  const asked = Number(params.get("record")) || null;      // a link to one record, e.g. from the Daily Playbook
+  const [openId, setOpenId] = useState<number | null>(asked);
+  useEffect(() => { if (asked) setOpenId(asked); }, [asked]);
   const [period, setPeriod] = useState<number | null>(null);   // null = the period today falls in
   const summary = useQuery({ queryKey: ["tracker", "summary", period], placeholderData: (prev) => prev, enabled: tab === "overview",
     queryFn: async () => (await api.get<Summary>("/tracker/summary/", { params: { period: period ?? undefined } })).data });

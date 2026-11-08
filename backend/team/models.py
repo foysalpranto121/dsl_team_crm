@@ -69,6 +69,8 @@ class TeamSettings(models.Model):
                                                       help_text="A member is Overloaded with more open overdue items than this.")
     overload_days = models.PositiveSmallIntegerField(default=5, validators=[MinValueValidator(1), MaxValueValidator(60)],
                                                      help_text="Or when the oldest overdue item waited more working days than this.")
+    # SRS v0.5 FR-DP11: the Daily Playbook's sources, weights, caps, closing items, phase labels and tone; defaults in playbook.services
+    playbook = models.JSONField(default=dict, blank=True)
     currency = models.CharField(max_length=8, default="BDT")
     updated_at = models.DateTimeField(auto_now=True)
 

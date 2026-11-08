@@ -18,6 +18,8 @@ urlpatterns = [
     path("api/tasks/", include("mytasks.urls")),
     path("api/frameworks/", include("frameworks.urls")),
     path("api/scoring/", include("scoring.urls")),
+    path("api/playbook/", include("playbook.urls")),
+    path("api/progress/", include("progress.urls")),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="docs"),
 ]

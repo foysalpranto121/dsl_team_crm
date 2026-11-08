@@ -1,4 +1,5 @@
 import { Navigate, useNavigate } from "react-router";
+import { homeFor } from "../lib/nav";
 import { useAuth } from "../auth/AuthContext";
 import { BrandName, Logo, ThemeToggle } from "../components/Brand";
 import ProfileForm from "../components/ProfileForm";
@@ -7,7 +8,7 @@ import ProfileForm from "../components/ProfileForm";
 export default function Welcome() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  if (user?.profile.is_complete) return <Navigate to="/dashboard" replace />;
+  if (user?.profile.is_complete) return <Navigate to={homeFor(user.role)} replace />;
   const first = (user?.name || "").split(" ")[0];
   return (
     <div className="min-h-dvh">
@@ -17,7 +18,7 @@ export default function Welcome() {
           <p className="text-sm font-semibold text-accent-600 dark:text-accent-400">You're approved{first ? `, ${first}` : ""} 🎉</p>
           <h1 className="mt-1 text-2xl font-extrabold">Set up your profile</h1>
           <p className="mb-8 mt-1 text-sm text-slate-500 dark:text-slate-400">Your team sees this on the People page. Fields marked * are needed to continue.</p>
-          <ProfileForm submitLabel="Save and continue" onSaved={(u) => u.profile.is_complete && navigate("/dashboard", { replace: true })} />
+          <ProfileForm submitLabel="Save and continue" onSaved={(u) => u.profile.is_complete && navigate(homeFor(u.role), { replace: true })} />
         </div>
       </main>
     </div>

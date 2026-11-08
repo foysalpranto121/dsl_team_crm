@@ -1,3 +1,4 @@
+import type { PlaybookConfig } from "../features/playbook/api";
 import type { ScoreEvent } from "../features/scoring/api";
 
 /** SRS v0.5 §3: Member · Supervisor / Team Leader (also approves) · Management (stored as "viewer") · Admin. */
@@ -207,6 +208,8 @@ export interface TeamSettings {
   holidays: string[];
   overload_items: number;
   overload_days: number;
+  /** SRS v0.5 FR-DP11 */
+  playbook: PlaybookConfig;
   today: string;
   seconds_to_lock: number;
 }

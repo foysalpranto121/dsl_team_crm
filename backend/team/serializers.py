@@ -16,7 +16,7 @@ class TeamSettingsSerializer(serializers.ModelSerializer):
         model = TeamSettings
         fields = ["name", "timezone", "lock_days", "week_start_dow", "weekend_days", "count_weekend", "currency", "unplanned_mode", "plan_cutoff",
                   "feature_tv", "feature_huddle", "feature_digest", "feature_renewals", "kpi_mode", "kpi_from", "lost_reasons",
-                  "holidays", "overload_items", "overload_days", "today", "seconds_to_lock", "updated_at"]
+                  "holidays", "overload_items", "overload_days", "playbook", "today", "seconds_to_lock", "updated_at"]
         read_only_fields = ["updated_at"]
 
     def get_today(self, obj):
@@ -41,6 +41,21 @@ class TeamSettingsSerializer(serializers.ModelSerializer):
         if not out:
             raise serializers.ValidationError("Keep at least one lost reason.")
         return out[:30]
+
+    def validate_playbook(self, v):
+        from playbook.services import clean_config, config   # playbook builds on team, so it's imported here
+        try:
+            clean = clean_config(v)
+        except ValueError as e:
+            raise serializers.ValidationError(str(e))
+        merged = config(self.instance) if self.instance else {}
+        for k, x in clean.items():
+            merged[k] = {**merged[k], **x} if isinstance(x, dict) and k in merged else x
+        return merged
+
+    def to_representation(self, obj):
+        from playbook.services import config
+        return {**super().to_representation(obj), "playbook": config(obj)}
 
     def validate_holidays(self, v):
         from datetime import date

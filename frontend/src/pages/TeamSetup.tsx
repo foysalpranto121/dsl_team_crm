@@ -6,6 +6,7 @@ import type { Backup, JobRole, Sheet, TeamSettings, User } from "../api/types";
 import ImportWorkbook from "../components/ImportWorkbook";
 import TasksRoles from "../components/TasksRoles";
 import { CalendarAndLoad } from "../features/setup/CalendarAndLoad";
+import { PlaybookSettings } from "../features/setup/PlaybookSettings";
 import { PolicyAndFeatures } from "../features/setup/PolicyAndFeatures";
 import { SalesProcess } from "../features/setup/SalesProcess";
 import { ScoringVersions } from "../features/setup/ScoringVersions";
@@ -247,6 +248,7 @@ export default function TeamSetup() {
       <div className="mb-6"><RulesCard st={st.data!} /></div>
       <div className="mb-6"><PolicyAndFeatures st={st.data!} /></div>
       <div className="mb-6"><CalendarAndLoad st={st.data!} /></div>
+      <div className="mb-6"><PlaybookSettings st={st.data!} /></div>
       <div className="mb-6"><SalesProcess st={st.data!} /></div>
       <div className="mb-6"><ScoringVersions /></div>
 

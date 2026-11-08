@@ -25,7 +25,7 @@ function TaskRow({ t }: { t: Task }) {
   };
   return (
     <>
-      <tr className={clsx("border-b border-slate-100 dark:border-white/5", !t.active && "opacity-60")}>
+      <tr className={clsx("border-b border-slate-100 dark:border-white/5", !t.active && "opacity-70")}>
         <td className="px-2 py-1"><input defaultValue={t.type} onBlur={onBlur("type")} aria-label={`Type of ${t.name}`} className={cls} /></td>
         <td className="px-2 py-1"><input defaultValue={t.name} onBlur={onBlur("name")} aria-label="Task name" className={clsx(cls, "font-medium")} /></td>
         <td className="px-2 py-1"><input type="number" min={0} step={0.5} defaultValue={+t.points} onBlur={onBlur("points")} aria-label={`Points for ${t.name}`} className={clsx(cls, "num w-20 text-right")} /></td>

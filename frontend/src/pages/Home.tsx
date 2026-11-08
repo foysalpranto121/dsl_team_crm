@@ -3,6 +3,7 @@ import { BarChart3, CalendarClock, CheckCircle2, Clock3, LockKeyhole, ShieldChec
 import { useState, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router";
 import { errorText } from "../api/client";
+import { homeFor } from "../lib/nav";
 import { useAuth } from "../auth/AuthContext";
 import { BrandName, Logo, ThemeToggle } from "../components/Brand";
 import { Alert, Spinner } from "../components/ui";
@@ -72,7 +73,7 @@ export default function Home() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  if (session.phase === "signedIn") return <Navigate to={session.user.profile.is_complete ? from || "/dashboard" : "/welcome"} replace />;
+  if (session.phase === "signedIn") return <Navigate to={session.user.profile.is_complete ? from || homeFor(session.user.role) : "/welcome"} replace />;
   if (session.phase === "waiting") return <Navigate to="/waiting" replace />;
 
   const onCredential = async (credential?: string) => {
@@ -80,7 +81,7 @@ export default function Home() {
     setBusy(true); setError("");
     try {
       const next = await signInWithGoogle(credential);
-      if (next.phase === "signedIn") navigate(next.user.profile.is_complete ? from || "/dashboard" : "/welcome", { replace: true });
+      if (next.phase === "signedIn") navigate(next.user.profile.is_complete ? from || homeFor(next.user.role) : "/welcome", { replace: true });
       else navigate("/waiting", { replace: true });
     } catch (e) {
       setError(errorText(e));

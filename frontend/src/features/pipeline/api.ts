@@ -61,7 +61,7 @@ export const logQuery = (id: number) => queryOptions({
 
 /** After a record changes: the pipeline, its log, the weekly KPIs worked out from it, and the screens that show them. */
 export function refreshPipeline(qc: QueryClient) {
-  ["tracker", "frameworks", "kpi-week", "kpi-evidence", "dashboard", "performance", "pipeline-reviews"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+  ["tracker", "frameworks", "kpi-week", "kpi-evidence", "dashboard", "performance", "pipeline-reviews", "playbook"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
 }
 
 /** The framework a record entering `stage` gets: the default for its segment, else the stage's default for every segment. */

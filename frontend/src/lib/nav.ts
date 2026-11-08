@@ -1,5 +1,5 @@
 import {
-  Activity, BarChart3, Briefcase, CalendarCheck2, CalendarClock, CalendarSync, ClipboardList, LayoutDashboard, LayoutGrid, ListTodo, Network, Newspaper,
+  Activity, BarChart3, Briefcase, CalendarCheck2, CalendarClock, CalendarSync, ClipboardList, House, LayoutDashboard, LayoutGrid, ListTodo, Network, Newspaper,
   Settings, ShieldCheck, Sunrise, Tv, UserRound, Users, Workflow, type LucideIcon,
 } from "lucide-react";
 import type { Feature, Role } from "../api/types";
@@ -34,6 +34,8 @@ const WORKERS: Role[] = ["admin", "supervisor", "member"];
 export const NAV: NavSection[] = [
   {
     id: "mine", title: "My work", items: [
+      { to: "/home", label: "Home", icon: House, description: "Your Daily Playbook: what to do today, in order", roles: WORKERS,
+        keywords: "playbook today start my day close ring next" },
       { to: "/my-day", label: "My Day", icon: CalendarClock, description: "Plan your week, then log each hour against the plan", roles: WORKERS,
         keywords: "plan log hours timesheet today sheets daily log week approve" },
       { to: "/my-tasks", label: "My Tasks", icon: ListTodo, description: "Your to-do list, with dates and tasks your supervisor assigned", roles: WORKERS,
@@ -96,6 +98,9 @@ export const QUICK_ACTIONS: QuickAction[] = [
 
 const allowed = (item: { roles?: Role[]; feature?: Feature }, role: Role, features?: Features) =>
   (!item.roles || item.roles.includes(role)) && (!item.feature || !!features?.[item.feature]);
+
+/** Where someone lands: the Daily Playbook, or the Dashboard for management, who don't log work. */
+export const homeFor = (role?: Role) => (role === "viewer" ? "/dashboard" : "/home");
 
 export const navFor = (role: Role, features?: Features) =>
   NAV.filter((s) => !s.roles || s.roles.includes(role))
