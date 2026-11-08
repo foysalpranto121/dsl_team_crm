@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { ChevronLeft, ChevronRight, Download, Plus, Trash2, Upload, X } from "lucide-react";
-import { useRef, useState, type FormEvent, type ReactNode } from "react";
+import { ChevronLeft, ChevronRight, Upload } from "lucide-react";
+import { lazy, Suspense, useRef, useState, type ReactNode } from "react";
 import { Navigate, useSearchParams } from "react-router";
-import { api, downloadFile, errorText } from "../api/client";
+import { api, errorText } from "../api/client";
 import { Alert, Badge, Button, Card, EmptyState, Field, Input, PageHeader, Select, Spinner, Textarea } from "../components/ui";
 
 /* ---------- types ---------- */
@@ -11,9 +11,6 @@ type Key = { key: string; label: string; points?: number };
 interface Settings { product: string; tagline: string; period_start: string; period_days: number; targets: Record<"points" | "leads" | "opps" | "clients", number>;
   weeks: { leads: number; opps: number; clients: number; points: number; focus: string }[]; rules: Record<string, number>;
   lists: Record<"countries" | "industries" | "channels" | "plans", string[]>; plan_template: "blank" | "centralai"; share_with_admins: boolean; stages: Key[]; milestones: Key[]; activity_types: Key[]; updated_at: string }
-interface Prospect { id: number; company: string; website: string; contact: string; role: string; email: string; phone: string; linkedin: string; country: string;
-  industry: string; channel: string; plan: string; stage: string; last_contacted: string | null; next_follow_up: string | null; next_action: string;
-  lead_date: string | null; opp_date: string | null; client_date: string | null; lost_reason: string; notes: string; updated_at: string }
 interface Activity { id: number; date: string; type: string; qty: number; note: string; points: number }
 type M = { leads: number; opps: number; clients: number; points: number };
 interface Week { n: number; from: string; to: string; leads: number; opps: number; clients: number; points: number; focus: string; actual: M; plan: { done: number; total: number } }
@@ -23,12 +20,13 @@ interface Summary { today: string; period: Period; targets: M; totals: M; weeks:
   funnel: { prospects: number; contacted: number; leads: number; opps: number; clients: number }; due: { id: number; company: string; next_follow_up: string; next_action: string; overdue: boolean }[];
   due_count: number; by_country: Row[]; by_channel: Row[] }
 
-const STAGE_TONE: Record<string, "slate" | "brand" | "amber" | "green" | "red" | "accent"> = { prospect: "slate", contacted: "brand", lead: "amber", opp: "accent", client: "green", lost: "red" };
 const fmt = (s?: string | null) => (s ? new Date(s + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : "");
 const longDay = (s: string) => new Date(s + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 const nf = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 1 });
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "–");
-const TABS = [["overview", "Overview"], ["pipeline", "Pipeline"], ["activity", "Activity log"], ["settings", "Settings"]] as const;
+const TABS = [["pipeline", "Pipeline"], ["overview", "Overview"], ["activity", "Activity log"], ["settings", "Settings"]] as const;
+// SRS v0.5 My Pipeline: the board, list and record drawer (stage stepper, deal health, Client Log).
+const PipelineView = lazy(() => import("../features/pipeline/PipelineView"));
 const fmtY = (s: string) => new Date(s + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
 /** Step between periods. The current period (the one today falls in) is shown unless you pick another. */
@@ -43,9 +41,6 @@ function PeriodNav({ p, set }: { p: Period; set: (n: number | null) => void }) {
     </div>
   );
 }
-
-const chip = (on: boolean) => clsx("rounded-full border px-3 py-1 text-xs font-semibold",
-  on ? "border-brand-700 bg-brand-700 text-white dark:border-brand-300 dark:bg-brand-300 dark:text-brand-950" : "border-slate-300 dark:border-white/15");
 
 /* ---------- overview ---------- */
 function Overview({ s, go, setPeriod }: { s: Summary; go: (tab: string, id?: number) => void; setPeriod: (n: number | null) => void }) {
@@ -115,126 +110,6 @@ function Overview({ s, go, setPeriod }: { s: Summary; go: (tab: string, id?: num
           </Card>
         ))}
       </div>
-    </div>
-  );
-}
-
-/* ---------- pipeline ---------- */
-const EMPTY: Omit<Prospect, "id" | "updated_at"> = { company: "", website: "", contact: "", role: "", email: "", phone: "", linkedin: "", country: "", industry: "", channel: "", plan: "",
-  stage: "prospect", last_contacted: null, next_follow_up: null, next_action: "", lead_date: null, opp_date: null, client_date: null, lost_reason: "", notes: "" };
-const DATE_FIELDS = new Set(["last_contacted", "next_follow_up", "lead_date", "opp_date", "client_date"]);
-
-function ProspectForm({ p, st, onClose }: { p: Prospect | null; st: Settings; onClose: () => void }) {
-  const qc = useQueryClient();
-  const [f, setF] = useState({ ...EMPTY, country: st.lists.countries[0] ?? "", industry: st.lists.industries[0] ?? "", channel: st.lists.channels[0] ?? "", plan: st.lists.plans[0] ?? "", ...(p ?? {}) });
-  const [confirm, setConfirm] = useState(false);
-  const done = () => { qc.invalidateQueries({ queryKey: ["tracker"] }); onClose(); };
-  const save = useMutation({
-    mutationFn: async () => {
-      const body = Object.fromEntries(Object.entries(f).map(([k, v]) => [k, DATE_FIELDS.has(k) && !v ? null : v]));
-      return p ? (await api.patch(`/tracker/prospects/${p.id}/`, body)).data : (await api.post("/tracker/prospects/", body)).data;
-    },
-    onSuccess: done,
-  });
-  const del = useMutation({ mutationFn: async () => api.delete(`/tracker/prospects/${p!.id}/`), onSuccess: done });
-  const text = (k: keyof typeof f, label: string, extra: { type?: string; placeholder?: string; className?: string } = {}) => (
-    <Field label={label} className={extra.className}><Input type={extra.type ?? "text"} value={(f[k] as string | null) ?? ""} placeholder={extra.placeholder}
-      onChange={(e) => setF({ ...f, [k]: e.target.value })} required={k === "company"} /></Field>);
-  const pick = (k: "country" | "industry" | "channel" | "plan", label: string, list: string[]) => (
-    <Field label={label}><Select value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })}>{[...new Set([f[k], ...list].filter(Boolean))].map((x) => <option key={x}>{x}</option>)}</Select></Field>);
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-brand-950/50 p-4" role="dialog" aria-modal="true" aria-label={p ? p.company : "Add prospect"}>
-      <form onSubmit={(e: FormEvent) => { e.preventDefault(); save.mutate(); }} className="card flex max-h-[calc(100dvh-2rem)] w-full max-w-3xl flex-col overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3 dark:border-white/10"><h2 className="text-lg font-bold">{p ? p.company : "Add prospect"}</h2>
-          <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-white/10"><X className="size-5" /></button></div>
-        <div className="grid gap-3 overflow-y-auto p-5 sm:grid-cols-2">
-          {text("company", "Company *")}{text("website", "Website", { placeholder: "example.com" })}{text("contact", "Contact name")}{text("role", "Job title")}
-          {text("email", "Email", { type: "email" })}{text("phone", "Phone / WhatsApp")}{text("linkedin", "LinkedIn URL", { className: "sm:col-span-2" })}
-          {pick("country", "Country", st.lists.countries)}{pick("industry", "Industry", st.lists.industries)}{pick("channel", "Source channel", st.lists.channels)}{pick("plan", "Plan interest", st.lists.plans)}
-          <Field label="Stage"><Select value={f.stage} onChange={(e) => setF({ ...f, stage: e.target.value })}>{st.stages.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</Select></Field>
-          {text("next_follow_up", "Next follow-up", { type: "date" })}{text("next_action", "Next action", { placeholder: "Send demo video…" })}{text("last_contacted", "Last contacted", { type: "date" })}
-          {text("lead_date", "Lead date", { type: "date" })}{text("opp_date", "Opportunity date", { type: "date" })}{text("client_date", "Client won date", { type: "date" })}{text("lost_reason", "Lost reason")}
-          <Field label="Notes" className="sm:col-span-2"><Textarea value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></Field>
-          {(save.error || del.error) && <div className="sm:col-span-2"><Alert>{errorText(save.error || del.error)}</Alert></div>}
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-5 py-3 dark:border-white/10">
-          <span>{p && (confirm
-            ? <span className="flex items-center gap-2 text-sm">Delete this prospect? <Button type="button" variant="danger" onClick={() => del.mutate()} busy={del.isPending}>Yes, delete</Button><Button type="button" variant="ghost" onClick={() => setConfirm(false)}>Keep</Button></span>
-            : <Button type="button" variant="ghost" className="text-accent-600" onClick={() => setConfirm(true)}><Trash2 className="size-4" /> Delete</Button>)}</span>
-          <Button type="submit" busy={save.isPending}>Save prospect</Button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-function Pipeline({ st, openId, clearOpen }: { st: Settings; openId: number | null; clearOpen: () => void }) {
-  const qc = useQueryClient();
-  const [q, setQ] = useState("");
-  const [stage, setStage] = useState("");
-  const [editing, setEditing] = useState<Prospect | "new" | null>(null);
-  const file = useRef<HTMLInputElement>(null);
-  const list = useQuery({ queryKey: ["tracker", "prospects"], queryFn: async () => (await api.get<Prospect[]>("/tracker/prospects/")).data });
-  const move = useMutation({ mutationFn: async ({ id, stage }: { id: number; stage: string }) => (await api.patch(`/tracker/prospects/${id}/`, { stage })).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tracker"] }) });
-  const imp = useMutation({
-    mutationFn: async (f: File) => { const b = new FormData(); b.append("file", f); return (await api.post<{ added: number; skipped: number }>("/tracker/prospects/import/", b)).data; },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tracker"] }),
-  });
-  if (list.isLoading) return <Spinner />;
-  const all = list.data ?? [];
-  const opened = openId ? all.find((x) => x.id === openId) : undefined;
-  if (opened && !editing) { setEditing(opened); clearOpen(); }
-  const t = new Date().toISOString().slice(0, 10);
-  const rows = all.filter((p) => (!stage || p.stage === stage) && (!q || [p.company, p.contact, p.email, p.notes, p.next_action, p.country, p.industry].join(" ").toLowerCase().includes(q.toLowerCase())))
-    .sort((a, b) => Number(["client", "lost"].includes(a.stage)) - Number(["client", "lost"].includes(b.stage)) || (a.next_follow_up ?? "9999").localeCompare(b.next_follow_up ?? "9999"));
-  return (
-    <div className="grid gap-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Input className="max-w-xs" placeholder="Search company, contact, notes…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search pipeline" />
-        <div className="flex flex-wrap gap-1.5">{[{ key: "", label: "All" }, ...st.stages].map((s) => (
-          <button key={s.key} type="button" onClick={() => setStage(s.key)} className={chip(stage === s.key)}>
-            {s.label} <span className="num opacity-70">{s.key ? all.filter((p) => p.stage === s.key).length : all.length}</span></button>))}</div>
-        <div className="ml-auto flex flex-wrap gap-2">
-          <input ref={file} type="file" accept=".csv,text/csv" className="sr-only" aria-label="Import prospects CSV"
-            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) imp.mutate(f); }} />
-          <Button variant="secondary" onClick={() => file.current?.click()} busy={imp.isPending}><Upload className="size-4" /> Import CSV</Button>
-          <Button variant="secondary" onClick={() => downloadFile("/tracker/prospects/export/", "prospects.csv")}><Download className="size-4" /> Export CSV</Button>
-          <Button onClick={() => setEditing("new")}><Plus className="size-4" /> Add prospect</Button>
-        </div>
-      </div>
-      {imp.data && <Alert tone="green">Imported {imp.data.added} prospect{imp.data.added === 1 ? "" : "s"}{imp.data.skipped ? ` · ${imp.data.skipped} skipped (duplicates or no company)` : ""}.</Alert>}
-      {imp.error && <Alert>{errorText(imp.error)}</Alert>}
-      {move.error && <Alert>{errorText(move.error)}</Alert>}
-      <Card className="overflow-x-auto">
-        {all.length === 0 ? (
-          <EmptyState title="No prospects yet" action={<Button onClick={() => setEditing("new")}><Plus className="size-4" /> Add your first prospect</Button>}>
-            Add companies one by one, or import a CSV from Apollo, Hunter, Snov or Sales Navigator.</EmptyState>
-        ) : (
-          <table className="w-full min-w-[880px] text-sm">
-            <thead><tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] uppercase tracking-wider text-slate-500 dark:border-white/10 dark:bg-white/5">
-              {["Company / contact", "Market", "Channel", "Stage", "Next step", "Plan", "Last touch"].map((h) => <th key={h} className="px-4 py-2.5">{h}</th>)}</tr></thead>
-            <tbody>{rows.map((p) => {
-              const open = !["client", "lost"].includes(p.stage);
-              return (
-                <tr key={p.id} className="cursor-pointer border-b border-slate-100 hover:bg-slate-50 dark:border-white/5 dark:hover:bg-white/5"
-                  onClick={(e) => { if (!(e.target as HTMLElement).closest("select")) setEditing(p); }}>
-                  <td className="px-4 py-2.5"><div className="font-semibold">{p.company}</div><div className="text-xs text-slate-500">{[p.contact, p.role].filter(Boolean).join(" · ")}</div></td>
-                  <td className="px-4 py-2.5">{p.country}<div className="text-xs text-slate-500">{p.industry}</div></td>
-                  <td className="px-4 py-2.5">{p.channel}</td>
-                  <td className="px-4 py-2.5"><Select aria-label={`Stage for ${p.company}`} value={p.stage} className="w-auto py-1 text-xs font-semibold" onChange={(e) => move.mutate({ id: p.id, stage: e.target.value })}>
-                    {st.stages.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</Select></td>
-                  <td className="px-4 py-2.5">{p.next_follow_up
-                    ? <span className={clsx("num", open && p.next_follow_up < t && "font-semibold text-accent-600", open && p.next_follow_up === t && "font-semibold text-amber-600")}>{fmt(p.next_follow_up)}</span>
-                    : <span className="text-slate-400">—</span>}<div className="text-xs text-slate-500">{p.next_action}</div></td>
-                  <td className="px-4 py-2.5">{p.plan && p.plan !== "Not known" ? p.plan : ""}</td>
-                  <td className="num px-4 py-2.5 text-xs text-slate-500">{fmt(p.last_contacted)} <Badge tone={STAGE_TONE[p.stage] ?? "slate"} className="ml-1">{st.stages.find((s) => s.key === p.stage)?.label}</Badge></td>
-                </tr>);
-            })}{!rows.length && <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No prospects match these filters.</td></tr>}</tbody>
-          </table>
-        )}
-      </Card>
-      {editing && <ProspectForm p={editing === "new" ? null : editing} st={st} onClose={() => setEditing(null)} />}
     </div>
   );
 }
@@ -335,7 +210,7 @@ function TrackerSettings({ st }: { st: Settings }) {
 export default function Tracker() {
   const settings = useQuery({ queryKey: ["tracker", "settings"], queryFn: async () => (await api.get<Settings>("/tracker/settings/")).data });
   const [params, setParams] = useSearchParams();
-  const tab = params.get("tab") ?? "overview";
+  const tab = params.get("tab") ?? "pipeline";
   const [openId, setOpenId] = useState<number | null>(null);
   const [period, setPeriod] = useState<number | null>(null);   // null = the period today falls in
   const summary = useQuery({ queryKey: ["tracker", "summary", period], placeholderData: (prev) => prev, enabled: tab === "overview",
@@ -346,15 +221,16 @@ export default function Tracker() {
   if (settings.error) return <Alert>{errorText(settings.error)}</Alert>;
   const st = settings.data!;
   const go = (t: string, id?: number) => { setParams({ tab: t }, { replace: true }); if (id) setOpenId(id); };
+  const clearOpen = () => setOpenId(null);
   return (
     <>
-      <PageHeader title={st.product ? `My tracker · ${st.product}` : "My tracker"} subtitle={st.tagline || "Your own pipeline and activity. Only you can see it. Plans are made in My Day."} />
+      <PageHeader title="My pipeline" subtitle={st.product ? `${st.product}${st.tagline ? ` · ${st.tagline}` : ""}` : "Your qualified leads and opportunities. Weekly KPIs are counted from the stages they reach."} />
       <div className="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-white/10" role="tablist">
         {TABS.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => go(k)}
           className={clsx("whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold", tab === k ? "border-accent-500 text-slate-900 dark:text-white" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200")}>{l}</button>)}
       </div>
       {tab === "overview" && (summary.isLoading ? <Spinner /> : summary.data ? <Overview s={summary.data} go={go} setPeriod={setPeriod} /> : <Alert>{errorText(summary.error)}</Alert>)}
-      {tab === "pipeline" && <Pipeline st={st} openId={openId} clearOpen={() => setOpenId(null)} />}
+      {tab === "pipeline" && <Suspense fallback={<Spinner />}><PipelineView openId={openId} clearOpen={clearOpen} /></Suspense>}
       {tab === "activity" && <ActivityLog st={st} />}
       {tab === "settings" && <TrackerSettings key={st.updated_at} st={st} />}
     </>

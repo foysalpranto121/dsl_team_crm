@@ -142,7 +142,8 @@ def summary(user, n=None):
     plan_stat = lambda a, b: {"done": sum(1 for d in plan if a <= d["date"] <= b for x in d["tasks"] if x.get("done")),
                               "total": sum(len(d["tasks"]) for d in plan if a <= d["date"] <= b)}
     wk = [{**w, "actual": metrics(st, prospects, activities, w["from"], w["to"]), "plan": plan_stat(w["from"], w["to"])} for w in weeks(st, info["n"])]
-    contacted = sum(1 for p in prospects if p.last_contacted)
+    first = pipeline.first_stage()
+    contacted = sum(1 for p in prospects if p.last_contacted or (first and p.stage != first.key))
     closed = set(PipelineStage.objects.exclude(kind=PipelineStage.Kind.OPEN).values_list("key", flat=True))
     open_ = [p for p in prospects if p.stage not in closed]
     due = sorted((p for p in open_ if p.next_follow_up and p.next_follow_up <= t), key=lambda p: p.next_follow_up)

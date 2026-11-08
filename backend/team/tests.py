@@ -122,6 +122,7 @@ class TeamRulesTests(TestCase):
 
     # ----- weekly results -----
     def test_weekly_results(self):
+        TeamSettings.load() and TeamSettings.objects.filter(pk=1).update(kpi_mode="manual")   # SRS v0.5 FR-K5: the typed-in mode (the default works it out)
         kpi = lambda u, s, wk, **d: self.api(u).put(f"/api/team/sheets/{s.pk}/kpis/{wk}/", {"leads": 3, "opps": 1, "clients": 0, "revenue": "5000", **d}, format="json")
         self.assertEqual(kpi(self.member, self.work, WEEK).status_code, 200)
         self.assertEqual(kpi(self.member, self.work, WEEK - timedelta(days=7)).status_code, 403)
@@ -227,6 +228,7 @@ class TeamRulesTests(TestCase):
             self.assertEqual(self.put(self.member, self.work, date(2026, 11, 1), [self.calls.pk]).status_code, 200)
 
     def test_kpi_week_screen(self):
+        TeamSettings.load() and TeamSettings.objects.filter(pk=1).update(kpi_mode="manual")   # SRS v0.5 FR-K5: the typed-in mode (the default works it out)
         r = self.api(self.member).get("/api/team/kpi-week/?week=2026-10-27").data      # a Tuesday: the week of Sat 24 Oct
         self.assertEqual((str(r["week_start"]), r["week_no"], r["counts_in_month"]), ("2026-10-24", 44, "2026-10"))
         rows = {x["name"]: x for x in r["rows"]}

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Briefcase } from "lucide-react";
 import { api, errorText } from "../api/client";
 import { Alert, Badge, Card, EmptyState, PageHeader, Spinner } from "../components/ui";
+import { configQuery } from "../features/pipeline/api";
 
 interface Person {
   user: { id: number; name: string }; product: string; due_count: number;
@@ -9,11 +10,11 @@ interface Person {
   totals: { leads: number; opps: number; clients: number; points: number }; targets: Record<string, number>;
   prospects: { id: number; company: string; contact: string; country: string; stage: string; next_follow_up: string | null; next_action: string }[];
 }
-const STAGE: Record<string, string> = { prospect: "Prospect", contacted: "Contacted", lead: "Lead", opp: "Opportunity" };
 const fmt = (s: string | null) => (s ? new Date(s + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : "—");
 
 export default function TeamPipelines() {
   const q = useQuery({ queryKey: ["team-pipelines"], queryFn: async () => (await api.get<{ people: Person[] }>("/tracker/team/")).data.people });
+  const stageName = Object.fromEntries((useQuery(configQuery).data?.stages ?? []).map((s) => [s.key, s.name]));
   if (q.isLoading) return <Spinner />;
   if (q.error) return <Alert>{errorText(q.error)}</Alert>;
   const today = new Date().toISOString().slice(0, 10);
@@ -41,7 +42,7 @@ export default function TeamPipelines() {
                   <tbody>{p.prospects.length ? p.prospects.map((x) => (
                     <tr key={x.id} className="border-t border-slate-100 dark:border-white/5">
                       <td className="px-5 py-2"><div className="font-semibold">{x.company}</div><div className="text-xs text-slate-500">{x.contact}</div></td>
-                      <td className="px-5 py-2">{x.country}</td><td className="px-5 py-2">{STAGE[x.stage] ?? x.stage}</td>
+                      <td className="px-5 py-2">{x.country}</td><td className="px-5 py-2">{stageName[x.stage] ?? x.stage}</td>
                       <td className="px-5 py-2"><span className={x.next_follow_up && x.next_follow_up < today ? "font-semibold text-accent-600" : ""}>{fmt(x.next_follow_up)}</span>
                         <div className="text-xs text-slate-500">{x.next_action}</div></td>
                     </tr>)) : <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">No open prospects.</td></tr>}</tbody>

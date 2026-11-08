@@ -13,6 +13,7 @@ from team import services as team_services
 from .models import Activity, PlanDay, Prospect
 
 NOW = datetime(2026, 11, 5, 6, 0, tzinfo=tz.utc)   # Thu 5 Nov 2026, 12:00 in Dhaka
+NEXT = {"requirement": "CRM for 20 users", "next_action": "Call back", "next_follow_up": "2026-11-08"}   # an open record needs these (SRS v0.5)
 
 
 class TrackerTests(TestCase):
@@ -43,20 +44,21 @@ class TrackerTests(TestCase):
         self.assertEqual(self.api.delete(f"/api/tracker/prospects/{p.pk}/").status_code, 404)
 
     def test_stage_dates_are_stamped_once(self):
-        r = self.api.post("/api/tracker/prospects/", {"company": "Acme", "country": "UAE", "stage": "opp"}, format="json")
+        r = self.api.post("/api/tracker/prospects/", {"company": "Acme", "country": "UAE", "stage": "requirements", **NEXT}, format="json")
         self.assertEqual(r.status_code, 201, r.data)
-        self.assertEqual((r.data["lead_date"], r.data["opp_date"], r.data["client_date"], r.data["last_contacted"]), ("2026-11-05", "2026-11-05", None, "2026-11-05"))
+        self.assertEqual((r.data["lead_date"], r.data["opp_date"], r.data["client_date"], r.data["stage_name"]), ("2026-11-05", "2026-11-05", None, "Requirements Shared"))
         pid = r.data["id"]
         Prospect.objects.filter(pk=pid).update(lead_date=date(2026, 11, 2))
-        r = self.api.patch(f"/api/tracker/prospects/{pid}/", {"stage": "client"}, format="json")
+        r = self.api.patch(f"/api/tracker/prospects/{pid}/", {"stage": "won", "value": "50000", "win_loss_why": "Best fit"}, format="json")
         self.assertEqual((r.data["lead_date"], r.data["client_date"]), ("2026-11-02", "2026-11-05"))   # earlier dates kept
-        r = self.api.patch(f"/api/tracker/prospects/{pid}/", {"stage": "lost", "lost_reason": "budget"}, format="json")
+        r = self.api.patch(f"/api/tracker/prospects/{pid}/", {"stage": "lost", "lost_reason": "No budget", "win_loss_why": "Budget cut"}, format="json")
         self.assertEqual((r.data["stage"], r.data["client_date"]), ("lost", "2026-11-05"))          # history isn't wiped
 
     def test_points_and_weeks_like_the_original_tracker(self):
         self.setup_period()
-        for company, stage in (("A", "lead"), ("B", "opp"), ("C", "client")):
-            self.api.post("/api/tracker/prospects/", {"company": company, "stage": stage}, format="json")
+        for company, stage in (("A", "qualified"), ("B", "requirements"), ("C", "won")):
+            r = self.api.post("/api/tracker/prospects/", {"company": company, "stage": stage, "value": "1000", "win_loss_why": "Fit", **NEXT}, format="json")
+            self.assertEqual(r.status_code, 201, r.data)
         r = self.api.post("/api/tracker/activities/", {"date": "2026-11-03", "type": "email", "qty": 30}, format="json")
         self.assertEqual(r.data["points"], 3.0)                       # 30 × 0.1
         self.api.post("/api/tracker/activities/", {"date": "2026-11-04", "type": "demo", "qty": 1}, format="json")
@@ -74,7 +76,7 @@ class TrackerTests(TestCase):
         Prospect.objects.create(owner=self.me, company="Late", next_follow_up=date(2026, 11, 1))
         Prospect.objects.create(owner=self.me, company="Today", next_follow_up=date(2026, 11, 5))
         Prospect.objects.create(owner=self.me, company="Later", next_follow_up=date(2026, 11, 9))
-        Prospect.objects.create(owner=self.me, company="Won", stage="client", next_follow_up=date(2026, 11, 1))
+        Prospect.objects.create(owner=self.me, company="Won", stage="won", next_follow_up=date(2026, 11, 1))
         due = self.api.get("/api/tracker/summary/").data["due"]
         self.assertEqual([(d["company"], d["overdue"]) for d in due], [("Late", True), ("Today", False)])
 
@@ -117,13 +119,14 @@ class TrackerTests(TestCase):
                ",No,Company,,,,,\n"
                "Beta Clinic,,,,ops@beta.my,Malaysia,Clinic / Healthcare,\n")
         r = self.api.post("/api/tracker/prospects/import/", {"file": SimpleUploadedFile("apollo.csv", csv.encode())}, format="multipart")
-        self.assertEqual(r.data, {"added": 2, "skipped": 2})
+        self.assertEqual(r.data, {"added": 2, "skipped": 2, "unknown_stages": []})
         acme = Prospect.objects.get(company="Acme Study")
-        self.assertEqual((acme.contact, acme.stage, acme.lead_date), ("Sara Khan", "lead", date(2026, 11, 5)))
+        # stage matched by name; an open record gets a next step (FR-CL3); importing isn't a new lead this week
+        self.assertEqual((acme.contact, acme.stage, acme.next_action, str(acme.next_follow_up), acme.lead_date), ("Sara Khan", "lead", "First contact", "2026-11-05", None))
         out = self.api.get("/api/tracker/prospects/export/")
         text = out.content.decode("utf-8-sig")
-        self.assertIn("Company,Website,Contact", text)
-        self.assertIn("Acme Study,,Sara Khan,Founder,sara@acme.ae", text)
+        self.assertIn("Company,Requirement,Segment,Stage,Expected value", text)
+        self.assertIn("Acme Study,,,Lead,", text)
         bad = self.api.post("/api/tracker/prospects/import/", {"file": SimpleUploadedFile("x.csv", b"Name,Email\nA,a@b.c\n")}, format="multipart")
         self.assertEqual(bad.status_code, 400)
 
@@ -150,5 +153,5 @@ class TrackerTests(TestCase):
         viewer = User.objects.create_user("v@x.com", status="approved", role="viewer")
         c = APIClient()
         c.force_authenticate(viewer)
-        self.assertEqual(c.post("/api/tracker/prospects/", {"company": "Mine"}, format="json").status_code, 201)
+        self.assertEqual(c.post("/api/tracker/prospects/", {"company": "Mine", **NEXT}, format="json").status_code, 201)
         self.assertEqual(Activity.objects.count(), 0)

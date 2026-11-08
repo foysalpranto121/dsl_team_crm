@@ -1,5 +1,5 @@
 import { AlertCircle, AlertTriangle, CalendarClock, CheckCircle2 } from "lucide-react";
-import type { ReactNode } from "react";
+import type { DragEvent, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Avatar } from "../Brand";
 import { Tip } from "../ui/tooltip";
@@ -36,15 +36,17 @@ const health: Record<Health, { Icon: typeof CheckCircle2; cls: string; text: str
 };
 
 /** One deal. Health uses a different icon per state as well as colour (SRS FR-SP5). */
-export function KanbanCard({ title, subtitle, value, due, dueTone = "neutral", healthState, owner, tags, onClick, className }: {
+export function KanbanCard({ title, subtitle, value, due, dueTone = "neutral", healthState, owner, tags, onClick, onDragStart, className }: {
   title: string; subtitle?: string; value?: ReactNode; due?: string; dueTone?: "neutral" | "warning" | "danger"; healthState?: Health;
-  owner?: { name: string; src?: string | null }; tags?: ReactNode; onClick?: () => void; className?: string;
+  owner?: { name: string; src?: string | null }; tags?: ReactNode; onClick?: () => void;
+  /** Makes the card draggable (to another stage). The card itself is the drag source: browsers won't start a drag from a button inside a draggable wrapper. */
+  onDragStart?: (e: DragEvent<HTMLElement>) => void; className?: string;
 }) {
   const h = healthState ? health[healthState] : null;
   const Comp = onClick ? "button" : "div";
   return (
-    <Comp type={onClick ? "button" : undefined} onClick={onClick}
-      className={cn("w-full rounded-lg border border-border bg-card p-3 text-left shadow-xs transition-[box-shadow,border-color]",
+    <Comp type={onClick ? "button" : undefined} onClick={onClick} draggable={onDragStart ? true : undefined} onDragStart={onDragStart}
+      className={cn("w-full rounded-lg border border-border bg-card p-3 text-left shadow-xs transition-[box-shadow,border-color]", onDragStart && "cursor-grab active:cursor-grabbing",
         onClick && "hover:border-input hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden", className)}>
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">

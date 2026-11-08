@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlarmClock, Bell, CalendarClock, CalendarSync, CalendarX2, CheckCircle2, LayoutGrid, ShieldCheck, type LucideIcon } from "lucide-react";
+import { AlarmClock, BadgeCheck, Bell, CalendarClock, CalendarSync, CalendarX2, CheckCircle2, LayoutGrid, ShieldCheck, type LucideIcon } from "lucide-react";
 import { Link } from "react-router";
 import { pendingUsersQuery, plansMineQuery, renewalsDueQuery, todayQuery, trackerSummaryQuery } from "@/api/queries";
 import { useFeatures } from "@/lib/features";
 import { useAuth } from "@/auth/AuthContext";
+import { api } from "@/api/client";
+import type { Reviews } from "@/features/pipeline/api";
 import { duration } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Badge, toneClass, type Tone } from "../ui/badge";
@@ -25,6 +27,9 @@ export function NotificationBell() {
   const features = useFeatures();
   const renewals = useQuery({ ...renewalsDueQuery, staleTime: 5 * 60_000, enabled: features.renewals && user?.role !== "viewer" });
   const plans = useQuery({ ...plansMineQuery, staleTime: 2 * 60_000, enabled: !!user && user.role !== "viewer" });
+  // SRS v0.5 FR-K2: wins whose work order needs verifying and backward stage moves, for supervisors and admins
+  const reviews = useQuery({ queryKey: ["pipeline-reviews"], queryFn: async () => (await api.get<Reviews>("/tracker/reviews/")).data, staleTime: 2 * 60_000,
+    enabled: user?.role === "admin" || user?.role === "supervisor" });
 
   const items: Item[] = [];
   const t = today.data;
@@ -45,6 +50,12 @@ export function NotificationBell() {
   if (pm?.to_review) {
     items.push({ id: "review", tone: "primary", icon: LayoutGrid, title: `${pm.to_review} ${pm.to_review === 1 ? "hour waits" : "hours wait"} for your decision`,
       body: "Plans, deviations and unplanned hours, on the Team Board.", to: "/team-board" });
+  }
+  const rv = reviews.data;
+  if (rv && (rv.wins.length || rv.moves.length)) {
+    const parts = [rv.wins.length && `${rv.wins.length} ${rv.wins.length === 1 ? "win" : "wins"} to verify`, rv.moves.length && `${rv.moves.length} backward ${rv.moves.length === 1 ? "move" : "moves"}`].filter(Boolean);
+    items.push({ id: "pipeline-reviews", tone: "primary", icon: BadgeCheck, title: `Pipeline: ${parts.join(", ")}`,
+      body: "A win counts as a client and revenue once you verify the work order.", to: "/kpi" });
   }
   if (pm?.this_week?.rejected) {
     items.push({ id: "rejected", tone: "danger", icon: CalendarX2, title: `${pm.this_week.rejected} planned ${pm.this_week.rejected === 1 ? "hour was" : "hours were"} sent back`,

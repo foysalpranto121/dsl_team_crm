@@ -15,7 +15,7 @@ class TeamSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = TeamSettings
         fields = ["name", "timezone", "lock_days", "week_start_dow", "weekend_days", "count_weekend", "currency", "unplanned_mode", "plan_cutoff",
-                  "feature_tv", "feature_huddle", "feature_digest", "feature_renewals",
+                  "feature_tv", "feature_huddle", "feature_digest", "feature_renewals", "kpi_mode", "kpi_from", "lost_reasons",
                   "today", "seconds_to_lock", "updated_at"]
         read_only_fields = ["updated_at"]
 
@@ -29,6 +29,24 @@ class TeamSettingsSerializer(serializers.ModelSerializer):
         if not isinstance(v, list) or any(d not in range(7) for d in v) or len(set(v)) > 3:
             raise serializers.ValidationError("Pick up to three weekend days (0 = Sunday … 6 = Saturday).")
         return sorted(set(v))
+
+    def validate_lost_reasons(self, v):
+        if not isinstance(v, list):
+            raise serializers.ValidationError("Lost reasons must be a list.")
+        out = []
+        for x in v:
+            x = " ".join(str(x).split())[:80]
+            if x and x.lower() not in {o.lower() for o in out}:
+                out.append(x)
+        if not out:
+            raise serializers.ValidationError("Keep at least one lost reason.")
+        return out[:30]
+
+    def validate(self, attrs):
+        week_start = attrs.get("week_start_dow", self.instance.week_start_dow if self.instance else 6)
+        if attrs.get("kpi_from") and calc.dow(attrs["kpi_from"]) != week_start:
+            raise serializers.ValidationError({"kpi_from": "The cut-over date must be the first day of a week."})
+        return attrs
 
 
 class TaskSerializer(serializers.ModelSerializer):
@@ -127,12 +145,44 @@ class EntryWriteSerializer(serializers.Serializer):
 
 
 class KpiSerializer(serializers.ModelSerializer):
+    """A week's results. source: typed in, or worked out from the pipeline (derived = before a supervisor's adjust).
+    stale: the numbers changed after the member confirmed them."""
+
     updated_by = serializers.SerializerMethodField()
+    adjusted_by = serializers.SerializerMethodField()
+    confirmed_by = serializers.SerializerMethodField()
+    stale = serializers.SerializerMethodField()
 
     class Meta:
         model = KpiEntry
-        fields = ["week_start", "leads", "opps", "clients", "revenue", "notes", "updated_by", "updated_at"]
-        read_only_fields = ["week_start", "updated_by", "updated_at"]
+        fields = ["week_start", "leads", "opps", "clients", "revenue", "notes", "updated_by", "updated_at", "source", "derived", "adjust",
+                  "adjust_note", "adjusted_by", "adjusted_at", "confirmed", "confirmed_by", "confirmed_at", "stale"]
+        read_only_fields = ["week_start", "updated_by", "updated_at", "source", "derived", "adjust", "adjust_note", "adjusted_at", "confirmed",
+                            "confirmed_at"]
+
+    @staticmethod
+    def _name(u):
+        return (u.name or u.email) if u else None
 
     def get_updated_by(self, obj):
-        return (obj.updated_by.name or obj.updated_by.email) if obj.updated_by else None
+        return self._name(obj.updated_by)
+
+    def get_adjusted_by(self, obj):
+        return self._name(obj.adjusted_by)
+
+    def get_confirmed_by(self, obj):
+        return self._name(obj.confirmed_by)
+
+    def get_stale(self, obj):
+        if not obj.confirmed_at:
+            return False
+        now = {"leads": obj.leads, "opps": obj.opps, "clients": obj.clients, "revenue": float(obj.revenue)}
+        return any(float(obj.confirmed.get(k, 0)) != float(v) for k, v in now.items())
+
+
+class KpiAdjustSerializer(serializers.Serializer):
+    leads = serializers.IntegerField(min_value=0, required=False)
+    opps = serializers.IntegerField(min_value=0, required=False)
+    clients = serializers.IntegerField(min_value=0, required=False)
+    revenue = serializers.DecimalField(max_digits=14, decimal_places=2, min_value=0, required=False)
+    note = serializers.CharField(max_length=300)

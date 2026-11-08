@@ -187,6 +187,10 @@ export interface TeamSettings {
   feature_huddle: boolean;
   feature_digest: boolean;
   feature_renewals: boolean;
+  /** SRS v0.5 FR-K2, FR-K5, FR-K7: weekly KPIs from the pipeline (or typed in), the cut-over date, lost reasons */
+  kpi_mode: "derived" | "manual";
+  kpi_from: string | null;
+  lost_reasons: string[];
   today: string;
   seconds_to_lock: number;
 }

@@ -5,7 +5,7 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -18,7 +18,7 @@ from . import calc, planning, services, snapshots
 from .exporter import build_workbook
 from .importer import WorkbookError, import_workbook
 from .models import JobRole, KpiEntry, Sheet, SheetEntry, Task, TeamSettings
-from .serializers import (EntrySerializer, EntryWriteSerializer, JobRoleSerializer, KpiSerializer, SheetSerializer, TaskSerializer,
+from .serializers import (EntrySerializer, EntryWriteSerializer, JobRoleSerializer, KpiAdjustSerializer, KpiSerializer, SheetSerializer, TaskSerializer,
                           TeamSettingsSerializer)
 
 DAY = r"(?P<day>\d{4}-\d{2}-\d{2})"
@@ -41,10 +41,15 @@ class TeamSettingsView(APIView):
 
     @extend_schema(request=TeamSettingsSerializer, responses=TeamSettingsSerializer)
     def patch(self, request):
-        ser = TeamSettingsSerializer(TeamSettings.load(), data=request.data, partial=True)
+        st = TeamSettings.load()
+        before = (st.kpi_mode, st.kpi_from)
+        ser = TeamSettingsSerializer(st, data=request.data, partial=True)
         ser.is_valid(raise_exception=True)
-        ser.save()
+        st = ser.save()
         audit.log(request.user, "settings.save", "team settings", **{k: str(v) for k, v in ser.validated_data.items()})
+        if (st.kpi_mode, st.kpi_from) != before:   # SRS v0.5 FR-K5: switching the KPI mode or the cut-over works the weeks out again
+            from tracker import kpis
+            kpis.refresh_all(st)
         return Response(ser.data)
 
 
@@ -95,7 +100,7 @@ class SheetViewSet(viewsets.ModelViewSet):
         return qs if self.request.query_params.get("archived") == "1" else qs.filter(archived=False)
 
     def get_permissions(self):
-        if self.action in ("entry", "kpi"):   # members write here too; services.entry_block / kpi_block decide
+        if self.action in ("entry", "kpi", "kpi_confirm", "kpi_adjust", "kpi_evidence"):   # members write here too; the services decide
             return [IsApproved()]
         return super().get_permissions()
 
@@ -180,6 +185,51 @@ class SheetViewSet(viewsets.ModelViewSet):
             return locked(err)
         return Response(KpiSerializer(k).data)
 
+    def _kpi_week(self, day):
+        st = TeamSettings.load()
+        try:
+            return calc.week_start_of(services.parse_day(day), services.cfg_of(st))
+        except services.Locked as e:
+            raise ValidationError(str(e))
+
+    @extend_schema(request=None, responses=KpiSerializer)
+    @action(detail=True, methods=["post"], url_path=f"kpis/{DAY}/confirm")
+    def kpi_confirm(self, request, pk=None, day=None):
+        """SRS v0.5 FR-K3: the member confirms the week's numbers worked out from the pipeline."""
+        from tracker import kpis
+        try:
+            k = kpis.confirm(request.user, self.get_object(), self._kpi_week(day))
+        except kpis.KpiError as err:
+            return locked(err)
+        return Response(KpiSerializer(k).data)
+
+    @extend_schema(request=KpiAdjustSerializer, responses=KpiSerializer)
+    @action(detail=True, methods=["post"], url_path=f"kpis/{DAY}/adjust")
+    def kpi_adjust(self, request, pk=None, day=None):
+        """SRS v0.5 FR-K2: a supervisor sets the week's final numbers, with a note (audit-logged)."""
+        from tracker import kpis
+        ser = KpiAdjustSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        d = dict(ser.validated_data)
+        note = d.pop("note")
+        try:
+            k = kpis.adjust(request.user, self.get_object(), self._kpi_week(day), d, note)
+        except kpis.KpiError as err:
+            return locked(err)
+        return Response(KpiSerializer(k).data)
+
+    @extend_schema(responses=OpenApiTypes.OBJECT)
+    @action(detail=True, methods=["get"], url_path=f"kpis/{DAY}/evidence")
+    def kpi_evidence(self, request, pk=None, day=None):
+        """The pipeline records behind a week's numbers (SRS v0.5 §11: every number drills down to its records)."""
+        from tracker import kpis
+        sheet, u = self.get_object(), request.user
+        if not (sheet.owner_id == u.pk or u.can_approve or u.role == "viewer"):
+            raise PermissionDenied("Only the person, supervisors and management see the records behind someone's numbers.")
+        if not sheet.owner_id:
+            return Response({"counted": {m: [] for m in kpis.METRICS}, "waiting": []})
+        return Response(kpis.evidence(sheet.owner_id, self._kpi_week(day)))
+
 
 class TodayView(APIView):
     """What 'today' is for the team, how long until it locks, and whether my sheets are filled in."""
@@ -247,13 +297,16 @@ class KpiWeekView(APIView):
         for s in sheets:
             reason = services.kpi_block(request.user, s, ws, st)
             rows.append({"sheet": s.id, "name": s.name, "person": s.person or (s.owner.name if s.owner else s.name), "role": s.role.name if s.role else None,
-                         "mine": s.owner_id == request.user.pk, "editable": reason is None, "blocked": reason,
+                         "mine": s.owner_id == request.user.pk, "editable": reason is None, "blocked": reason, "has_owner": s.owner_id is not None,
                          "kpi": KpiSerializer(kpis[s.id]).data if s.id in kpis else None,
                          "renewals": renewed.get((s.id, ws), 0),   # added to the revenue typed in (renewal tracker, SRS FR-RN4)
                          "targets": {"leads": float(s.target_leads), "opps": float(s.target_opps), "clients": float(s.target_clients), "revenue": float(s.target_revenue)}})
         year, month = calc.month_of_week(ws)
         return Response({"week_start": ws, "week_end": ws + timedelta(days=6), "week_no": calc.week_no(ws, cfg)[0], "today": t,
-                         "current_week_start": calc.week_start_of(t, cfg), "counts_in_month": f"{year}-{month:02d}", "rows": rows})
+                         "current_week_start": calc.week_start_of(t, cfg), "counts_in_month": f"{year}-{month:02d}", "rows": rows,
+                         # SRS v0.5 FR-K2/K5: worked out from the pipeline, or typed (manual mode, or a week before the cut-over)
+                         "derived": services.kpi_derived(st, ws), "kpi_mode": st.kpi_mode, "kpi_from": st.kpi_from,
+                         "can_adjust": request.user.can_approve})
 
 
 class ExportView(APIView):
