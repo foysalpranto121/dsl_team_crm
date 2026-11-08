@@ -9,6 +9,9 @@ import type { DashboardRow, Gap, Pace, Today } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { Announcements, Leaderboard } from "../components/DashboardExtras";
 import { Alert, Badge, Button, Card, EmptyState, PageHeader, Spinner } from "../components/ui";
+import { addDays } from "../features/log/util";
+import { monthRange, type DrillTarget } from "../features/scoring/api";
+import { Drill, LedgerDrawer } from "../features/scoring/LedgerDrawer";
 
 const nf = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 1 });
 const money = new Intl.NumberFormat("en-GB", { notation: "compact", maximumFractionDigits: 1 });
@@ -57,7 +60,7 @@ function useCountdown(seconds?: number) {
   return `${Math.floor(left / 3600)}h ${Math.floor((left % 3600) / 60)}m`;
 }
 
-function Kpi({ icon, label, value, target, unit, foot }: { icon: ReactNode; label: string; value: number; target: number; unit?: string; foot?: string }) {
+function Kpi({ icon, label, value, target, unit, foot, onDrill }: { icon: ReactNode; label: string; value: number; target: number; unit?: string; foot?: ReactNode; onDrill: () => void }) {
   const pct = target > 0 ? Math.min(100, (value / target) * 100) : 0;
   return (
     <Card className="p-5">
@@ -66,13 +69,13 @@ function Kpi({ icon, label, value, target, unit, foot }: { icon: ReactNode; labe
         <span className="grid size-8 place-items-center rounded-lg bg-brand-50 text-brand-600 [&>svg]:size-4 dark:bg-white/10 dark:text-brand-200">{icon}</span>
       </div>
       <div className="mt-3 flex items-baseline gap-2">
-        <span className="num text-3xl font-medium">{unit === "money" ? money.format(value) : nf.format(value)}</span>
+        <span className="num text-3xl font-medium"><Drill onClick={onDrill} what={label}>{unit === "money" ? money.format(value) : nf.format(value)}</Drill></span>
         {target > 0 && <span className="text-sm text-slate-500">of {unit === "money" ? money.format(target) : nf.format(target)}</span>}
       </div>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10" role="img" aria-label={`${Math.round(pct)}% of target`}>
         <div className={clsx("h-full rounded-full transition-[width] duration-500", pct >= 100 ? "bg-emerald-500" : "bg-brand-600 dark:bg-brand-300")} style={{ width: `${pct}%` }} />
       </div>
-      <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">{target > 0 ? `${Math.round((value / target) * 100)}% of target` : "No target set"}{foot ? ` · ${foot}` : ""}</div>
+      <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">{target > 0 ? `${Math.round((value / target) * 100)}% of target` : "No target set"}{foot && <> · {foot}</>}</div>
     </Card>
   );
 }
@@ -82,6 +85,7 @@ export default function Dashboard() {
   const dark = useIsDark();
   const today = useQuery({ queryKey: ["today"], queryFn: async () => (await api.get<Today>("/team/today/")).data, refetchInterval: 300_000 });
   const [month, setMonth] = useState<string | null>(null);   // null = this month
+  const [drill, setDrill] = useState<DrillTarget | null>(null);   // SRS v0.5 FR-S3: the entries behind a number
   const dash = useQuery({ queryKey: ["dashboard", month], placeholderData: (prev) => prev,
     queryFn: async () => (await api.get<{ date: string; month: string; current_month: string; rows: DashboardRow[]; gaps: Gap[] }>("/team/dashboard/", { params: { month: month ?? undefined } })).data });
   const countdown = useCountdown(today.data?.seconds_to_lock);
@@ -99,6 +103,10 @@ export default function Dashboard() {
         thisW: rows[0] ? `Week of ${shortDay(rows[0].week_start)}` : "Last week", lastW: "Week before", thisM: mName, lastM: prevName,
         hoursSub: `Last whole week of ${mName}`, pointsSub: `${mName} compared with ${prevName}` };
   const sum = (f: (r: DashboardRow) => number) => rows.reduce((s, r) => s + f(r), 0);
+  const [yy, mm] = shown.split("-").map(Number);
+  const inMonth = monthRange(yy, mm);
+  const inWeek = rows[0] ? { from: rows[0].week_start, to: rows[0].week_end } : inMonth;
+  const lastWeek = { from: addDays(inWeek.from, -7), to: addDays(inWeek.from, -1) };
   const unfilled = t.my_sheets.filter((s) => s.kind === "work" && !s.filled_today);
   const hour = new Date().getHours();
   const hello = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -144,10 +152,12 @@ export default function Dashboard() {
         <>
           <MonthNav month={shown} current={dash.data!.current_month} set={setMonth} />
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Kpi icon={<Clock />} label={L.hours} value={sum((r) => r.week_hours)} target={sum((r) => r.week_target)} foot={`${L.lastWeek} ${sum((r) => r.last_week_hours)}`} />
-            <Kpi icon={<Star />} label={L.points} value={sum((r) => r.month_points)} target={sum((r) => r.month_target)} />
-            <Kpi icon={<Target />} label={L.leads} value={sum((r) => r.kpi_month.leads)} target={sum((r) => r.kpi_targets.leads)} foot={`${sum((r) => r.kpi_month.clients)} clients`} />
-            <Kpi icon={<Coins />} label={L.revenue} value={sum((r) => r.kpi_month.revenue)} target={sum((r) => r.kpi_targets.revenue)} unit="money" />
+            <Kpi icon={<Clock />} label={L.hours} value={sum((r) => r.week_hours)} target={sum((r) => r.week_target)} onDrill={() => setDrill({ title: L.hours, ...inWeek })}
+              foot={<>{L.lastWeek} <Drill onClick={() => setDrill({ title: `Team hours, ${L.lastWeek}`, ...lastWeek })} what={`team hours, ${L.lastWeek}`}>{sum((r) => r.last_week_hours)}</Drill></>} />
+            <Kpi icon={<Star />} label={L.points} value={sum((r) => r.month_points)} target={sum((r) => r.month_target)} onDrill={() => setDrill({ title: L.points, ...inMonth })} />
+            <Kpi icon={<Target />} label={L.leads} value={sum((r) => r.kpi_month.leads)} target={sum((r) => r.kpi_targets.leads)} onDrill={() => setDrill({ title: L.leads, metric: "leads", ...inMonth })}
+              foot={<><Drill onClick={() => setDrill({ title: `Clients in ${mName}`, metric: "clients", ...inMonth })} what={`clients in ${mName}`}>{sum((r) => r.kpi_month.clients)}</Drill> clients</>} />
+            <Kpi icon={<Coins />} label={L.revenue} value={sum((r) => r.kpi_month.revenue)} target={sum((r) => r.kpi_targets.revenue)} unit="money" onDrill={() => setDrill({ title: L.revenue, metric: "revenue", ...inMonth })} />
           </div>
 
           <div className="mt-6 grid gap-6 xl:grid-cols-2">
@@ -173,7 +183,11 @@ export default function Dashboard() {
             ))}
           </div>
 
-          <Leaderboard month={month} label={isNow ? undefined : mName} />
+          <Leaderboard month={month} label={isNow ? undefined : mName} onDrill={(r, by) => {
+            const who = r.person;
+            if (by === "hours") setDrill({ title: `${who}: hours`, sheet: r.id, ...inWeek });
+            else setDrill({ title: by === "score" ? `${who}: score, ${mName}` : `${who}: points, ${mName}`, sheet: r.id, ...inMonth, ...(by === "score" ? { score: { year: yy, month: mm } } : {}) });
+          }} />
 
           <Card className="mt-6 overflow-hidden">
             <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 pt-5"><h2 className="text-base font-bold">Team status{isNow ? "" : ` · ${mName}`}</h2>
@@ -184,24 +198,27 @@ export default function Dashboard() {
                   {["Person", ...(isNow ? ["Today"] : []), "Week hours", "Week", "Month points", "Month", "Leads", "Avg / week"].map((h) => <th key={h} className="px-5 py-2.5 font-semibold">{h}</th>)}
                 </tr></thead>
                 <tbody>
-                  {rows.map((r) => (
+                  {rows.map((r) => { const who = r.person || r.name; return (
                     <tr key={r.id} className="border-b border-slate-100 last:border-0 dark:border-white/5">
                       <td className="px-5 py-3"><div className="font-semibold">{r.person || r.name}</div><div className="text-xs text-slate-500">{r.role || "No job role"}</div></td>
-                      {isNow && <td className="num px-5 py-3">{r.today_hours ? `${r.today_hours} h` : <span className="text-slate-400">—</span>}</td>}
-                      <td className="num px-5 py-3">{r.week_hours} / {nf.format(r.week_target)}</td>
+                      {isNow && <td className="num px-5 py-3">{r.today_hours ? <Drill onClick={() => setDrill({ title: `${who}: hours today`, sheet: r.id, from: t.today, to: t.today })} what={`${who}'s hours today`}>{r.today_hours} h</Drill> : <span className="text-slate-400">—</span>}</td>}
+                      <td className="num px-5 py-3"><Drill onClick={() => setDrill({ title: `${who}: week hours`, sheet: r.id, from: r.week_start, to: r.week_end })} what={`${who}'s week hours`}>{r.week_hours}</Drill> / {nf.format(r.week_target)}</td>
                       <td className="px-5 py-3"><Badge tone={PACE[r.week_status.key].tone}>{PACE[r.week_status.key].label}</Badge></td>
-                      <td className="num px-5 py-3">{nf.format(r.month_points)} / {nf.format(r.month_target)}</td>
+                      <td className="num px-5 py-3"><Drill onClick={() => setDrill({ title: `${who}: points, ${mName}`, sheet: r.id, ...inMonth })} what={`${who}'s month points`}>{nf.format(r.month_points)}</Drill> / {nf.format(r.month_target)}</td>
                       <td className="px-5 py-3"><Badge tone={PACE[r.month_status.key].tone}>{PACE[r.month_status.key].label}</Badge></td>
-                      <td className="num px-5 py-3">{r.kpi_month.leads} / {nf.format(r.kpi_targets.leads)}</td>
-                      <td className="num px-5 py-3">{r.avg_week_hours ?? <span className="text-slate-400">—</span>}</td>
+                      <td className="num px-5 py-3"><Drill onClick={() => setDrill({ title: `${who}: leads, ${mName}`, sheet: r.id, metric: "leads", ...inMonth })} what={`${who}'s leads`}>{r.kpi_month.leads}</Drill> / {nf.format(r.kpi_targets.leads)}</td>
+                      <td className="num px-5 py-3">{r.avg_week_hours != null
+                        ? <Drill onClick={() => setDrill({ title: `${who}: hours behind the average`, subtitle: "Every completed week since the start date", sheet: r.id, from: r.start, to: addDays(r.week_start, -1) })} what={`${who}'s average`}>{r.avg_week_hours}</Drill>
+                        : <span className="text-slate-400">—</span>}</td>
                     </tr>
-                  ))}
+                  ); })}
                 </tbody>
               </table>
             </div>
           </Card>
         </>
       )}
+      <LedgerDrawer target={drill} onClose={() => setDrill(null)} />
     </>
   );
 }

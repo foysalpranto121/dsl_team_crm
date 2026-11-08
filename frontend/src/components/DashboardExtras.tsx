@@ -4,6 +4,7 @@ import { Megaphone, Pin, Plus, Trash2, Trophy, X } from "lucide-react";
 import { useState } from "react";
 import { api, errorText } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { Drill } from "../features/scoring/LedgerDrawer";
 import { Alert, Button, Card, Field, Input, Textarea } from "./ui";
 
 interface Announcement { id: number; title: string; body: string; pinned: boolean; expires_on: string | null; created_by: string | null; created_at: string }
@@ -60,7 +61,7 @@ export function Announcements() {
 const MEDAL = ["bg-amber-400 text-amber-950", "bg-slate-300 text-slate-800", "bg-orange-300 text-orange-950"];
 
 /** Who is leading: score so far this month, points this month, or hours this week. A past month (label set) shows how it ended. */
-export function Leaderboard({ month, label }: { month: string | null; label?: string }) {
+export function Leaderboard({ month, label, onDrill }: { month: string | null; label?: string; onDrill?: (r: Leader, by: "score" | "points" | "hours") => void }) {
   const METRICS = label ? [["score", `Score in ${label}`], ["points", `Points in ${label}`], ["hours", "Hours, last week of the month"]] as const
     : [["score", "Score this month"], ["points", "Points this month"], ["hours", "Hours this week"]] as const;
   const [by, setBy] = useState<(typeof METRICS)[number][0]>("score");
@@ -86,7 +87,7 @@ export function Leaderboard({ month, label }: { month: string | null; label?: st
             <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
               <div className={clsx("h-full rounded-full", i === 0 ? "bg-leaf-500" : "bg-brand-600 dark:bg-brand-300")} style={{ width: `${Math.max(2, ((r[by] ?? 0) / top) * 100)}%` }} />
             </div>
-            <span className="num w-16 text-right text-sm font-medium">{show(r)}</span>
+            <span className="num w-16 text-right text-sm font-medium">{onDrill && r[by] != null ? <Drill onClick={() => onDrill(r, by)} what={`${r.person}'s ${by}`}>{show(r)}</Drill> : show(r)}</span>
           </li>
         ))}
       </ol>

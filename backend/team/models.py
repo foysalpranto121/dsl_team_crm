@@ -99,6 +99,13 @@ class Task(models.Model):
     position = models.PositiveIntegerField(default=0)
     counts_as_win = models.BooleanField(default=False, help_text="Logging this task is a win: it shows on the office TV and is celebrated.")
 
+    class ScoringMode(models.TextChoices):
+        """SRS v0.5 FR-C3, §7, D2: one slot × its points, or quantity × its points once a supervisor verified the event."""
+        TIME = "time", "Per hour slot"
+        EVENT = "event", "Per event, once verified"
+
+    scoring_mode = models.CharField(max_length=5, choices=ScoringMode.choices, default=ScoringMode.TIME)
+
     class Meta:
         ordering = ["position", "id"]
 

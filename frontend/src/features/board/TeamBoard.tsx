@@ -20,6 +20,7 @@ import { PageSkeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
 import { TimeByType } from "../log/parts";
+import { EventsPanel } from "../scoring/Events";
 import { SLOTS, addDays, dow, fmt, hoursText, num, ptsText, typeColours, weekStartOf } from "../log/util";
 import { STATUS_PILL, type WeekStatus } from "../myday/rules";
 
@@ -211,7 +212,7 @@ function Review({ m, tasks, open, onClose, strict }: { m: Member | null; tasks: 
             <DialogHeader><DialogTitle>Edit and approve</DialogTitle><DialogDescription>Choose the task this hour should be; it's approved as that task.</DialogDescription></DialogHeader>
             <DialogBody>
               <Combobox aria-label="Task" value={null} searchPlaceholder="Search tasks…" placeholder="Choose a task…"
-                options={tasks.filter((t) => t.active).map((t) => ({ value: String(t.id), label: t.name, hint: ptsText(+t.points), group: t.type || "Tasks" }))}
+                options={tasks.filter((t) => t.active && t.scoring_mode !== "event").map((t) => ({ value: String(t.id), label: t.name, hint: ptsText(+t.points), group: t.type || "Tasks" }))}
                 onChange={(v) => v && decide.mutate({ items: items(sel, "plan"), decision: "approve", task: Number(v) })} />
             </DialogBody>
           </DialogContent>
@@ -262,6 +263,8 @@ export default function TeamBoard() {
         ))}
         <TimeByType rows={b.coverage.map((c) => ({ ...c, colour: colours.get(c.type) ?? "var(--subtle-foreground)" }))} />
       </div>
+
+      <EventsPanel />
 
       {b.members.length === 0 ? <div className="card"><EmptyState icon={<LayoutGrid />} title="No one to show">Give people a daily log in Team setup.</EmptyState></div> : (
         <section className="card overflow-hidden" aria-label="Team">

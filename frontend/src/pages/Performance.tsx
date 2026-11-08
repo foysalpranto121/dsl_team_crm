@@ -6,11 +6,14 @@ import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, X
 import { api, errorText } from "../api/client";
 import DownloadExcel from "../components/DownloadExcel";
 import { Alert, Button, Card, EmptyState, PageHeader, Spinner } from "../components/ui";
+import { monthRange, type DrillTarget, type KpiMetric } from "../features/scoring/api";
+import { Drill, LedgerDrawer } from "../features/scoring/LedgerDrawer";
 
 type Metrics = { hours?: number; avg_weekly?: number | null; points?: number; leads?: number; opps?: number; clients?: number; revenue?: number; score?: number | null };
 type Month = Metrics & { m: number; state: "future" | "before" | "current" | "done" };
-type Roll = Metrics & { months: number };
+type Roll = Metrics & { months?: number };
 interface Row { id: number; name: string; person: string; role: string | null; start: string; months: Month[]; quarters: Roll[]; year: Roll }
+type TeamRow = Pick<Row, "months" | "quarters" | "year">;
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const VIEWS = [
@@ -41,13 +44,14 @@ export default function Performance() {
   const [year, setYear] = useState<number | null>(null);
   const [view, setView] = useState<View>("score");
   const dark = useIsDark();
+  const [drill, setDrill] = useState<DrillTarget | null>(null);   // SRS v0.5 FR-S3: the entries behind a number
   const q = useQuery({
     queryKey: ["performance", year],
-    queryFn: async () => (await api.get<{ year: number; date: string; rows: Row[] }>(`/team/performance/${year ? `?year=${year}` : ""}`)).data,
+    queryFn: async () => (await api.get<{ year: number; date: string; rows: Row[]; team: TeamRow | null }>(`/team/performance/${year ? `?year=${year}` : ""}`)).data,
   });
   if (q.isLoading) return <Spinner />;
   if (q.error) return <Alert>{errorText(q.error)}</Alert>;
-  const { rows, year: y, date } = q.data!;
+  const { rows, team, year: y, date } = q.data!;
   const thisYear = +date.slice(0, 4);
   const fmt = (v: number | null | undefined) => v == null ? "" : view === "score" ? pct(v) : nf.format(v);
   const tone = (v: number | null | undefined) => view !== "score" || v == null ? "" : v >= 1 ? "text-leaf-600 dark:text-leaf-400" : v >= 0.8 ? "text-amber-600" : "text-accent-600 dark:text-accent-400";
@@ -58,6 +62,21 @@ export default function Performance() {
     return point;
   });
   const axis = dark ? "#9aa7bf" : "#5b6880", grid = dark ? "rgba(255,255,255,.08)" : "#e2e8f0";
+  const viewLabel = VIEWS.find((v) => v.key === view)!.label;
+  /** A cell of the table → the entries behind it. r = null is the team's row. */
+  const open = (r: Row | null, label: string, m1: number, m2: number) => {
+    const who = r ? r.person || r.name : "Team";
+    const base = { title: `${who}: ${viewLabel.toLowerCase()}, ${label}`, sheet: r?.id ?? null, from: monthRange(y, m1).from, to: monthRange(y, m2).to };
+    if (view === "score") {
+      if (r && m1 === m2) return setDrill({ ...base, score: { year: y, month: m1 } });
+      if (r) return setDrill({ ...base, scores: r.months.slice(m1 - 1, m2).filter((m) => m.state === "done").map((m) => ({ label: `${MONTHS[m.m - 1]} ${y}`, score: m.score ?? null })) });
+      const of = (x: Row) => (m1 === m2 ? x.months[m1 - 1].score : m2 - m1 === 2 ? x.quarters[(m1 - 1) / 3].score : x.year.score) ?? null;
+      return setDrill({ ...base, scores: rows.map((x) => ({ label: x.person || x.name, score: of(x) })) });
+    }
+    setDrill(view === "points" || view === "avg_weekly" ? base : { ...base, metric: view as KpiMetric });
+  };
+  const cell = (v: number | null | undefined, r: Row | null, label: string, m1: number, m2: number) =>
+    v == null ? fmt(v) : <Drill onClick={() => open(r, label, m1, m2)} what={`${r ? r.person || r.name : "the team"}, ${label}`}>{fmt(v)}</Drill>;
 
   return (
     <>
@@ -116,19 +135,28 @@ export default function Performance() {
                         <td key={m.m} className={clsx("num border-b border-slate-100 px-3 py-2.5 text-right dark:border-white/5", tone(m[view]),
                           m.state === "before" && "text-slate-300 dark:text-white/20", m.state === "current" && "bg-accent-500/[0.05]")}
                           title={m.state === "before" ? "Before the start date: shown, not scored" : m.state === "current" ? "This month so far" : undefined}>
-                          {m.state === "future" ? "" : m.state === "before" ? (view === "score" || view === "avg_weekly" ? "—" : fmt(m[view])) : fmt(m[view])}
+                          {m.state === "future" ? "" : m.state === "before" && (view === "score" || view === "avg_weekly") ? "—" : cell(m[view], r, `${MONTHS[m.m - 1]} ${y}`, m.m, m.m)}
                         </td>
                       ))}
-                      {r.quarters.map((qq, i) => <td key={i} className={clsx("num border-b border-slate-100 bg-slate-50 px-3 py-2.5 text-right font-medium dark:border-white/5 dark:bg-white/[0.03]", tone(qq[view]))}>{fmt(qq[view])}</td>)}
-                      <td className={clsx("num border-b border-slate-100 bg-brand-50 px-3 py-2.5 text-right font-bold dark:border-white/5 dark:bg-brand-400/10", tone(r.year[view]))}>{fmt(r.year[view])}</td>
+                      {r.quarters.map((qq, i) => <td key={i} className={clsx("num border-b border-slate-100 bg-slate-50 px-3 py-2.5 text-right font-medium dark:border-white/5 dark:bg-white/[0.03]", tone(qq[view]))}>{cell(qq[view], r, `Q${i + 1} ${y}`, i * 3 + 1, i * 3 + 3)}</td>)}
+                      <td className={clsx("num border-b border-slate-100 bg-brand-50 px-3 py-2.5 text-right font-bold dark:border-white/5 dark:bg-brand-400/10", tone(r.year[view]))}>{cell(r.year[view], r, String(y), 1, 12)}</td>
                     </tr>
                   ))}
                 </tbody>
+                {team && rows.length > 1 && (
+                  <tfoot><tr className="font-semibold">
+                    <td className="sticky left-0 z-10 bg-white px-4 py-2.5 dark:bg-[#0a1a31]"><div>Team</div><div className="text-xs font-normal text-slate-500">{view === "score" || view === "avg_weekly" ? "Average of the team" : "Team total"}</div></td>
+                    {team.months.map((m) => <td key={m.m} className={clsx("num px-3 py-2.5 text-right", tone(m[view]), m.state === "current" && "bg-accent-500/[0.05]")}>{m.state === "future" || m.state === "before" ? "" : cell(m[view], null, `${MONTHS[m.m - 1]} ${y}`, m.m, m.m)}</td>)}
+                    {team.quarters.map((qq, i) => <td key={i} className={clsx("num bg-slate-50 px-3 py-2.5 text-right dark:bg-white/[0.03]", tone(qq[view]))}>{cell(qq[view], null, `Q${i + 1} ${y}`, i * 3 + 1, i * 3 + 3)}</td>)}
+                    <td className={clsx("num bg-brand-50 px-3 py-2.5 text-right font-bold dark:bg-brand-400/10", tone(team.year[view]))}>{cell(team.year[view], null, String(y), 1, 12)}</td>
+                  </tr></tfoot>
+                )}
               </table>
             </div>
           </Card>
         </>
       )}
+      <LedgerDrawer target={drill} onClose={() => setDrill(null)} />
     </>
   );
 }

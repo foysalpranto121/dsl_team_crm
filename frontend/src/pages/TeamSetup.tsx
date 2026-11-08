@@ -8,6 +8,7 @@ import TasksRoles from "../components/TasksRoles";
 import { CalendarAndLoad } from "../features/setup/CalendarAndLoad";
 import { PolicyAndFeatures } from "../features/setup/PolicyAndFeatures";
 import { SalesProcess } from "../features/setup/SalesProcess";
+import { ScoringVersions } from "../features/setup/ScoringVersions";
 import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select, Spinner } from "../components/ui";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -247,6 +248,7 @@ export default function TeamSetup() {
       <div className="mb-6"><PolicyAndFeatures st={st.data!} /></div>
       <div className="mb-6"><CalendarAndLoad st={st.data!} /></div>
       <div className="mb-6"><SalesProcess st={st.data!} /></div>
+      <div className="mb-6"><ScoringVersions /></div>
 
       <TasksRoles />
 

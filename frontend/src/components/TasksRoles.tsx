@@ -11,7 +11,7 @@ type WKey = (typeof W)[number][0];
 
 function useRefresh() {
   const qc = useQueryClient();
-  return () => ["tasks", "roles", "warnings", "entries", "dashboard", "performance"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+  return () => ["tasks", "roles", "warnings", "entries", "dashboard", "performance", "leaderboard", "plan-history", "score-ledger", "score-versions"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
 }
 
 function TaskRow({ t }: { t: Task }) {
@@ -29,11 +29,13 @@ function TaskRow({ t }: { t: Task }) {
         <td className="px-2 py-1"><input defaultValue={t.type} onBlur={onBlur("type")} aria-label={`Type of ${t.name}`} className={cls} /></td>
         <td className="px-2 py-1"><input defaultValue={t.name} onBlur={onBlur("name")} aria-label="Task name" className={clsx(cls, "font-medium")} /></td>
         <td className="px-2 py-1"><input type="number" min={0} step={0.5} defaultValue={+t.points} onBlur={onBlur("points")} aria-label={`Points for ${t.name}`} className={clsx(cls, "num w-20 text-right")} /></td>
+        <td className="px-3 py-1 text-center"><input type="checkbox" checked={t.scoring_mode === "event"} onChange={(e) => save.mutate({ scoring_mode: e.target.checked ? "event" : "time" })}
+          aria-label={`${t.name} counts per event, once a supervisor verifies it`} title="Logged as an event with evidence: it adds its points once a supervisor verifies it, and no hours" /></td>
         <td className="px-3 py-1 text-center"><input type="checkbox" checked={t.active} onChange={(e) => save.mutate({ active: e.target.checked })} aria-label={`${t.name} is in use`} /></td>
         <td className="px-2 py-1 text-right"><button type="button" onClick={() => remove.mutate()} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-accent-600 dark:hover:bg-white/10"
           aria-label={`Delete ${t.name}`} title="Delete (only if never used)"><Trash2 className="size-4" /></button></td>
       </tr>
-      {(save.error || remove.error) && <tr><td colSpan={5} className="px-3 pb-2"><Alert>{errorText(save.error || remove.error)}</Alert></td></tr>}
+      {(save.error || remove.error) && <tr><td colSpan={6} className="px-3 pb-2"><Alert>{errorText(save.error || remove.error)}</Alert></td></tr>}
     </>
   );
 }
@@ -149,7 +151,7 @@ export default function TasksRoles() {
         <div className="mt-3 max-h-[32rem] overflow-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead className="sticky top-0"><tr className="border-y border-slate-200 bg-slate-50 text-left text-[11px] uppercase tracking-wider text-slate-500 dark:border-white/10 dark:bg-[#0b1d37]">
-              <th className="px-4 py-2">Type</th><th className="px-4 py-2">Task</th><th className="px-4 py-2 text-right">Points</th><th className="px-3 py-2 text-center">In use</th><th />
+              <th className="px-4 py-2">Type</th><th className="px-4 py-2">Task</th><th className="px-4 py-2 text-right">Points</th><th className="px-3 py-2 text-center" title="Logged as an event with evidence: it adds its points once a supervisor verifies it, and no hours">Event</th><th className="px-3 py-2 text-center">In use</th><th />
             </tr></thead>
             <tbody>{shown.map((t) => <TaskRow key={`${t.id}-${t.name}-${t.points}-${t.type}`} t={t} />)}</tbody>
           </table>

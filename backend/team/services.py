@@ -119,9 +119,12 @@ def clean_slots(user, sheet, slots, previous):
     known = {t.id: t for t in Task.objects.filter(id__in=ids)}
     if ids - known.keys():
         raise Locked("One of the chosen tasks no longer exists.")
+    prev = (previous or []) + [None] * SLOTS
+    for i, s in enumerate(slots):          # SRS v0.5 D2, FR-T5: an event isn't an hour of work, and counts once it's verified
+        if s is not None and s != prev[i] and known[s].scoring_mode == Task.ScoringMode.EVENT:
+            raise Locked(f'"{known[s].name}" is an event, not an hour of work. Log it as an event, with its evidence, so a supervisor can verify it.')
     if not user.is_team_admin:
         allowed = set(sheet.role.tasks.filter(active=True).values_list("id", flat=True)) if sheet.role else set()
-        prev = (previous or []) + [None] * SLOTS
         for i, s in enumerate(slots):
             if s is not None and s != prev[i] and s not in allowed:
                 raise Locked(f'"{known[s].name}" isn\'t one of your job role\'s tasks.')
@@ -205,15 +208,17 @@ def kpi_rows(sheet, renewals=None):
     return rows
 
 
-def _snapshot(sheets_qs, renewals=True):
-    """renewals=False: only the results people entered (for "missing results")."""
+def _snapshot(sheets_qs, renewals=True, ledger=True):
+    """Each sheet's days and weekly results. Hours and points come from the score ledger (SRS v0.5 FR-S1), so they stay as they were
+    scored. renewals=False, ledger=False: only the results people entered (for "missing results")."""
+    from scoring import services as scoring   # scoring builds on this module, so it's imported here
     st = TeamSettings.load()
     cfg = cfg_of(st)
-    pts = {t.id: float(t.points) for t in Task.objects.all()}
-    sheets = list(sheets_qs.select_related("owner", "role").prefetch_related("entries", "kpis"))
+    sheets = list(sheets_qs.select_related("owner", "role").prefetch_related("kpis"))
     extra = renewal_revenue(cfg) if renewals else None
-    data = [(s, [calc.Day(e.day, e.counted_slots()) for e in s.entries.all()], kpi_rows(s, extra)) for s in sheets]
-    return st, cfg, pts, data
+    days, pts = scoring.days_for([s.id for s in sheets]) if ledger else ({}, {})
+    data = [(s, days.get(s.id, []), kpi_rows(s, extra)) for s in sheets]
+    return st, scoring.read_cfg(cfg), pts, data
 
 
 def _sheet_meta(s):
@@ -227,16 +232,20 @@ def work_sheets():
 
 def dashboard_rows(on=None, finished_month=False):
     """finished_month: `on` is the last day of a past month, so the week shown is that month's last whole week."""
+    from scoring.services import Book
     st, cfg, pts, data = _snapshot(work_sheets())
     on = on or today(st)
     week_on = calc.last_full_week_end(on, cfg) if finished_month else None
-    return on, [{**_sheet_meta(s), **calc.dashboard(s.targets, e, k, cfg, pts, on, week_on)} for s, e, k in data]
+    book = Book()                          # the month's targets are the ones of its configuration version (SRS v0.5 §7)
+    return on, [{**_sheet_meta(s), **calc.dashboard(book.targets(s, on), e, k, cfg, pts, on, week_on)} for s, e, k in data]
 
 
 def performance_rows(year, on=None):
+    from scoring.services import Book
     st, cfg, pts, data = _snapshot(work_sheets())
     on = on or today(st)
-    return on, [{**_sheet_meta(s), **calc.performance(s.targets, e, k, cfg, pts, s.role.weights if s.role else None, year, on)}
+    book = Book()
+    return on, [{**_sheet_meta(s), **calc.performance(s.targets, e, k, cfg, pts, s.role.weights if s.role else None, year, on, monthly=book.monthly(s))}
                 for s, e, k in data]
 
 
@@ -250,22 +259,33 @@ def setup_warnings():
 def sheet_summary(sheet, frm, to, st=None):
     """Totals for a sheet's view of [frm, to], all calculated here so every screen and export agrees.
     Each week shows its full Saturday-to-Friday total, even when it runs into the next or previous month."""
+    from scoring import services as scoring
     st = st or TeamSettings.load()
     cfg = cfg_of(st)
-    pts = {t.id: float(t.points) for t in Task.objects.all()}
     first, last = calc.week_start_of(frm, cfg), calc.week_start_of(to, cfg) + timedelta(days=6)
-    days = [calc.Day(e.day, e.counted_slots()) for e in sheet.entries.filter(day__range=(first, last))]
+    book = scoring.Book()
+    if sheet.kind == Sheet.Kind.WORK:      # what was scored (SRS v0.5 FR-S1)
+        by, pts = scoring.days_for([sheet.id], first, last)
+        days, cfg = by.get(sheet.id, []), scoring.read_cfg(cfg)
+    else:                                  # a plan isn't scored: it shows what it would earn today
+        pts = {t.id: float(t.points) for t in Task.objects.all()}
+        days = [calc.Day(e.day, e.counted_slots()) for e in sheet.entries.filter(day__range=(first, last))]
     weeks, ws = [], first
     while ws <= to:
         we = ws + timedelta(days=6)
         h, p = calc.totals(days, ws, we, cfg, pts)
         no, year = calc.week_no(ws, cfg)
-        weeks.append({"start": ws, "end": we, "no": no, "year": year, "hours": h, "points": p,
-                      "target_hours": float(sheet.target_hours), "status": calc.final_of(h, float(sheet.target_hours))})
+        target = book.targets(sheet, ws + timedelta(days=3))["hours"] if sheet.kind == Sheet.Kind.WORK else float(sheet.target_hours)
+        weeks.append({"start": ws, "end": we, "no": no, "year": year, "hours": h, "points": p, "target_hours": target, "status": calc.final_of(h, target)})
         ws += timedelta(days=7)
     h, p = calc.totals(days, frm, to, cfg, pts)
-    choices = list(sheet.role.tasks.filter(active=True).values_list("id", flat=True)) if sheet.role else []
-    return {"weeks": weeks, "totals": {"hours": h, "points": p}, "choices": choices,
+    role_tasks = sheet.role.tasks.filter(active=True) if sheet.role else Task.objects.none()
+    choices = list(role_tasks.filter(scoring_mode=Task.ScoringMode.TIME).values_list("id", flat=True))
+    event_tasks = role_tasks.filter(scoring_mode=Task.ScoringMode.EVENT)
+    if kpi_derived(st):                    # a work order counts when a supervisor verifies the win in the pipeline (FR-K2)
+        event_tasks = event_tasks.exclude(counts_as_win=True)
+    events = [{"id": t.id, "name": t.name, "points": float(t.points)} for t in event_tasks]
+    return {"weeks": weeks, "totals": {"hours": h, "points": p}, "choices": choices, "event_choices": events,
             "week_start_dow": st.week_start_dow, "weekend_days": st.weekend_days, "count_weekend": st.count_weekend,
             "lock_days": st.lock_days, "timezone": st.timezone, "seconds_to_lock": calc.seconds_to_midnight(st.timezone, now())}
 
@@ -273,8 +293,11 @@ def sheet_summary(sheet, frm, to, st=None):
 def delete_team_data():
     """Remove every sheet with its days and weekly KPIs. Accounts, profiles, tasks, job roles, team rules,
     personal trackers and the activity log stay. Returns what was removed."""
+    from scoring import services as scoring
     counts = {"sheets": Sheet.objects.count(), "days": SheetEntry.objects.count(), "kpi_weeks": KpiEntry.objects.count()}
-    Sheet.objects.all().delete()          # days and KPIs go with their sheet
+    with scoring.paused():                # one configuration version for the whole clear-out, not one per sheet
+        Sheet.objects.all().delete()      # days, KPIs and ledger rows go with their sheet
+    scoring.sync_config()
     return counts
 
 
@@ -298,13 +321,22 @@ def wins_between(a, b, details=True):
             out.append({"id": f"{e.pk}-{task_id}", "day": e.day, "what": names[task_id], "owner_id": s.owner_id,
                         "person": s.person or (s.owner.name if s.owner else s.name), "photo": photo_of(s.owner),
                         "details": (e.remarks.strip()[:160] or None) if details else None})
+    from scoring.models import EventLog           # verified events that count as wins (SRS v0.5 D2)
+    events = (EventLog.objects.filter(status=EventLog.Status.VERIFIED, activity_id__in=names, day__range=(a, b), sheet__kind=Sheet.Kind.WORK, sheet__archived=False)
+              .select_related("sheet__owner__profile", "record"))
+    for ev in events:
+        s = ev.sheet
+        out.append({"id": f"event-{ev.pk}", "day": ev.day, "what": names[ev.activity_id], "owner_id": s.owner_id,
+                    "person": s.person or (s.owner.name if s.owner else s.name), "photo": photo_of(s.owner),
+                    "details": ((ev.record.company if ev.record else ev.note or ev.evidence)[:160] or None) if details else None})
+    out.sort(key=lambda w: w["day"], reverse=True)
     return out
 
 
 def missing_results(on, owner_id=None):
     """Completed weeks this year with no results entered (no row, or all four numbers zero), per work sheet.
     Counts from each sheet's start date. owner_id limits the list to one person's sheets."""
-    _, cfg, _, data = _snapshot(work_sheets(), renewals=False)
+    _, cfg, _, data = _snapshot(work_sheets(), renewals=False, ledger=False)
     year_start = date(on.year, 1, 1)
     gaps = []
     for s, _, kpis in data:

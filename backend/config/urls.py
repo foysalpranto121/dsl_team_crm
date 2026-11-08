@@ -17,6 +17,7 @@ urlpatterns = [
     path("api/renewals/", include("renewals.urls")),
     path("api/tasks/", include("mytasks.urls")),
     path("api/frameworks/", include("frameworks.urls")),
+    path("api/scoring/", include("scoring.urls")),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="docs"),
 ]

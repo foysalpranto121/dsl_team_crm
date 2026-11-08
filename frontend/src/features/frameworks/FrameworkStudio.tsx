@@ -211,7 +211,7 @@ function StepEditor({ s, i, n, outcomes, tasks, onChange, onRemove, onMove }: {
       {more && <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <Field label="Activity Type" hint="Optional: the step can then be logged as an hour and earn its points.">
           <SimpleSelect value={s.activity ? String(s.activity) : "none"} onValueChange={(v) => onChange({ ...s, activity: v === "none" ? null : Number(v) })} aria-label={`Step ${i + 1} activity`}
-            options={[{ value: "none", label: "None" }, ...tasks.filter((t) => t.active || t.id === s.activity).map((t) => ({ value: String(t.id), label: `${t.name} · ${+t.points} pts` }))]} />
+            options={[{ value: "none", label: "None" }, ...tasks.filter((t) => (t.active && t.scoring_mode !== "event") || t.id === s.activity).map((t) => ({ value: String(t.id), label: `${t.name} · ${+t.points} pts` }))]} />
         </Field>
         <Field label="Template or resource link"><Input type="url" value={s.resource_url} maxLength={300} onChange={(e) => onChange({ ...s, resource_url: e.target.value })} placeholder="https://…" /></Field>
         <Field label="Instructions" className="sm:col-span-2"><Textarea value={s.instruction} maxLength={1000} className="min-h-14" onChange={(e) => onChange({ ...s, instruction: e.target.value })} placeholder="What to say or send, what to check" /></Field>

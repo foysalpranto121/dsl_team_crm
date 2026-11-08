@@ -9,6 +9,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
+from scoring import services as scoring
+
 from . import calc, services
 from .models import SLOTS, JobRole, KpiEntry, Sheet, Task, TeamSettings
 
@@ -61,6 +63,10 @@ def build_workbook(year, sheet_ids=None):
         qs = qs.filter(id__in=sheet_ids)
     sheets = list(qs)
     first, last = date(year, 1, 1), date(year, 12, 31)
+    work_ids = [s.id for s in sheets if s.kind == Sheet.Kind.WORK]
+    scored_days, scored_pts = scoring.days_for(work_ids)
+    scored_totals = scoring.day_totals(work_ids, first, last)
+    book, read_cfg = scoring.Book(), scoring.read_cfg(cfg)
     wb = Workbook()
     used = {"dashboard", "kpi_weekly_input", "config", "monthly performance"}
 
@@ -75,9 +81,9 @@ def build_workbook(year, sheet_ids=None):
     for s in sheets:
         if s.kind != Sheet.Kind.WORK:
             continue
-        days = [calc.Day(e.day, e.counted_slots()) for e in s.entries.all()]
-        d = calc.dashboard(s.targets, days, services.kpi_rows(s, renewal_rev), cfg, pts, on)
-        h, p = calc.totals(days, first, last, cfg, pts)
+        days = scored_days.get(s.id, [])
+        d = calc.dashboard(book.targets(s, on), days, services.kpi_rows(s, renewal_rev), read_cfg, scored_pts, on)
+        h, p = calc.totals(days, first, last, read_cfg, scored_pts)
         for c, v in enumerate([s.name, s.person, s.role.name if s.role else "", h, p, float(s.target_hours), d["avg_week_hours"],
                                float(s.target_points), d["avg_month_points"]], start=1):
             dash.cell(r, c, v).border = GRID
@@ -92,7 +98,9 @@ def build_workbook(year, sheet_ids=None):
                f"Weekly target {float(s.target_hours):g} h · monthly points target {float(s.target_points):g} · counting from {s.start_date or '—'}")
         _header(ws, 4, heads, [11, 6] + [22] * SLOTS + [28, 8, 8, 6, 6, 9, 9])
         entries = {e.day: e for e in s.entries.filter(day__range=(first - timedelta(days=6), last + timedelta(days=6)))}
-        days = [calc.Day(d, e.counted_slots()) for d, e in entries.items()]
+        work = s.kind == Sheet.Kind.WORK       # a work log's numbers are what was scored (SRS v0.5 FR-S1); a plan isn't scored
+        days = scored_days.get(s.id, []) if work else [calc.Day(d, e.counted_slots()) for d, e in entries.items()]
+        tab_cfg, tab_pts = (read_cfg, scored_pts) if work else (cfg, pts)
         week_cache, month_cache = {}, {}
         row, d = 5, first
         while d <= last:
@@ -100,11 +108,17 @@ def build_workbook(year, sheet_ids=None):
             slots = (e.slots if e else []) + [None] * SLOTS
             ws0 = calc.week_start_of(d, cfg)
             if ws0 not in week_cache:
-                week_cache[ws0] = calc.totals(days, ws0, ws0 + timedelta(days=6), cfg, pts)[0]
+                week_cache[ws0] = calc.totals(days, ws0, ws0 + timedelta(days=6), tab_cfg, tab_pts)[0]
             if d.month not in month_cache:
-                month_cache[d.month] = calc.totals(days, calc.month_start(d), calc.month_end(d), cfg, pts)[1]
+                month_cache[d.month] = calc.totals(days, calc.month_start(d), calc.month_end(d), tab_cfg, tab_pts)[1]
+            if work:
+                scored = scored_totals.get((s.id, d), scoring.ZERO)
+                day_hours, day_points = scored["hours"], scored["points"]
+            else:
+                day_hours, day_points = (calc.day_hours(slots), calc.day_points(slots, pts)) if e else (0, 0)
             values = [d, d.strftime("%a")] + [tasks[x].name if x in tasks else None for x in slots[:SLOTS]] + [
-                e.remarks if e else None, calc.day_hours(slots) if e else 0, calc.day_points(slots, pts) if e else 0,
+                e.remarks if e else None,
+                day_hours, day_points,
                 calc.week_no(ws0, cfg)[0], d.month, week_cache[ws0], month_cache[d.month]]
             weekend = calc.dow(d) in cfg.weekend_days
             for c, v in enumerate(values, start=1):

@@ -17,7 +17,7 @@ from django.utils.text import slugify
 from core import audit
 
 from . import services
-from .models import Backup, JobRole, KpiEntry, Sheet, SheetEntry
+from .models import Backup, JobRole, KpiEntry, Sheet, SheetEntry, Task
 
 KEEP = 30
 TARGET_FIELDS = ["target_hours", "target_points", "target_leads", "target_opps", "target_clients", "target_revenue"]
@@ -30,7 +30,9 @@ def _sheet_data(s):
             "targets": {f: str(getattr(s, f)) for f in TARGET_FIELDS}, "start_date": s.start_date.isoformat() if s.start_date else None,
             "position": s.position, "archived": s.archived,
             "entries": [{"day": e.day.isoformat(), "slots": e.slots, "meta": e.meta, "remarks": e.remarks} for e in s.entries.all()],
-            "kpis": [_kpi_data(k) for k in s.kpis.all()]}
+            "kpis": [_kpi_data(k) for k in s.kpis.all()],
+            "events": [{"day": e.day.isoformat(), "activity": e.activity_id, "quantity": e.quantity, "evidence": e.evidence, "note": e.note, "status": e.status,
+                        "decision_note": e.decision_note, "record": e.record_id} for e in s.events.all()]}
 
 
 def _kpi_data(k):
@@ -41,7 +43,7 @@ def _kpi_data(k):
 def take(reason, actor=None):
     """Save a copy of all team data now. Returns the file name."""
     now = datetime.now(timezone.utc)
-    sheets = [_sheet_data(s) for s in Sheet.objects.select_related("role").prefetch_related("entries", "kpis")]
+    sheets = [_sheet_data(s) for s in Sheet.objects.select_related("role").prefetch_related("entries", "kpis", "events")]
     counts = {"sheets": len(sheets), "days": sum(len(s["entries"]) for s in sheets), "kpi_weeks": sum(len(s["kpis"]) for s in sheets)}
     name = f"{now:%Y%m%d-%H%M%S}-{secrets.token_hex(3)}-{slugify(reason)[:40] or 'backup'}.json"
     Backup.objects.create(name=name, created=now, reason=reason, counts=counts,
@@ -77,7 +79,11 @@ def restore(name, actor):
     before = take(f"before restoring {name}", actor)
     users = set(get_user_model().objects.values_list("id", flat=True))
     roles = {r.name: r for r in JobRole.objects.all()}
-    with transaction.atomic():
+    from scoring import services as scoring   # scoring builds on team, so it's imported here
+    from scoring.models import EventLog
+    from tracker.models import Prospect
+    tasks, records = set(Task.objects.values_list("id", flat=True)), set(Prospect.objects.values_list("id", flat=True))
+    with scoring.paused(), transaction.atomic():
         services.delete_team_data()
         for d in data["sheets"]:
             s = Sheet.objects.create(name=d["name"], kind=d["kind"], owner_id=d["owner_id"] if d["owner_id"] in users else None,
@@ -86,5 +92,10 @@ def restore(name, actor):
             SheetEntry.objects.bulk_create([SheetEntry(sheet=s, day=parse_date(e["day"]), slots=e["slots"], meta=e.get("meta") or [], remarks=e["remarks"]) for e in d["entries"]])
             KpiEntry.objects.bulk_create([KpiEntry(sheet=s, week_start=parse_date(k["week_start"]), revenue=Decimal(k["revenue"]), notes=k["notes"], counts_in=k.get("counts_in", ""),
                                                    **{f: k[f] for f in KPI_FIELDS}) for k in d["kpis"]])
+            EventLog.objects.bulk_create([EventLog(sheet=s, day=parse_date(e["day"]), activity_id=e["activity"], quantity=e["quantity"], evidence=e["evidence"], note=e["note"],
+                                                   status=e["status"], decision_note=e["decision_note"], record_id=e["record"] if e["record"] in records else None)
+                                          for e in d.get("events", []) if e["activity"] in tasks])
+        # SRS v0.5 §7: restoring is an explicit recalculation: the restored data is priced with today's configuration
+        scoring.adopt(scoring.ScoringVersion.Kind.RESTORE, actor, f"Backup restored: {name}")
     audit.log(actor, "team.restore", name, flagged=True, backup_before=before, **data["counts"])
     return {**data["counts"], "backup_before": before}

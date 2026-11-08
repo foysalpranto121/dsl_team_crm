@@ -13,6 +13,9 @@ from rest_framework.views import APIView
 from accounts.models import User
 from accounts.permissions import IsAdminOrReadOnly, IsApproved, IsTeamAdmin
 from core import audit
+from scoring import services as scoring
+from scoring.models import EventLog
+from scoring.serializers import EventSerializer
 
 from . import calc, planning, services, snapshots
 from .exporter import build_workbook
@@ -24,6 +27,15 @@ from .serializers import (EntrySerializer, EntryWriteSerializer, JobRoleSerializ
 DAY = r"(?P<day>\d{4}-\d{2}-\d{2})"
 
 
+def months_rates(frm, to):
+    """{"2026-10": {task id: points}} for the months from frm to to: a past month's hours are worth what they were worth then."""
+    book, out, ms = scoring.Book(), {}, calc.month_start(frm)
+    while ms <= to:
+        out[f"{ms:%Y-%m}"] = book.rates(ms)
+        ms = calc.add_months(ms, 1)
+    return out
+
+
 def locked(e):
     return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
 
@@ -32,7 +44,26 @@ def task_points():
     return {t.id: float(t.points) for t in Task.objects.all()}
 
 
-class TeamSettingsView(APIView):
+def day_numbers(sheet, frm, to):
+    """{day: {hours, points}} from the score ledger for a work log (SRS v0.5 FR-S1); None for a plan, which isn't scored."""
+    if sheet.kind != Sheet.Kind.WORK:
+        return None
+    return {d: n for (_, d), n in scoring.day_totals([sheet.id], frm, to).items()}
+
+
+class ConfigActor:
+    """Configuration changes made through this view are versioned in this person's name (SRS v0.5 FR-C9)."""
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        scoring.set_actor(request.user)
+
+    def finalize_response(self, request, response, *args, **kwargs):
+        scoring.set_actor(None)
+        return super().finalize_response(request, response, *args, **kwargs)
+
+
+class TeamSettingsView(ConfigActor, APIView):
     permission_classes = [IsAdminOrReadOnly]
 
     @extend_schema(responses=TeamSettingsSerializer)
@@ -53,7 +84,7 @@ class TeamSettingsView(APIView):
         return Response(ser.data)
 
 
-class TaskViewSet(viewsets.ModelViewSet):
+class TaskViewSet(ConfigActor, viewsets.ModelViewSet):
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
     permission_classes = [IsAdminOrReadOnly]
@@ -69,12 +100,12 @@ class TaskViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         task = self.get_object()
-        if SheetEntry.objects.filter(slots__contains=[task.id]).exists():
+        if SheetEntry.objects.filter(slots__contains=[task.id]).exists() or EventLog.objects.filter(activity=task).exists():
             return Response({"detail": "This task is used in sheets. Switch it off instead, so past points stay correct."}, status=400)
         return super().destroy(request, *args, **kwargs)
 
 
-class JobRoleViewSet(viewsets.ModelViewSet):
+class JobRoleViewSet(ConfigActor, viewsets.ModelViewSet):
     queryset = JobRole.objects.prefetch_related("tasks")
     serializer_class = JobRoleSerializer
     permission_classes = [IsAdminOrReadOnly]
@@ -88,7 +119,7 @@ class JobRoleViewSet(viewsets.ModelViewSet):
         audit.log(self.request.user, "role.save", r.name, weights=r.weights, tasks=r.tasks.count())
 
 
-class SheetViewSet(viewsets.ModelViewSet):
+class SheetViewSet(ConfigActor, viewsets.ModelViewSet):
     """Sheets: everyone sees them; admins create, rename, set targets and archive. Entries and weekly results are nested."""
 
     serializer_class = SheetSerializer
@@ -138,7 +169,11 @@ class SheetViewSet(viewsets.ModelViewSet):
                 blocked[d.isoformat()] = reason
             d += timedelta(days=1)
         return Response({"from": frm, "to": to, "today": t, "editable": editable, "blocked": blocked,
-                         "entries": EntrySerializer(rows, many=True, context={"pts": task_points()}).data,
+                         "entries": EntrySerializer(rows, many=True, context={"pts": task_points(), "ledger": day_numbers(sheet, frm, to)}).data,
+                         # SRS v0.5 §7, D2: what each activity is worth in these months, and the events logged on these days
+                         "rates": months_rates(frm, to) if sheet.kind == Sheet.Kind.WORK else {},
+                         "events": EventSerializer(sheet.events.filter(day__range=(frm, to)).select_related("sheet", "activity", "decided_by", "record"), many=True,
+                                                   context={"request": request}).data,
                          "plan_weeks": {str(k): v for k, v in plans.items()},
                          # the approved task of each hour, so the log can show the plan and pre-fill it (SRS v0.5 FR-T7)
                          "planned": {str(k): v for k, v in planning.approved_plans(sheet, frm, to, services.cfg_of(st)).items()}
@@ -162,7 +197,7 @@ class SheetViewSet(viewsets.ModelViewSet):
             return locked(err)
         if e is None:
             return Response(status=status.HTTP_204_NO_CONTENT)
-        return Response(EntrySerializer(e, context={"pts": task_points()}).data)
+        return Response(EntrySerializer(e, context={"pts": task_points(), "ledger": day_numbers(sheet, d, d)}).data)
 
     # ----- weekly results -----
     @extend_schema(parameters=[OpenApiParameter("year", int)], responses=KpiSerializer(many=True))
@@ -276,7 +311,7 @@ class PerformanceView(APIView):
         t = services.today()
         year = int(request.query_params.get("year") or t.year)
         on, rows = services.performance_rows(year, t)
-        return Response({"year": year, "date": on, "rows": rows})
+        return Response({"year": year, "date": on, "rows": rows, "team": calc.team_row(rows) if rows else None})
 
 
 class KpiWeekView(APIView):

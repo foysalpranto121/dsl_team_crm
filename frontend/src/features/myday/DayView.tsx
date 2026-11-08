@@ -17,6 +17,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { MonthCard, TimeByType, WeekCard, WeekStrip, type DayInfo, type SlotTask } from "../log/parts";
+import type { DrillTarget } from "../scoring/api";
+import { DayEvents } from "../scoring/Events";
+import { LedgerDrawer } from "../scoring/LedgerDrawer";
 import { addDays, dow, fmt, hoursText, monthEnd, monthStart, num, ptsText, range, typeColours, weekStartOf } from "../log/util";
 import { counts, kindOf, missingReason, pad, reviewOf, summary, wire, type Hour } from "./rules";
 
@@ -228,6 +231,7 @@ export function DayView({ work, day, weekStartDow, go }: {
 
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 30_000); return () => window.clearInterval(id); }, []);
+  const [drill, setDrill] = useState<DrillTarget | null>(null);   // SRS v0.5 FR-S3: the entries behind a number
 
   const colours = useMemo(() => typeColours(tasks.data ?? []), [tasks.data]);
   const taskMap = useMemo(() => {
@@ -241,7 +245,7 @@ export function DayView({ work, day, weekStartDow, go }: {
     const opt = (x: Task, group: string): ComboOption => ({ value: String(x.id), label: x.name, hint: ptsText(+x.points), group,
       icon: <Dot colour={colours.get(x.type || "Other")!} />, keywords: [x.type] });
     return [...(tasks.data ?? []).filter((x) => chosen.has(x.id)).map((x) => opt(x, x.type || "Tasks")),
-      ...(isAdmin ? (tasks.data ?? []).filter((x) => x.active && !chosen.has(x.id)).map((x) => opt(x, "Other tasks (admins only)")) : [])];
+      ...(isAdmin ? (tasks.data ?? []).filter((x) => x.active && !chosen.has(x.id) && x.scoring_mode !== "event").map((x) => opt(x, "Other tasks (admins only)")) : [])];
   }, [d?.choices, tasks.data, colours, isAdmin]);
 
   if (data.error || tasks.error) return <ErrorState error={data.error || tasks.error} onRetry={() => { data.refetch(); tasks.refetch(); }} />;
@@ -252,7 +256,14 @@ export function DayView({ work, day, weekStartDow, go }: {
     const prev = hoursOfEntry(byDay.get(x)), planned = plannedOf(x);
     return hoursOf(x).map((h, i) => (drafts[x] ? reviewOf(planned[i], h, prev[i], strict) : h.meta.review));
   };
-  const sumOf = (x: string) => summary(plannedOf(x), hoursOf(x), reviewsOf(x), (id) => taskMap.get(id)?.points ?? 0);
+  // SRS v0.5 §7: an hour is worth what its activity was worth in that month; verified events add points, not hours
+  const rateOf = (x: string, id: number) => d.rates?.[x.slice(0, 7)]?.[String(id)] ?? taskMap.get(id)?.points ?? 0;
+  const eventPoints = (x: string) => (d.events ?? []).filter((e) => e.day === x && e.status === "verified").reduce((a, e) => a + e.points, 0);
+  const sumOf = (x: string) => {
+    const got = summary(plannedOf(x), hoursOf(x), reviewsOf(x), (id) => rateOf(x, id));
+    return { ...got, points: got.points + eventPoints(x) };
+  };
+  const taskOn = (id: Slot) => { const t = taskOf(id); return t ? { ...t, points: rateOf(day, t.id) } : null; };
   const info = (x: string): DayInfo => {
     const s = sumOf(x);
     return { day: x, hours: s.output, points: s.points, weekend: d.weekend_days.includes(dow(x)), locked: !d.editable[x] && x < d.today, inMonth: x.slice(0, 7) === day.slice(0, 7) };
@@ -337,9 +348,11 @@ export function DayView({ work, day, weekStartDow, go }: {
           <ol className="divide-y divide-border/70 px-3 py-1 sm:px-5" aria-label={`Hours on ${longDay}`}>
             {hours.map((h, i) => (
               <LogHour key={i} n={i + 1} planned={taskOf(planned[i])} hour={h} review={reviews[i]} editable={editable} options={options} strict={strict}
-                previous={i > 0 ? taskOf(hours[i - 1].task) : null} taskOf={taskOf} onChange={(next) => setHour(i, next)} />
+                previous={i > 0 ? taskOn(hours[i - 1].task) : null} taskOf={taskOn} onChange={(next) => setHour(i, next)} />
             ))}
           </ol>
+
+          <DayEvents sheet={work.id} day={day} events={(d.events ?? []).filter((e) => e.day === day)} choices={d.event_choices ?? []} editable={editable} />
 
           <div className="border-t border-border px-5 py-4">
             <label htmlFor="day-notes" className="label">Notes for the day</label>
@@ -370,6 +383,14 @@ export function DayView({ work, day, weekStartDow, go }: {
             </dl>
             <p className="mt-3 text-xs text-muted-foreground">Adherence: planned hours done as planned{s.adherence == null ? " (nothing was planned)" : ""}.</p>
             {pendingHere > 0 && <p className="mt-2 text-xs font-medium text-info-text">{hoursText(pendingHere)} waiting for your supervisor.</p>}
+            <div className="mt-3 text-xs text-muted-foreground">
+              <div>See what counted:</div>
+              <div className="mt-0.5 flex flex-wrap gap-x-3">
+                <Button size="sm" variant="link" className="h-auto px-0 text-xs" onClick={() => setDrill({ title: longDay, sheet: work.id, from: day, to: day })}>this day</Button>
+                {week && <Button size="sm" variant="link" className="h-auto px-0 text-xs" onClick={() => setDrill({ title: `Week ${week.no}`, sheet: work.id, from: week.start, to: week.end })}>this week</Button>}
+                <Button size="sm" variant="link" className="h-auto px-0 text-xs" onClick={() => setDrill({ title: fmt(day, { month: "long", year: "numeric" }), sheet: work.id, from: monthStart(day), to: monthEnd(day) })}>this month</Button>
+              </div>
+            </div>
           </section>
           <WeekCard week={week} days={weekDays} selected={day} today={d.today} onSelect={(x) => go({ day: x })} />
           <TimeByType rows={[...byType].map(([type, h]) => ({ type, hours: h, colour: colours.get(type)! })).sort((a, b) => b.hours - a.hours)} />
@@ -377,6 +398,7 @@ export function DayView({ work, day, weekStartDow, go }: {
             targetPoints={+work.target_points} daysFilled={counted.filter((x) => x.hours > 0).length} />
         </aside>
       </div>
+      <LedgerDrawer target={drill} onClose={() => setDrill(null)} />
     </>
   );
 }

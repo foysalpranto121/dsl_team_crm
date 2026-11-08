@@ -153,7 +153,7 @@ function QuickAdd({ tasks, focus }: { tasks: Task[]; focus: boolean }) {
           options={[{ value: "low", label: "Low" }, { value: "normal", label: "Normal" }, { value: "high", label: "High" }]} /></Field>
         <Field label="Counts as" className="min-w-52 flex-[2]" hint="Optional: log it as an hour of this activity.">
           <Combobox value={activity} onChange={setActivity} aria-label="Activity type" placeholder="No activity" searchPlaceholder="Search activities…" clearable
-            options={tasks.filter((t) => t.active).map((t) => ({ value: String(t.id), label: t.name, hint: ptsText(+t.points), group: t.type || "Tasks" }))} />
+            options={tasks.filter((t) => t.active && t.scoring_mode !== "event").map((t) => ({ value: String(t.id), label: t.name, hint: ptsText(+t.points), group: t.type || "Tasks" }))} />
         </Field>
         <div><span className="label" aria-hidden>&nbsp;</span>
           <Button type="submit" busy={add.isPending} disabled={!title.trim() || preview.isError}><Plus /> Add</Button></div>
@@ -199,7 +199,7 @@ function AssignDialog({ open, onOpenChange, tasks }: { open: boolean; onOpenChan
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="When"><Input value={f.due} maxLength={40} onChange={(e) => setF({ ...f, due: e.target.value })} placeholder="today" /></Field>
               <Field label="Activity type"><Combobox value={f.activity} onChange={(v) => setF({ ...f, activity: v })} aria-label="Activity type" placeholder="None" clearable
-                options={tasks.filter((t) => t.active).map((t) => ({ value: String(t.id), label: t.name, hint: ptsText(+t.points), group: t.type || "Tasks" }))} /></Field>
+                options={tasks.filter((t) => t.active && t.scoring_mode !== "event").map((t) => ({ value: String(t.id), label: t.name, hint: ptsText(+t.points), group: t.type || "Tasks" }))} /></Field>
             </div>
           </DialogBody>
           <DialogFooter><Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Cancel</Button>

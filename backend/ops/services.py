@@ -136,15 +136,15 @@ def huddle(user):
     prev = previous_working_day(today, cfg)
     ws = calc.week_start_of(today, cfg)
     _, rows = team.dashboard_rows(today)
-    pts = {t.id: float(t.points) for t in Task.objects.all()}
     types = dict(Task.objects.values_list("id", "type"))
     work = list(team.work_sheets().select_related("owner__profile"))
     week_wd = calc.working_days(ws, ws + timedelta(days=6), cfg)
     day_target = calc.r2(sum(r["week_target"] for r in rows) / week_wd) if week_wd else 0
 
     # Yesterday (the last working day): team numbers and the day's top contributor.
-    logged = {e.sheet_id: e for e in SheetEntry.objects.filter(sheet__in=work, day=prev)}
-    done = [(s, calc.day_hours(logged[s.id].counted_slots()), calc.day_points(logged[s.id].counted_slots(), pts)) for s in work if s.id in logged]
+    from scoring.services import day_totals       # what the score ledger holds (SRS v0.5 FR-S1)
+    scored = day_totals([s.id for s in work], prev, prev)
+    done = [(s, scored[(s.id, prev)]["hours"], scored[(s.id, prev)]["points"]) for s in work if (s.id, prev) in scored]
     star = max(done, key=lambda x: x[2], default=None)
     yesterday = {
         "day": prev, "people": len(work), "logged": sum(1 for _, h, _ in done if h > 0), "target_hours": day_target,

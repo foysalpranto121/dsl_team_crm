@@ -6,6 +6,7 @@ import { useFeatures } from "@/lib/features";
 import { useAuth } from "@/auth/AuthContext";
 import { api } from "@/api/client";
 import { teamLoadQuery } from "@/features/frameworks/api";
+import { pendingEventsQuery } from "@/features/scoring/api";
 import type { Reviews } from "@/features/pipeline/api";
 import { duration } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -33,6 +34,8 @@ export function NotificationBell() {
     enabled: user?.role === "admin" || user?.role === "supervisor" });
   // SRS v0.5 FR-SF6: members flagged Overloaded (their new framework steps wait), for supervisors and admins
   const load = useQuery({ ...teamLoadQuery, enabled: user?.role === "admin" || user?.role === "supervisor" });
+  // SRS v0.5 D2: events waiting for a supervisor to verify them
+  const events = useQuery({ ...pendingEventsQuery, enabled: user?.role === "admin" || user?.role === "supervisor" });
 
   const items: Item[] = [];
   const t = today.data;
@@ -61,6 +64,11 @@ export function NotificationBell() {
       flaggedStages && `${flaggedStages} stage ${flaggedStages === 1 ? "review" : "reviews"}`].filter(Boolean);
     items.push({ id: "pipeline-reviews", tone: "primary", icon: BadgeCheck, title: `Pipeline: ${parts.join(", ")}`,
       body: "A win counts as a client and revenue once you verify the work order.", to: "/kpi" });
+  }
+  const toVerify = (events.data ?? []).filter((e) => !e.mine).length;
+  if (toVerify) {
+    items.push({ id: "events", tone: "primary", icon: BadgeCheck, title: `${toVerify} ${toVerify === 1 ? "event" : "events"} to verify`,
+      body: "They add points once you've checked the evidence.", to: "/team-board" });
   }
   const over = (load.data?.people ?? []).filter((p) => p.flag && !p.flag.overridden);
   if (over.length) {

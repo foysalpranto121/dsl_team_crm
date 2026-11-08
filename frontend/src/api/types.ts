@@ -1,3 +1,5 @@
+import type { ScoreEvent } from "../features/scoring/api";
+
 /** SRS v0.5 §3: Member · Supervisor / Team Leader (also approves) · Management (stored as "viewer") · Admin. */
 export type Role = "admin" | "supervisor" | "member" | "viewer";
 export type Status = "pending" | "approved" | "rejected" | "disabled";
@@ -50,6 +52,7 @@ export interface DashboardRow {
   person: string;
   role: string | null;
   owner_id: number | null;
+  start: string;
   week_start: string;
   week_end: string;
   week_hours: number;
@@ -78,6 +81,8 @@ export interface Task {
   active: boolean;
   position: number;
   counts_as_win: boolean;  // logging it is a win: shown and celebrated on the office TV
+  /** SRS v0.5 FR-C3, §7, D2: one slot × its points, or quantity × its points once a supervisor verified the event */
+  scoring_mode: "time" | "event";
 }
 
 export interface JobRole {
@@ -169,6 +174,11 @@ export interface EntriesResponse {
   /** each week's plan status (week start → draft | submitted | approved | partial | rejected) */
   plan_weeks: Record<string, string>;
   unplanned_mode: "provisional" | "strict";
+  /** SRS v0.5 §7: what each activity was worth in these months ("2026-10" → task id → points) */
+  rates: Record<string, Record<string, number>>;
+  /** SRS v0.5 D2, FR-T5: the events logged on these days, and what this person can log */
+  events: ScoreEvent[];
+  event_choices: { id: number; name: string; points: number }[];
 }
 
 export type Feature = "tv" | "huddle" | "digest" | "renewals";

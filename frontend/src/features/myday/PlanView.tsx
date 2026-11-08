@@ -69,7 +69,7 @@ export function PlanView({ work, day, go }: { work: { id: number }; day: string;
   };
   const options = useMemo<ComboOption[]>(() => {
     const chosen = new Set(w?.choices ?? []);
-    return (tasks.data ?? []).filter((x) => chosen.has(x.id) || (isAdmin && x.active)).map((x) => ({ value: String(x.id), label: x.name, hint: ptsText(+x.points),
+    return (tasks.data ?? []).filter((x) => chosen.has(x.id) || (isAdmin && x.active && x.scoring_mode !== "event")).map((x) => ({ value: String(x.id), label: x.name, hint: ptsText(+x.points),
       group: chosen.has(x.id) ? x.type || "Tasks" : "Other tasks (admins only)", keywords: [x.type],
       icon: <span className="size-2.5 shrink-0 rounded-[3px]" style={{ background: colours.get(x.type || "Other") }} aria-hidden /> }));
   }, [w?.choices, tasks.data, colours, isAdmin]);

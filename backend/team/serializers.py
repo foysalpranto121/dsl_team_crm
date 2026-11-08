@@ -64,7 +64,7 @@ class TeamSettingsSerializer(serializers.ModelSerializer):
 class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
-        fields = ["id", "type", "name", "points", "active", "position", "counts_as_win"]
+        fields = ["id", "type", "name", "points", "active", "position", "counts_as_win", "scoring_mode"]
 
 
 class JobRoleSerializer(serializers.ModelSerializer):
@@ -130,11 +130,18 @@ class EntrySerializer(serializers.ModelSerializer):
         """Hours with a task logged, counted or not (hours and points count only output hours)."""
         return calc.day_hours(obj.slots)
 
+    def _ledger(self, obj):
+        """A work log's numbers are what the score ledger holds for the day (SRS v0.5 FR-S1); a plan isn't scored."""
+        led = self.context.get("ledger")
+        return None if led is None else led.get(obj.day, {"hours": 0, "points": 0})
+
     def get_hours(self, obj):
-        return calc.day_hours(obj.counted_slots())
+        led = self._ledger(obj)
+        return led["hours"] if led else calc.day_hours(obj.counted_slots())
 
     def get_points(self, obj):
-        return calc.day_points(obj.counted_slots(), self.context["pts"])
+        led = self._ledger(obj)
+        return led["points"] if led else calc.day_points(obj.counted_slots(), self.context["pts"])
 
     def get_updated_by(self, obj):
         return (obj.updated_by.name or obj.updated_by.email) if obj.updated_by else None

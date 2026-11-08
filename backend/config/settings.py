@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "renewals",
     "mytasks",
     "frameworks",
+    "scoring",
 ]
 
 MIDDLEWARE = [

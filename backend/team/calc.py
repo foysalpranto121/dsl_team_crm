@@ -24,6 +24,7 @@ class Cfg:
 class Day:
     day: date
     slots: list
+    extra: float = 0.0                # points from verified events that day: they add no hours (SRS v0.5 §7)
 
 
 def r2(x):
@@ -136,7 +137,7 @@ def totals(entries, a, b, cfg, pts):
     for e in entries:
         if a <= e.day <= b and counts(e.day, cfg):
             hours += day_hours(e.slots)
-            points += day_points(e.slots, pts)
+            points += day_points(e.slots, pts) + e.extra
     return hours, r2(points)
 
 
@@ -225,12 +226,15 @@ def dashboard(targets, entries, kpis, cfg, pts, today, week_on=None):
 
 # ---------- composite score ----------
 
-def performance(targets, entries, kpis, cfg, pts, weights, year, today):
+def performance(targets, entries, kpis, cfg, pts, weights, year, today, monthly=None):
     """score = Σ weight × (actual ÷ target) over the six metrics, with the person's own targets and job role weights.
     Hours compare average hours per week with the weekly target. The start month is pro-rated.
-    A metric with no target adds nothing. Quarter and year scores average the completed months."""
-    T, W = targets, weights or {m: 0.0 for m in METRICS}
-    start = start_of(T, entries, date(year, 1, 1))
+    A metric with no target adds nothing. Quarter and year scores average the completed months.
+    monthly(month start) gives the (targets, weights, version) that score that month, so changing them later leaves past
+    months alone (SRS v0.5 §7: formulas run with the configuration version pinned)."""
+    zero = {m: 0.0 for m in METRICS}
+    T0, W0 = targets, weights or zero
+    start0 = start_of(T0, entries, date(year, 1, 1))
     months = []
     for m in range(1, 13):
         ms = date(year, m, 1)
@@ -238,6 +242,9 @@ def performance(targets, entries, kpis, cfg, pts, weights, year, today):
         if ms > today:
             months.append({"m": m, "state": "future"})
             continue
+        T, W, version = monthly(ms) if monthly else (T0, W0, None)
+        W = W or zero
+        start = start_of(T, entries, date(year, 1, 1)) if monthly else start0
         k = kpi_for(kpis, lambda x, key=(year, m): counted_month(x) == key)
         if start > me:
             h, p = totals(entries, ms, me, cfg, pts)
@@ -252,7 +259,7 @@ def performance(targets, entries, kpis, cfg, pts, weights, year, today):
         ratio = {x: (actual[x] / target[x] if target[x] > 0 else 0.0) for x in METRICS}
         score = sum(W[x] / 100 * ratio[x] for x in METRICS)
         months.append({"m": m, "state": "current" if today <= me else "done", "from": frm, "hours": h, "avg_weekly": r2(actual["hours"]),
-                       "points": p, **{x: k[x] for x in KPI_KEYS}, "target": target, "ratio": ratio, "score": score})
+                       "points": p, **{x: k[x] for x in KPI_KEYS}, "target": target, "ratio": ratio, "score": score, "weights": W, "version": version})
 
     def roll(lst):
         scored = [x for x in lst if x["state"] in ("done", "current")]
@@ -263,7 +270,25 @@ def performance(targets, entries, kpis, cfg, pts, weights, year, today):
                 **{x: r2(sum(y[x] for y in scored)) for x in ("points",) + KPI_KEYS},
                 "score": sum(x["score"] for x in done) / len(done) if done else None, "months": len(done)}
 
-    return {"start": start, "weights": W, "months": months, "quarters": [roll(months[q * 3:q * 3 + 3]) for q in range(4)], "year": roll(months)}
+    return {"start": start0, "weights": W0, "months": months, "quarters": [roll(months[q * 3:q * 3 + 3]) for q in range(4)], "year": roll(months)}
+
+
+def team_row(rows):
+    """SRS v0.5 FR-S4: the team's numbers for each period, from its members' performance(): totals, with the composite score and the
+    weekly hours the average of the members who have one."""
+    def merge(cells):
+        scores = [c["score"] for c in cells if c.get("score") is not None]
+        weekly = [c["avg_weekly"] for c in cells if c.get("avg_weekly") is not None]
+        return {**{k: r2(sum(c.get(k) or 0 for c in cells)) for k in ("hours", "points") + KPI_KEYS},
+                "avg_weekly": r2(sum(weekly) / len(weekly)) if weekly else None, "score": sum(scores) / len(scores) if scores else None}
+
+    months = []
+    for i in range(12):
+        states = {r["months"][i]["state"] for r in rows}
+        state = next((s for s in ("current", "done", "before") if s in states), "future")
+        cells = [r["months"][i] for r in rows if r["months"][i]["state"] in ("current", "done")]
+        months.append({"m": i + 1, "state": state, **merge(cells)} if cells else {"m": i + 1, "state": state})
+    return {"months": months, "quarters": [merge([r["quarters"][q] for r in rows]) for q in range(4)], "year": merge([r["year"] for r in rows])}
 
 
 def warnings(roles, sheets):

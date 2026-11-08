@@ -72,6 +72,9 @@ def move(p, to, by, on=None, initial=False, baseline=False, refresh=True, old_st
                                    backward=back, baseline=baseline, review=StageEvent.Review.FLAGGED if back else StageEvent.Review.NONE)
     p.stage, p.stage_since = to, on
     if new.kind != S.WON:
+        if p.won_verified_at:              # it left Won: the work order event's points go with it (SRS v0.5 D2)
+            from scoring.services import withdraw_win
+            withdraw_win(by, p, f"Moved to {new.name}")
         p.won_verified_at, p.won_verified_by = None, None
     if not baseline:
         stamp_dates(p, new, on)
@@ -211,6 +214,11 @@ def verify_win(user, p, verified, note=""):
         ClientLogEntry.objects.create(record=p, type=ClientLogEntry.Type.NOTE, day=today(), by=user, note=f"Win not verified: {note.strip()[:900]}")
     p.save(update_fields=["won_verified_at", "won_verified_by", "updated_at"])
     audit.log(user, "pipeline.verify_win" if verified else "pipeline.reject_win", p.company, record=p.id, note=note.strip()[:300])
+    from scoring import services as scoring       # SRS v0.5 FR-K2, D2: this is the verification of the work order event, so it scores here
+    if verified:
+        scoring.record_win(user, p)
+    else:
+        scoring.withdraw_win(user, p, note.strip())
     from . import kpis
     kpis.refresh(p.owner_id)
     return p

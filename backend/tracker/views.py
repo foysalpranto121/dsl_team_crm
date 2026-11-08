@@ -83,6 +83,8 @@ class ProspectViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_destroy(self, p):
+        from scoring.services import withdraw_win
+        withdraw_win(self.request.user, p, "Record deleted")   # a verified win's points go with it
         owner = p.owner_id
         p.delete()
         kpis.refresh(owner)   # its stage events go with it

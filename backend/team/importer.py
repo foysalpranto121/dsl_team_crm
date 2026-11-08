@@ -64,7 +64,8 @@ def import_workbook(fileobj, actor, dry_run=False, replace=False):
               "warnings": []}
     warn = report["warnings"].append
 
-    with transaction.atomic():
+    from scoring import services as scoring   # scoring builds on team, so it's imported here
+    with scoring.paused(), transaction.atomic():
         if replace:   # start from nothing: inside the same transaction, so a failed import leaves the old data untouched
             from . import snapshots
             from .services import delete_team_data
@@ -88,8 +89,9 @@ def import_workbook(fileobj, actor, dry_run=False, replace=False):
             t = tasks.get(name.lower())
             if t is None:
                 position += 1
-                t = tasks[name.lower()] = Task.objects.create(name=name, type=typ, points=_num(pts, Decimal(1)), position=position,
-                                                              counts_as_win=Task.looks_like_win(name))
+                win = Task.looks_like_win(name)      # SRS v0.5 §12.1: Work Order Receiving is event-based, verified
+                t = tasks[name.lower()] = Task.objects.create(name=name, type=typ, points=_num(pts, Decimal(1)), position=position, counts_as_win=win,
+                                                              scoring_mode=Task.ScoringMode.EVENT if win else Task.ScoringMode.TIME)
                 report["tasks"]["created"].append(name)
             elif (t.type, t.points) != (typ or t.type, _num(pts, t.points)):
                 t.type, t.points = typ or t.type, _num(pts, t.points)
@@ -243,5 +245,7 @@ def import_workbook(fileobj, actor, dry_run=False, replace=False):
         if dry_run:
             transaction.set_rollback(True)
         else:
+            # SRS v0.5 FR-M1: the workbook's days go into the score ledger, priced with the workbook's configuration
+            scoring.adopt(scoring.ScoringVersion.Kind.IMPORT, actor, "Workbook imported: its configuration applies to all of its days")
             audit.log(actor, "import.workbook", "Team Operation Sheet", flagged=replace, replaced=replace, sheets=len(report["sheets"]), kpi_weeks=report["kpi"]["weeks"])
     return report

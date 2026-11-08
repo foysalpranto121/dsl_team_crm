@@ -200,6 +200,12 @@ def adherence(approved, entry):
     return done / len(hours), done, len(hours)
 
 
+def _scored(work, frm, to):
+    """{day: {hours, points}} from the score ledger (FR-S1)."""
+    from scoring.services import day_totals
+    return {d: n for (_, d), n in day_totals([work.id], frm, to).items()}
+
+
 # ---------- the hour log (FR-T1–T3, §6) ----------
 
 def log_details(user, work, day, slots, sent, entry, st):
@@ -278,6 +284,7 @@ def week(user, work, day):
     pts = {x.id: float(x.points) for x in Task.objects.all()}
     planned = {e.day: e for e in plan_sheet.entries.filter(day__range=(ws - timedelta(days=7), we))} if plan_sheet else {}
     done = {e.day: e for e in work.entries.filter(day__range=(ws, we))}
+    scored = _scored(work, ws, we)
     days, counts = [], Counter()
     for k in range(7):
         d = ws + timedelta(days=k)
@@ -294,8 +301,7 @@ def week(user, work, day):
             "day": d, "slots": slots, "states": cell_states, "note": e.remarks if e else "",
             "hours": calc.day_hours(slots), "points": calc.day_points(slots, pts), "weekend": calc.dow(d) in cfg.weekend_days,
             "editable": block is None, "blocked": block, "approved_hours": approved_hours,
-            "done": {"logged": calc.day_hours(w.slots), "hours": calc.day_hours(w.counted_slots()), "points": calc.day_points(w.counted_slots(), pts),
-                     "adherence": ratio} if w else None,
+            "done": {"logged": calc.day_hours(w.slots), **scored.get(d, {"hours": 0, "points": 0}), "adherence": ratio} if w else None,
         })
     open_ = [x for x in days if x["editable"]]
     submittable = sum(1 for x in open_ for i, s in enumerate(x["slots"]) if s is not None and x["states"][i] in (None, REJECTED))
@@ -312,7 +318,7 @@ def week(user, work, day):
         "totals": {"hours": sum(x["hours"] for x in days), "points": calc.r2(sum(x["points"] for x in days)), "approved": counts[APPROVED],
                    "logged": sum(x["done"]["logged"] for x in days if x["done"]), "output": sum(x["done"]["hours"] for x in days if x["done"])},
         "submittable": submittable, "target_hours": float(work.target_hours), "cutoff": st.plan_cutoff,
-        "choices": list(work.role.tasks.filter(active=True).values_list("id", flat=True)) if work.role else [],
+        "choices": list(work.role.tasks.filter(active=True, scoring_mode=Task.ScoringMode.TIME).values_list("id", flat=True)) if work.role else [],
         "can": {"plan": can_plan and bool(plan_sheet), "submit": can_plan and submittable > 0, "withdraw": can_plan and counts[SUBMITTED] > 0,
                 "copy_last_week": can_plan and any(calc.filled(x.slots) for d, x in planned.items() if d < ws), "templates": can_plan},
     }
@@ -599,7 +605,6 @@ def history(user, work):
     st = TeamSettings.load()
     cfg, t = services.cfg_of(st), services.today(st)
     since = calc.week_start_of(t, cfg) - timedelta(weeks=HISTORY_WEEKS)
-    pts = {x.id: float(x.points) for x in Task.objects.all()}
     plan_sheet = plan_sheet_for(work)
     plans = {p.week_start: p for p in WeekPlan.objects.filter(sheet=plan_sheet, week_start__gte=since).select_related("reviewed_by")} if plan_sheet else {}
     planned = {e.day: e for e in plan_sheet.entries.filter(day__gte=since)} if plan_sheet else {}
@@ -617,9 +622,11 @@ def history(user, work):
     for d, e in done.items():
         w = weeks[calc.week_start_of(d, cfg)]
         w["logged"] += calc.day_hours(e.slots)
-        w["output"] += calc.day_hours(e.counted_slots())
-        w["points"] += calc.day_points(e.counted_slots(), pts)
         w["pending"] += sum(1 for k in range(SLOTS) if e.meta_at(k).get("review") == PENDING)
+    for d, n in _scored(work, since, t + timedelta(days=366)).items():     # output hours and points: what the score ledger holds
+        w = weeks[calc.week_start_of(d, cfg)]
+        w["output"] += n["hours"]
+        w["points"] += n["points"]
     rows = []
     for ws in sorted(set(weeks) | set(plans), reverse=True):
         w, p, we = weeks[ws], plans.get(ws), ws + timedelta(days=6)
