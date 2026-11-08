@@ -26,6 +26,9 @@ const MyTasks = lazy(() => import("./features/mytasks/MyTasks"));
 const TeamBoard = lazy(() => import("./features/board/TeamBoard"));
 const FrameworkStudio = lazy(() => import("./features/frameworks/FrameworkStudio"));
 const Playbook = lazy(() => import("./features/playbook/Playbook"));
+const MyProgress = lazy(() => import("./features/progress/MyProgress"));
+const WeeklyReview = lazy(() => import("./features/progress/WeeklyReview"));
+const TeamReview = lazy(() => import("./features/progress/TeamReview"));
 
 /** The page was called Sheets, then Daily log; old links and bookmarks still work (SRS v0.5 FR-G5: My Day). */
 function ToMyDay() {
@@ -94,6 +97,9 @@ export default function App() {
         <Route path="/welcome" element={<Welcome />} />
         <Route element={<RequireProfile><Layout /></RequireProfile>}>
           <Route path="/home" element={<Suspense fallback={<PageSkeleton />}><HomeRoute /></Suspense>} />
+          <Route path="/my-progress" element={<Suspense fallback={<PageSkeleton />}><MyProgress /></Suspense>} />
+          <Route path="/weekly-review" element={<Suspense fallback={<PageSkeleton />}><WeeklyReview /></Suspense>} />
+          <Route path="/team-review" element={<Suspense fallback={<PageSkeleton />}><TeamReview /></Suspense>} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/huddle" element={<Suspense fallback={<PageSkeleton />}><Huddle /></Suspense>} />
           <Route path="/renewals" element={<Suspense fallback={<PageSkeleton />}><Renewals /></Suspense>} />

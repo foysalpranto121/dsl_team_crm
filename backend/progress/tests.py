@@ -37,6 +37,8 @@ class CalcTests(SimpleTestCase):
         self.assertEqual((got["key"], got["units"], got["text"]), ("clients", 2, "Two more clients get you to 100%."))
         self.assertEqual(pc.to_full_score(0.95, metrics)["text"], "One more client gets you to 100%.")
         self.assertIsNone(pc.to_full_score(1.0, metrics))
+        far = pc.to_full_score(0.31, metrics)                         # 14 more clients isn't a useful thing to say: what one more would add is
+        self.assertEqual((far["key"], far["units"], far["text"]), ("clients", 1, "One more client adds 5% to your score."))
         self.assertIsNone(pc.to_full_score(None, metrics))
 
     def test_catch_up_chain_and_money(self):
@@ -94,7 +96,7 @@ class ProgressTests(TestCase):
         self.assertEqual((d["week_start"], d["kpi"]["numbers"]["leads"], d["kpi"]["derived"], d["steps"]), (WEEK, 1, True, {"kpi": False, "deals": False, "focus": False, "plan": False}))
         deal = d["deals"][0]                                          # FR-CL2: compiled from the week's log entries
         self.assertEqual((deal["company"], deal["stage"]), ("Walton", "Qualified Lead"))
-        self.assertIn("1 contact. last outcome: Asked for a quote", deal["summary"])
+        self.assertIn("1 contact · Last outcome: Asked for a quote", deal["summary"])
         self.assertEqual(d["focus_options"][0][:3], "Log")
         bad = self.act(action="submit")
         self.assertEqual(bad.status_code, 400)

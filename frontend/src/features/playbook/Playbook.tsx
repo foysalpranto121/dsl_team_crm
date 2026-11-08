@@ -21,6 +21,7 @@ import { date } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { CompleteStepDialog } from "../frameworks/StepsPanel";
 import { recordsQuery } from "../pipeline/api";
+import { MorningBrief } from "../progress/Coach";
 import { playbookHistoryQuery, playbookQuery, refreshPlaybook, type Day, type PlaybookItem, type Suggestion } from "./api";
 
 const TAP = "max-sm:h-11";   // §10.4: touch targets ≥ 44 px on a phone
@@ -224,7 +225,7 @@ function ItemCard({ item, act, highlight }: { item: PlaybookItem; act: Act; high
 
 /* ---------- P5 Suggested (FR-AC1, FR-AC8) ---------- */
 
-function SuggestionCard({ s }: { s: Suggestion }) {
+export function SuggestionCard({ s }: { s: Suggestion }) {
   const qc = useQueryClient();
   const send = useMutation({
     mutationFn: async (body: { useful?: boolean; dismiss?: boolean }) => api.post(`/playbook/suggestions/${s.id}/`, body),
@@ -426,7 +427,7 @@ export default function Playbook() {
         <div className="flex flex-wrap items-center gap-3"><Phases d={d} />{started && <Stopwatch seconds={d.elapsed_seconds} running={d.running} />}</div>
       </header>
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,720px)_20rem]">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,720px)_20rem]">
         <div className="space-y-4">
           {/* FR-DP1, FR-DP4: the day ring and the one primary action */}
           <section className="card flex flex-wrap items-center gap-4 p-5" aria-label="Your day">
@@ -475,6 +476,7 @@ export default function Playbook() {
               ))}</ul>
             </Fold>
           </>}
+          {d.lens && <MorningBrief />}
           {d.lens && <LensCard d={d} />}
         </div>
 

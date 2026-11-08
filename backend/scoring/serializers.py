@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from team.models import Sheet, Task
+from team.planning import person_of
 
 from . import services
 from .models import EventLog
@@ -21,7 +22,7 @@ class EventSerializer(serializers.ModelSerializer):
                   "decided_by_name", "decided_at", "decision_note", "record", "company", "mine", "created_at"]
 
     def get_person(self, e):
-        return e.sheet.person or e.sheet.name
+        return person_of(e.sheet)
 
     def get_points(self, e):
         """What it earns: the ledger's value once verified, otherwise what it would earn on its date."""

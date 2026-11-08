@@ -1,6 +1,6 @@
 import {
   Activity, BarChart3, Briefcase, CalendarCheck2, CalendarClock, CalendarSync, ClipboardList, House, LayoutDashboard, LayoutGrid, ListTodo, Network, Newspaper,
-  Settings, ShieldCheck, Sunrise, Tv, UserRound, Users, Workflow, type LucideIcon,
+  ListChecks, Settings, ShieldCheck, Sunrise, TrendingUp, Tv, UserRound, Users, Workflow, type LucideIcon,
 } from "lucide-react";
 import type { Feature, Role } from "../api/types";
 import type { Features } from "./features";
@@ -41,6 +41,8 @@ export const NAV: NavSection[] = [
       { to: "/my-tasks", label: "My Tasks", icon: ListTodo, description: "Your to-do list, with dates and tasks your supervisor assigned", roles: WORKERS,
         keywords: "todo to-do reminders assigned due overdue checklist" },
       { to: "/tracker", label: "My pipeline", icon: Briefcase, description: "Your own pipeline and activity", keywords: "tracker prospects deals follow-ups" },
+      { to: "/my-progress", label: "My Progress", icon: TrendingUp, description: "Your rings, gaps, coach and weekly recap", roles: ["supervisor", "member"],
+        keywords: "rings gaps coach forecast recap weekly review analysis score" },
       { to: "/renewals", label: "Renewals", icon: CalendarSync, description: "AMCs, licences and software coming up for renewal", feature: "renewals",
         keywords: "amc contract licence subscription expiry renew upsell" },
     ],
@@ -52,6 +54,8 @@ export const NAV: NavSection[] = [
         keywords: "approve approvals plans board supervisor deviations" },
       { to: "/frameworks", label: "Frameworks", icon: Workflow, description: "Framework Studio: dated follow-up steps for each pipeline stage", roles: ["admin", "supervisor"],
         keywords: "framework studio steps follow-up cadence stage default overloaded template pack" },
+      { to: "/team-review", label: "Team review", icon: ListChecks, description: "The week person by person: the 15-minute team review", roles: ["admin", "supervisor", "viewer"],
+        keywords: "weekly review summary wins focus plans" },
       { to: "/huddle", label: "Morning huddle", icon: Sunrise, description: "Yesterday, today's plan, what needs attention, one focus", feature: "huddle",
         keywords: "meeting standup daily focus" },
       { to: "/kpi", label: "Weekly KPI", icon: CalendarCheck2, description: "Leads, opportunities, clients and revenue per week", keywords: "results" },
@@ -74,6 +78,7 @@ export const NAV: NavSection[] = [
 
 /** Pages reached from the user menu rather than the sidebar. */
 export const EXTRA: NavItem[] = [
+  { to: "/weekly-review", label: "Weekly Review", icon: CalendarCheck2, description: "Confirm the week, pick one focus, send next week's plan" },
   { to: "/profile", label: "My profile", icon: UserRound, description: "Your photo, position and contact details" },
 ];
 
@@ -93,6 +98,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
   { id: "task", label: "Add a task", description: "Put something on your to-do list", to: "/my-tasks?new=1", icon: ListTodo, roles: WORKERS },
   { id: "activity", label: "Log an activity", description: "Calls, emails, meetings…", to: "/tracker?tab=activity", icon: Activity },
   { id: "deal", label: "Update my pipeline", description: "Add a prospect or move a deal", to: "/tracker?tab=pipeline", icon: Briefcase },
+  { id: "review", label: "Weekly Review", description: "Ten minutes to wrap up the week", to: "/weekly-review", icon: ListChecks, roles: WORKERS },
   { id: "kpi", label: "Enter weekly KPI", description: "This week's leads, opportunities and revenue", to: "/kpi", icon: CalendarCheck2, roles: WORKERS },
 ];
 

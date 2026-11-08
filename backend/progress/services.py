@@ -99,10 +99,10 @@ def week_status(owner_id, ws, stages=None):
         if contacts:
             bits.append(pc.plural(len(contacts), "contact"))
         if last and last.outcome:
-            bits.append(f"last outcome: {last.outcome}")
+            bits.append(f"Last outcome: {last.outcome}")
         if moved:
             bits.append(moved[-1])
-        out.append({"record": rid, "company": p.company, "stage": st.name if st else p.stage, "stage_kind": st.kind if st else K.OPEN, "summary": ". ".join(bits) or "No contact logged.",
+        out.append({"record": rid, "company": p.company, "stage": st.name if st else p.stage, "stage_kind": st.kind if st else K.OPEN, "summary": " · ".join(bits) or "No contact logged.",
                     "next_action": p.next_action, "next_date": p.next_follow_up, "verified": bool(p.won_verified_at), "entries": len(rows)})
     return sorted(out, key=lambda r: r["company"].lower())
 
@@ -190,7 +190,7 @@ def review(user, work_id=None, week=None):
     entered = not derived and bool(k and any(float(v) for v in numbers.values()))
     next_plan = _next_plan(work, ws, st)
     steps = {"kpi": confirmed or entered, "deals": bool(r and r.deals_confirmed_at) or not deals, "focus": bool(r and r.focus), "plan": next_plan["done"]}
-    return {"week_start": ws, "week_end": end, "week_no": calc.week_no(ws, team.cfg_of(st))[0], "today": t, "current": ws <= t <= end, "person": work.person or work.name, "work": work.id, "mine": work.owner_id == user.pk,
+    return {"week_start": ws, "week_end": end, "week_no": calc.week_no(ws, team.cfg_of(st))[0], "today": t, "current": ws <= t <= end, "person": planning.person_of(work), "work": work.id, "mine": work.owner_id == user.pk,
             "kpi": {"numbers": numbers, "derived": derived, "confirmed": confirmed, "entered": entered, "waiting": waiting, "currency": st.currency},
             "deals": deals, "deals_confirmed_at": r.deals_confirmed_at if r else None, "recap": recap(work, ws, st), "focus": r.focus if r else "", "focus_options": _gaps_short(work, st),
             "last_focus": (WeeklyReview.objects.filter(owner_id=work.owner_id, week_start=ws - timedelta(days=7)).values_list("focus", flat=True).first() or ""),
@@ -268,7 +268,7 @@ def team_review(user, week=None):
         k, r = kp.get(w.id), reviews.get(w.owner_id)
         nums = kpis.current(k) if k else kpis.zero()
         plan = _next_plan(w, ws, st)
-        row = {"work": w.id, "person": w.person or w.name, "role": w.role.name if w.role else None, "hours": scored[w.id]["hours"], "hours_target": float(w.target_hours), "points": calc.r2(scored[w.id]["points"]),
+        row = {"work": w.id, "person": planning.person_of(w), "role": w.role.name if w.role else None, "hours": scored[w.id]["hours"], "hours_target": float(w.target_hours), "points": calc.r2(scored[w.id]["points"]),
                **{m: float(nums[m]) for m in ("leads", "opps", "clients", "revenue")}, "kpi_confirmed": bool(k and k.confirmed_at), "reviewed": bool(r and r.submitted_at), "focus": r.focus if r else "",
                "plan_status": plan["status_label"], "plan_sent": plan["done"], "deals_touched": touched.get(w.owner_id, 0), "stuck": stuck.get(w.owner_id, 0), "wins": sum(1 for x in wins if x["owner_id"] == w.owner_id)}
         rows.append(row)
@@ -474,7 +474,7 @@ def me(user, work_id=None):
         suggestions = playbook._suggestions(c)
     last_ws = ws - timedelta(days=7)
     return {
-        "person": work.person or work.name, "work": work.id, "mine": mine, "today": t, "month": f"{t:%B}",
+        "person": planning.person_of(work), "work": work.id, "mine": mine, "today": t, "month": f"{t:%B}", "currency": st.currency,
         "rings": {"day": {"value": today_n["hours"], "target": calc.r2(row["week_target"] / wd_week) if wd_week else 0, "unit": "h"}, "week": {"value": row["week_hours"], "target": row["week_target"], "unit": "h"},
                   "month": {"value": row["month_points"], "target": row["month_target"], "unit": "pts"}},
         "score": score, "version": month.get("version"), "forecast": forecast, "metrics": lines, "biggest_gap": biggest, "coach": coach,

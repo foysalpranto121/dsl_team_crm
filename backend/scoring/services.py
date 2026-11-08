@@ -25,6 +25,7 @@ from core import audit
 from team import calc
 from team import services as team
 from team.models import METRICS, JobRole, Sheet, SheetEntry, Task, TeamSettings, slot_counts
+from team.planning import person_of
 
 from .models import EventLog, ScoreLedger, ScoringVersion  # noqa: F401  (ScoringVersion.Kind is used by the importer and snapshots)
 
@@ -83,7 +84,7 @@ METRIC_LABEL = {"hours": "weekly hours", "points": "monthly points", "leads": "m
 def describe(old, new):
     """What changed between two versions, in plain words (FR-C9)."""
     tasks, roles = dict(Task.objects.values_list("id", "name")), dict(JobRole.objects.values_list("id", "name"))
-    people = {s.id: s.person or s.name for s in Sheet.objects.all()}
+    people = {s.id: person_of(s) for s in Sheet.objects.select_related("owner")}
     out = []
     for k in sorted(set(old["points"]) | set(new["points"]), key=int):
         a, b, name = old["points"].get(k), new["points"].get(k), tasks.get(int(k), f"Task {k}")
@@ -348,10 +349,10 @@ def rows_for(sheet_ids, frm, to, limit=1500):
     """FR-S3: the entries behind a number, with totals and the category and activity analysis (FR-S6)."""
     qs = ScoreLedger.objects.filter(sheet_id__in=sheet_ids, day__range=(frm, to))
     total = qs.aggregate(h=Sum("hours"), p=Sum("points"), n=Count("id"))
-    rows = [{"id": r.id, "sheet": r.sheet_id, "person": r.sheet.person or r.sheet.name, "day": r.day, "slot": r.slot, "activity": r.activity.name if r.activity else r.activity_name,
+    rows = [{"id": r.id, "sheet": r.sheet_id, "person": person_of(r.sheet), "day": r.day, "slot": r.slot, "activity": r.activity.name if r.activity else r.activity_name,
              "category": r.category or "Other", "quantity": r.quantity, "hours": float(r.hours), "points": float(r.points), "source": r.source,
              "source_label": r.get_source_display(), "version": r.version.number, "event": r.event_id}
-            for r in qs.select_related("sheet", "activity", "version").order_by("-day", "sheet_id", "slot")[:limit]]
+            for r in qs.select_related("sheet__owner", "activity", "version").order_by("-day", "sheet_id", "slot")[:limit]]
     group = lambda f: [{"name": x[f] or "Other", "hours": calc.r2(float(x["h"])), "points": calc.r2(float(x["p"])), "entries": x["n"]}  # noqa: E731
                        for x in qs.values(f).annotate(h=Sum("hours"), p=Sum("points"), n=Count("id")).order_by("-p", f)]
     return {"rows": rows, "truncated": total["n"] > limit,
@@ -373,7 +374,7 @@ def kpi_evidence(sheets, frm, to, metric):
     renewals = team.renewal_revenue(cfg) if metric == "revenue" else {}
     rows = []
     for s in sheets:
-        person = s.person or s.name
+        person = person_of(s)
         for k in s.kpis.all():
             if calc.counted_month({"week_start": k.week_start, "counts_in": k.counts_in}) not in months:
                 continue
@@ -497,7 +498,7 @@ def log_event(user, sheet, day, activity, quantity, evidence, note=""):
     if len(evidence) < 3:
         raise ScoringError("Add the evidence: a reference or link your supervisor can check.")
     ev = EventLog.objects.create(sheet=sheet, day=day, activity=activity, quantity=quantity, evidence=evidence[:300], note=(note or "").strip()[:500], by=user)
-    audit.log(user, "event.log", activity.name, person=sheet.person or sheet.name, day=str(day), quantity=quantity)
+    audit.log(user, "event.log", activity.name, person=person_of(sheet), day=str(day), quantity=quantity)
     return ev
 
 
@@ -515,7 +516,7 @@ def decide_event(user, ev, verified, note=""):
     ev.status, ev.decided_by, ev.decided_at, ev.decision_note = (EV.VERIFIED if verified else EV.REJECTED), user, timezone.now(), note[:300]
     ev.save(update_fields=["status", "decided_by", "decided_at", "decision_note", "updated_at"])
     _sync_event(ev)
-    audit.log(user, "event.verify" if verified else "event.reject", ev.activity.name, person=ev.sheet.person or ev.sheet.name, day=str(ev.day), note=note[:200])
+    audit.log(user, "event.verify" if verified else "event.reject", ev.activity.name, person=person_of(ev.sheet), day=str(ev.day), note=note[:200])
     return ev
 
 

@@ -18,6 +18,7 @@ import { date, money } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { logQuery, orderedStages, refreshPipeline, type Health, type PipelineConfig, type PipelineRecord, type Stage } from "./api";
 import { NextStepCard, StepsPanel } from "../frameworks/StepsPanel";
+import { RecordCoach } from "../progress/Coach";
 import { fieldErrors } from "./dialogs";
 
 const LOG_ICON: Record<string, ReactNode> = { call: <Phone />, email: <Mail />, whatsapp: <MessageCircle />, visit: <MapPin />, meeting: <Users />, note: <StickyNote />,
@@ -215,7 +216,7 @@ export function RecordSheet({ record, config, onClose, onMove }: {
             <Tabs value={tab} onValueChange={setTab}>
               <TabsList><TabsTrigger value="details">Details</TabsTrigger><TabsTrigger value="steps">Steps{steps ? ` · ${steps}` : ""}</TabsTrigger><TabsTrigger value="log">Client Log</TabsTrigger></TabsList>
               <TabsContent value="details" className="pt-4"><Details record={record} config={config} onDeleted={onClose} /></TabsContent>
-              <TabsContent value="steps" className="pt-4"><StepsPanel recordId={record.id} open={record.stage_kind === "open"} today={today} /></TabsContent>
+              <TabsContent value="steps" className="pt-4"><div className="space-y-4"><StepsPanel recordId={record.id} open={record.stage_kind === "open"} today={today} />{record.stage_kind === "open" && <RecordCoach recordId={record.id} />}</div></TabsContent>
               <TabsContent value="log" className="pt-4"><ClientLog record={record} config={config} /></TabsContent>
             </Tabs>
           </SheetBody>

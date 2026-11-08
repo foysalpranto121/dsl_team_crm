@@ -4,6 +4,7 @@ import re
 import statistics
 
 WORDS = {1: "One", 2: "Two", 3: "Three", 4: "Four", 5: "Five", 6: "Six", 7: "Seven", 8: "Eight", 9: "Nine", 10: "Ten"}
+REACHABLE = 5                # past this, "N more gets you to 100%" isn't a useful thing to say
 PER_SLOT = re.compile(r"\b(\d{1,3})\s+[\w\s]*calls?\b", re.I)
 
 
@@ -36,16 +37,23 @@ def project(actual, elapsed, total, weekly, wd_per_week):
 
 
 def to_full_score(score, metrics):
-    """FR-MO1: the fewest more of one KPI that takes a score to 100%. metrics: [{key, label, one, many, weight, target}]. None when none can."""
+    """FR-MO1: a positive forecast. The fewest more of one KPI that takes a score to 100%; when that's out of reach, what one more of it would add.
+    metrics: [{key, label, one, many, weight, target}]. None when none can."""
     if score is None or score >= 1:
         return None
     best = None
     for m in metrics:
         if m["weight"] > 0 and m["target"] > 0:
-            n = math.ceil((1 - score) / (m["weight"] / 100 / m["target"]) - 1e-9)
+            each = m["weight"] / 100 / m["target"]
+            n = math.ceil((1 - score) / each - 1e-9)
             if n > 0 and (best is None or n < best["units"]):
-                best = {"key": m["key"], "units": n, "text": f"{WORDS.get(n, n)} more {m['one'] if n == 1 else m['many']} {'gets' if n == 1 else 'get'} you to 100%."}
-    return best
+                best = {"key": m["key"], "units": n, "each": each, "one": m["one"], "many": m["many"]}
+    if best is None:
+        return None
+    n = best["units"]
+    if n > REACHABLE:
+        return {"key": best["key"], "units": 1, "text": f"One more {best['one']} adds {best['each'] * 100:.3g}% to your score."}
+    return {"key": best["key"], "units": n, "text": f"{WORDS.get(n, n)} more {best['one'] if n == 1 else best['many']} {'gets' if n == 1 else 'get'} you to 100%."}
 
 
 def calls_in(activity_name):
@@ -74,11 +82,11 @@ def quality_flags(days):
             run.append(d["day"])
         else:
             if len(run) >= 2:
-                out.append({"kind": "copied", "day": run[-1], "text": f"The same hours and remarks on {len(run) + 1} days in a row, up to {run[-1]:%d %b}."})
+                out.append({"kind": "copied", "day": run[-1], "text": f"The same hours and remarks on {len(run) + 1} days in a row, up to {run[-1].day} {run[-1]:%b}."})
             run = []
         last = sig
     if len(run) >= 2:
-        out.append({"kind": "copied", "day": run[-1], "text": f"The same hours and remarks on {len(run) + 1} days in a row, up to {run[-1]:%d %b}."})
+        out.append({"kind": "copied", "day": run[-1], "text": f"The same hours and remarks on {len(run) + 1} days in a row, up to {run[-1].day} {run[-1]:%b}."})
     vague = [d for d in days if d["remarks"].strip() and len(d["remarks"].split()) <= 1]
     if len(vague) >= 3:
         out.append({"kind": "vague", "day": vague[-1]["day"], "text": f"One-word remarks on {len(vague)} days. A short sentence helps later."})
@@ -87,5 +95,5 @@ def quality_flags(days):
         usual = statistics.median(pts)
         for d in days:
             if usual > 0 and d["points"] >= max(3 * usual, 10):
-                out.append({"kind": "spike", "day": d["day"], "text": f"{d['points']:g} points on {d['day']:%d %b}, against a usual {usual:g}. Worth checking it's right."})
+                out.append({"kind": "spike", "day": d["day"], "text": f"{d['points']:g} points on {d["day"].day} {d["day"]:%b}, against a usual {usual:g}. Worth checking it's right."})
     return out
