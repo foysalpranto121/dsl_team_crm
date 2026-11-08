@@ -48,7 +48,8 @@ function LoadPanel() {
   });
   if (!q.data) return null;
   const flagged = q.data.people.filter((p) => p.flag);
-  const limit = `more than ${q.data.threshold_items} overdue items, or one waiting over ${q.data.threshold_days} working days`;
+  const { threshold_items: n, threshold_days: d } = q.data;
+  const limit = `more than ${n} overdue ${n === 1 ? "item" : "items"}, or one waiting over ${d} working ${d === 1 ? "day" : "days"}`;
   if (!flagged.length) return <p className="text-sm text-muted-foreground">Nobody is overloaded right now. A member is flagged with {limit}.</p>;
   return (
     <section className="card overflow-hidden" aria-labelledby="load-title">

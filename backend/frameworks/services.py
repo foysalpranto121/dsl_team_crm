@@ -310,7 +310,7 @@ def complete(user, inst, outcome, note="", next_date=None, next_action=""):
                                               "day_offset": inst.day_offset, "activity": inst.activity_id, "resource_url": inst.resource_url,
                                               "instruction": inst.instruction, "stop_on": inst.stop_on}, due, held(record.owner_id), t, inst.attempt + 1)
                 retry.save()
-                result = {"action": "retry", "label": f"Trying again on {due:%d %b} (try {inst.attempt + 1} of {rule['retry_max'] + 1})."}
+                result = {"action": "retry", "label": f"Trying again on {due.day} {due:%b} (try {inst.attempt + 1} of {rule['retry_max'] + 1})."}
             else:
                 result = {"action": "next", "label": f"No more tries left ({rule['retry_max'] + 1} made); on to the next step."}
         elif rule["action"] == OutcomeRule.Action.JUMP:

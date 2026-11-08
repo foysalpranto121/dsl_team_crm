@@ -7,7 +7,8 @@ import { Tip } from "../ui/tooltip";
 /** Pipeline board building blocks. Drag and drop between stages is added in M2 (@dnd-kit) on top of these. */
 
 export function KanbanBoard({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:px-0", className)}>{children}</div>;
+  // relative: absolutely positioned bits inside cards (screen-reader labels) are clipped by this scroller, not the page
+  return <div className={cn("relative -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:px-0", className)}>{children}</div>;
 }
 
 export function KanbanColumn({ title, count, summary, color, children, footer, className }: {

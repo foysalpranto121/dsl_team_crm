@@ -284,14 +284,16 @@ export function NextStepCard({ recordId, open: recordOpen, today, onShowAll }: {
   if (!s || !q.data?.mine) return null;
   const Icon = stepIcon(s.type);
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-primary/30 bg-primary-soft px-3 py-2.5">
-      <Icon className="size-4 shrink-0 text-primary" aria-hidden />
-      <div className="min-w-0 flex-1">
+    <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 rounded-lg border border-primary/30 bg-primary-soft px-3 py-2.5 sm:grid-cols-[auto_1fr_auto]">
+      <Icon className="size-4 shrink-0 text-primary-text" aria-hidden />
+      <div className="min-w-0">
         <div className="text-sm font-medium">Next: {s.title}</div>
         <div className="text-xs text-muted-foreground">{dayLabel(s.day_offset)} of {s.framework} · {dueText(s, today)}{live.length > 1 ? ` · ${live.length - 1} more after this` : ""}</div>
       </div>
-      <Button size="sm" variant="ghost" onClick={onShowAll}>All steps</Button>
-      <Button size="sm" onClick={() => setDoing(s)}>Complete step</Button>
+      <div className="col-span-2 flex justify-end gap-2 sm:col-span-1">
+        <Button size="sm" variant="ghost" onClick={onShowAll}>All steps</Button>
+        <Button size="sm" onClick={() => setDoing(s)}>Complete step</Button>
+      </div>
       <CompleteStepDialog step={doing} isLast={recordOpen && live.length === 1 && !(q.data?.steps ?? []).some((x) => x.status === "held")} onClose={() => setDoing(null)} />
     </div>
   );
