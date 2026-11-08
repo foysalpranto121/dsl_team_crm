@@ -144,7 +144,7 @@ export const PLAN_TEMPLATES: { key: string; name: string; why: string; slots: st
 ];
 
 /* ---------- onboarding ---------- */
-export const ONBOARDING_STEPS = ["Your role", "This week's targets", "First plan", "Practice slot", "Finish on Home"];
+export const ONBOARDING_STEPS = ["Your role", "This week", "First plan", "Practice", "Finish"];
 export const NEW_JOINERS = [
   { name: "Rakib Hasan", role: "tender" as RoleKey, joined: "2026-10-27", step: 3, minutes: 6, active: "Today, 10:20" },
   { name: "Mim Akter", role: "marketing" as RoleKey, joined: "2026-10-28", step: 5, minutes: 9, active: "Today, 09:05" },

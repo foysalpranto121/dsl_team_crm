@@ -5,7 +5,7 @@ import { ChartCard, ChartTooltip, useChartTheme } from "@/components/data/chart"
 import { Button } from "@/components/ui/button";
 import { Field, NativeSelect } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toaster";
 import { num } from "@/lib/format";
 import { adherenceOf, avgScore, CATEGORIES, CURRENCY, METRICS, PEOPLE, ROLES, scoreOf, statusOf, sumOf, targetsFor, targetSumOf, TASKS, TURNAROUND, WEEKLY_PERFORMANCE, type PeriodKey, type RoleKey } from "./mock";
@@ -14,7 +14,7 @@ import { CardTitle, pctOf, PreviewPage, ScorePill, ScrollX, showMetric, TH, TH_N
 type ReportKey = "performance" | "tasks" | "kpi" | "adherence" | "turnaround";
 const REPORTS: { key: ReportKey; name: string }[] = [{ key: "performance", name: "Performance" }, { key: "tasks", name: "Task analysis" }, { key: "kpi", name: "KPI summary" }, { key: "adherence", name: "Plan adherence" }, { key: "turnaround", name: "Approval turnaround" }];
 type Cell = string | number;
-interface Built { question: string; summary: string; action: string; columns: { label: string; num?: boolean }[]; rows: Cell[][]; total?: Cell[]; chart: { title: string; note: string; data: { name: string; value: number }[]; unit?: string; bars?: boolean }; fileName: string; status?: number[] }
+interface Built { question: string; summary: string; action: string; columns: { label: string; num?: boolean }[]; rows: Cell[][]; total?: Cell[]; chart: { title: string; note: string; data: { name: string; value: number }[]; unit?: string; bars?: boolean }; fileName: string; status?: number[]; totalRatio?: number }
 
 const pts = (c: { hours: number; points: number }) => (c.hours ? num(c.points / c.hours, 1) : "—");
 const roleKeys = Object.keys(ROLES) as RoleKey[];
@@ -27,10 +27,10 @@ function ReportChart({ c }: { c: Built["chart"] }) {
       <ResponsiveContainer width="100%" height="100%">
         {horizontal ? (
           <BarChart data={c.data} layout="vertical" margin={{ left: 0, right: 44 }}><XAxis type="number" hide /><YAxis type="category" dataKey="name" {...theme.axis} width={150} tick={{ ...theme.axis.tick, fontSize: 11 }} interval={0} /><Tooltip content={<ChartTooltip format={(v) => `${num(v)}${c.unit ?? ""}`} />} cursor={theme.cursor} />
-            <Bar dataKey="value" name={c.title} fill={theme.series[0]} radius={[0, 4, 4, 0]} maxBarSize={16}><LabelList dataKey="value" position="right" fill={theme.muted} fontSize={11} formatter={(v: unknown) => `${num(Number(v))}${c.unit ?? ""}`} /></Bar></BarChart>
+            <Bar isAnimationActive={false} dataKey="value" name={c.title} fill={theme.series[0]} radius={[0, 4, 4, 0]} maxBarSize={16}><LabelList dataKey="value" position="right" fill={theme.muted} fontSize={11} formatter={(v: unknown) => `${num(Number(v))}${c.unit ?? ""}`} /></Bar></BarChart>
         ) : (
-          <BarChart data={c.data} margin={{ left: -16, right: 8, top: 20 }}><CartesianGrid {...theme.gridProps} /><XAxis dataKey="name" {...theme.axis} interval={0} tick={{ ...theme.axis.tick, fontSize: 11 }} /><YAxis {...theme.axis} /><Tooltip content={<ChartTooltip format={(v) => `${num(v)}${c.unit ?? ""}`} />} cursor={theme.cursor} />
-            <Bar dataKey="value" name={c.title} fill={theme.series[0]} {...theme.bar} maxBarSize={32}><LabelList dataKey="value" position="top" fill={theme.muted} fontSize={11} formatter={(v: unknown) => `${num(Number(v))}${c.unit ?? ""}`} /></Bar></BarChart>
+          <BarChart data={c.data} margin={{ left: -8, right: 8, top: 20 }}><CartesianGrid {...theme.gridProps} /><XAxis dataKey="name" {...theme.axis} interval={0} tick={{ ...theme.axis.tick, fontSize: 11 }} /><YAxis {...theme.axis} unit={c.unit} /><Tooltip content={<ChartTooltip format={(v) => `${num(v)}${c.unit ?? ""}`} />} cursor={theme.cursor} />
+            <Bar isAnimationActive={false} dataKey="value" name={c.title} fill={theme.series[0]} {...theme.bar} maxBarSize={32}><LabelList dataKey="value" position="top" fill={theme.muted} fontSize={11} formatter={(v: unknown) => `${num(Number(v))}${c.unit ?? ""}`} /></Bar></BarChart>
         )}
       </ResponsiveContainer>
     </ChartCard>
@@ -65,17 +65,17 @@ export default function Reports() {
       const last = rows[rows.length - 1], prev = rows[rows.length - 2];
       return { question: "How did each week go?", fileName: "performance-weekly", summary: `Last week's ${num(last.hours)} output hours were ${last.hours >= prev.hours ? "up" : "down"} ${num(Math.abs(last.hours - prev.hours))} on the week before.`,
         action: "Hours have slipped for two weeks. Check whether plans are full before approving next week's.", columns: [{ label: "Week" }, { label: "Output hours", num: true }, { label: "Points", num: true }, { label: "Points per hour", num: true }],
-        rows: rows.map((w) => [w.week, w.hours, w.points, pts(w)]), total: ["Total", totalH, totalP, pts({ hours: totalH, points: totalP })], chart: { title: "Output hours", note: "By week", data: rows.map((w) => ({ name: w.week, value: w.hours })) } };
+        rows: rows.map((w) => [w.week, num(w.hours), num(w.points), pts(w)]), total: ["Total", num(totalH), num(totalP), pts({ hours: totalH, points: totalP })], chart: { title: "Output hours", note: "By week", data: rows.map((w) => ({ name: w.week, value: w.hours })) } };
     }
     if (report === "performance") {
       const score = avgScore(people, period), other = avgScore(people, period === "last" ? "month" : "last");
       const low = [...people].sort((a, b) => scoreOf(a, period) - scoreOf(b, period))[0];
       return { question: "How did each person do this month?", fileName: `performance-${whenName.toLowerCase()}`, summary: `The average score for ${whenName} is ${pctOf(score)}, ${score >= other ? "up" : "down"} from ${pctOf(other)} ${period === "last" ? "in October" : "in September"}.`,
-        action: low ? `${low.name} has the most room to grow. Open their numbers before the next one-to-one.` : "Nobody matches these filters.",
+        action: !low ? "Nobody matches these filters." : people.length === 1 ? `Compare ${low.name}'s numbers with last month before the next one-to-one.` : `${low.name} has the most room to grow. Open their numbers before the next one-to-one.`,
         columns: [{ label: "Person" }, ...METRICS.map((m) => ({ label: m.label, num: true })), { label: "Score", num: true }, { label: "Status" }],
         rows: people.map((p) => [p.name, ...METRICS.map((m) => showMetric(m.key, p.actual[period][m.key])), pctOf(scoreOf(p, period)), statusOf(scoreOf(p, period)).label]),
         total: people.length ? ["Team", ...METRICS.map((m) => (m.key === "hours" ? `${num(sumOf(people, period, "hours") / people.length)} avg` : showMetric(m.key, sumOf(people, period, m.key)))), pctOf(score), statusOf(score).label] : undefined,
-        status: people.map((p) => scoreOf(p, period)), chart: { title: "Composite score", note: whenName, unit: "%", data: people.map((p) => ({ name: p.name.split(" ")[0], value: Math.round(scoreOf(p, period) * 100) })) } };
+        status: people.map((p) => scoreOf(p, period)), totalRatio: score, chart: { title: "Composite score", note: whenName, unit: "%", data: people.map((p) => ({ name: p.name.split(" ")[0], value: Math.round(scoreOf(p, period) * 100) })) } };
     }
     if (report === "tasks") {
       const scale = (v: number) => Math.round(v * share);
@@ -84,19 +84,19 @@ export default function Reports() {
         const totalH = rows.reduce((s, c) => s + c.hours, 0), totalP = rows.reduce((s, c) => s + c.points, 0), top = rows[0], best = [...rows].filter((c) => c.hours > 20 * share).sort((a, b) => b.points / b.hours - a.points / a.hours)[0];
         return { question: "Where did the hours go?", fileName: "task-analysis-category", summary: `${top.name} took ${pctOf(top.hours / totalH)} of the hours, against an expected ${top.expected}%.`, action: best ? `${best.name} earns the most, ${pts(best)} points an hour. See if more of the plan can move there.` : "Not enough hours to compare yet.",
           columns: [{ label: "Category" }, { label: "Hours", num: true }, { label: "Share", num: true }, { label: "Expected", num: true }, { label: "Points", num: true }, { label: "Points per hour", num: true }],
-          rows: rows.map((c) => [c.name, c.hours, pctOf(c.hours / totalH), `${c.expected}%`, c.points, pts(c)]), total: ["Total", totalH, "100%", "100%", totalP, pts({ hours: totalH, points: totalP })], chart: { title: "Hours by category", note: "October", bars: true, data: rows.map((c) => ({ name: c.name, value: c.hours })) } };
+          rows: rows.map((c) => [c.name, num(c.hours), pctOf(c.hours / totalH), `${c.expected}%`, num(c.points), pts(c)]), total: ["Total", num(totalH), "100%", "100%", num(totalP), pts({ hours: totalH, points: totalP })], chart: { title: "Hours by category", note: "October", bars: true, data: rows.map((c) => ({ name: c.name, value: c.hours })) } };
       }
       const rows = TASKS.map((t) => ({ ...t, hours: scale(t.hours), points: scale(t.points) }));
       const totalH = rows.reduce((s, c) => s + c.hours, 0), totalP = rows.reduce((s, c) => s + c.points, 0), top = rows[0];
       return { question: "Which tasks took the most time?", fileName: "task-analysis-task", summary: `${top.name} is the biggest single task, ${num(top.hours)} hours.`, action: "Demo & Presentation Session earns the most per hour. Book more demos where deals are ready.",
-        columns: [{ label: "Task" }, { label: "Category" }, { label: "Hours", num: true }, { label: "Points", num: true }, { label: "Points per hour", num: true }], rows: rows.map((t) => [t.name, t.category, t.hours, t.points, pts(t)]), total: ["The top 8 tasks", "", totalH, totalP, pts({ hours: totalH, points: totalP })], chart: { title: "Hours by task", note: "October", bars: true, data: rows.map((t) => ({ name: t.name, value: t.hours })) } };
+        columns: [{ label: "Task" }, { label: "Category" }, { label: "Hours", num: true }, { label: "Points", num: true }, { label: "Points per hour", num: true }], rows: rows.map((t) => [t.name, t.category, num(t.hours), num(t.points), pts(t)]), total: ["The top 8 tasks", "", num(totalH), num(totalP), pts({ hours: totalH, points: totalP })], chart: { title: "Hours by task", note: "October", bars: true, data: rows.map((t) => ({ name: t.name, value: t.hours })) } };
     }
     if (report === "kpi") {
       const kpis = METRICS.filter((m) => m.key !== "hours" && m.key !== "points");
-      const achieved = kpis.map((m) => { const t = targetSumOf(people, period, m.key); return { name: m.label, value: t ? Math.round((sumOf(people, period, m.key) / t) * 100) : 0 }; });
+      const achieved = kpis.filter((m) => targetSumOf(people, period, m.key) > 0).map((m) => ({ name: m.label, value: Math.round((sumOf(people, period, m.key) / targetSumOf(people, period, m.key)) * 100) }));
       const low = [...achieved].sort((a, b) => a.value - b.value)[0];
-      return { question: "Are the KPIs on track?", fileName: `kpi-summary-${whenName.toLowerCase()}`, summary: `For ${whenName}, ${low?.name.toLowerCase()} ${low?.value < 100 ? `is the furthest from target, at ${low?.value}%` : "and every other KPI are on target"}.`, action: "Counts come from the pipeline, so there's nothing to type. Check any backward moves on Weekly KPI before confirming.",
-        columns: [{ label: "Person" }, ...kpis.flatMap((m) => [{ label: m.label, num: true }, { label: "Target", num: true }])],
+      return { question: "Are the KPIs on track?", fileName: `kpi-summary-${whenName.toLowerCase()}`, summary: !low ? "Nobody matches these filters." : low.value < 100 ? `Furthest from target in ${whenName}: ${low.name.toLowerCase()}, at ${low.value}%.` : `Every KPI is on target in ${whenName}.`, action: "Counts come from the pipeline, so there's nothing to type. Check any backward moves on Weekly KPI before confirming.",
+        columns: [{ label: "Person" }, ...kpis.flatMap((m) => [{ label: m.label, num: true }, { label: `${m.label} target`, num: true }])],
         rows: people.map((p) => [p.name, ...kpis.flatMap((m) => [showMetric(m.key, p.actual[period][m.key]), targetsFor(p.role, period)[m.key] ? showMetric(m.key, targetsFor(p.role, period)[m.key]) : "—"])]),
         total: people.length ? ["Team", ...kpis.flatMap((m) => [showMetric(m.key, sumOf(people, period, m.key)), showMetric(m.key, targetSumOf(people, period, m.key))])] : undefined, chart: { title: "Achievement", note: `${whenName}, the team against its targets`, unit: "%", data: achieved } };
     }
@@ -105,7 +105,7 @@ export default function Reports() {
       const low = [...people].sort((a, b) => adherenceOf(a) - adherenceOf(b))[0], rate = sum("approved") ? sum("completed") / sum("approved") : 0;
       return { question: "Did people do what they planned?", fileName: "plan-adherence", summary: `${pctOf(rate)} of approved hours were done as planned in October.`, action: low ? `${low.name} missed ${low.adherence.missed} approved hours. Smaller plans may help more than bigger targets.` : "Nobody matches these filters.",
         columns: [{ label: "Person" }, { label: "Approved hours", num: true }, { label: "Done", num: true }, { label: "Adherence", num: true }, { label: "Missed", num: true }, { label: "Deviations", num: true }, { label: "Unplanned", num: true }],
-        rows: people.map((p) => [p.name, p.adherence.approved, p.adherence.completed, pctOf(adherenceOf(p)), p.adherence.missed, p.adherence.deviations, p.adherence.unplanned]), total: people.length ? ["Team", sum("approved"), sum("completed"), pctOf(rate), sum("missed"), sum("deviations"), sum("unplanned")] : undefined,
+        rows: people.map((p) => [p.name, p.adherence.approved, p.adherence.completed, pctOf(adherenceOf(p)), p.adherence.missed, p.adherence.deviations, p.adherence.unplanned]), total: people.length ? ["Team", num(sum("approved")), num(sum("completed")), pctOf(rate), num(sum("missed")), num(sum("deviations")), num(sum("unplanned"))] : undefined,
         chart: { title: "Adherence", note: "October", unit: "%", data: people.map((p) => ({ name: p.name.split(" ")[0], value: Math.round(adherenceOf(p) * 100) })) } };
     }
     const decided = TURNAROUND.reduce((s, w) => s + w.decided, 0), esc = TURNAROUND.reduce((s, w) => s + w.escalated, 0), last = TURNAROUND[TURNAROUND.length - 1];
@@ -123,7 +123,8 @@ export default function Reports() {
   if (report === "tasks") controls = <div><span className="label">Show</span><Segmented label="By category or by task" value={cut} onChange={setCut} options={[{ key: "category", label: "By category" }, { key: "task", label: "By task" }]} /></div>;
   return (
     <PreviewPage title="Reports" subtitle={`Five ready-made reports. Currency: ${CURRENCY}. Each one ends with something to do about it.`}>
-      <Tabs value={report} onValueChange={(v) => setReport(v as ReportKey)}><TabsList className="mb-4">{REPORTS.map((r) => <TabsTrigger key={r.key} value={r.key}>{r.name}</TabsTrigger>)}</TabsList></Tabs>
+      <Tabs value={report} onValueChange={(v) => setReport(v as ReportKey)}><TabsList className="mb-4">{REPORTS.map((r) => <TabsTrigger key={r.key} value={r.key}>{r.name}</TabsTrigger>)}</TabsList>
+      <TabsContent value={report}>
       <div className="mb-4 flex flex-wrap items-end gap-3">
         {controls}
         {usesPeriod && <div><span className="label">Period</span><Segmented label="Period" value={period} onChange={setPeriod} options={[{ key: "month", label: "October" }, { key: "last", label: "September" }]} /></div>}
@@ -146,18 +147,19 @@ export default function Reports() {
           <CardTitle id="report-table-title" title="The numbers" />
           <ScrollX label="Report table">
             <table className="w-full min-w-[36rem] text-sm" data-report-table>
-              <thead><tr className="border-b border-border">{built.columns.map((c) => <th key={c.label + (c.num ? "n" : "")} scope="col" className={c.num ? TH_NUM : TH}>{c.label}</th>)}</tr></thead>
+              <thead><tr className="border-b border-border">{built.columns.map((c, i) => <th key={i} scope="col" className={c.num ? TH_NUM : TH}>{c.label}</th>)}</tr></thead>
               <tbody className="tabular-nums">{built.rows.map((r, i) => (
                 <tr key={i} className="border-b border-border">{r.map((cell, j) => {
                   const isStatus = built.status && built.columns[j].label === "Status";
                   return j === 0 ? <th key={j} scope="row" className="whitespace-nowrap px-3 py-2 text-left font-medium">{cell}</th>
                     : <td key={j} className={built.columns[j].num ? "whitespace-nowrap px-3 py-2 text-right" : "whitespace-nowrap px-3 py-2"}>{isStatus ? <ScorePill ratio={built.status![i]} /> : cell}</td>;
                 })}</tr>))}</tbody>
-              {built.total && <tfoot className="tabular-nums"><tr className="bg-muted/50">{built.total.map((cell, j) => (j === 0 ? <th key={j} scope="row" className="whitespace-nowrap px-3 py-2 text-left font-semibold">{cell}</th> : <td key={j} className={built.columns[j].num ? "whitespace-nowrap px-3 py-2 text-right font-semibold" : "whitespace-nowrap px-3 py-2 font-semibold"}>{cell}</td>))}</tr></tfoot>}
+              {built.total && <tfoot className="tabular-nums"><tr className="bg-muted/50">{built.total.map((cell, j) => (j === 0 ? <th key={j} scope="row" className="whitespace-nowrap px-3 py-2 text-left font-semibold">{cell}</th> : <td key={j} className={built.columns[j].num ? "whitespace-nowrap px-3 py-2 text-right font-semibold" : "whitespace-nowrap px-3 py-2 font-semibold"}>{built.columns[j].label === "Status" && built.totalRatio != null ? <ScorePill ratio={built.totalRatio} /> : cell}</td>))}</tr></tfoot>}
             </table>
           </ScrollX>
         </section>
       </div>
+      </TabsContent></Tabs>
     </PreviewPage>
   );
 }

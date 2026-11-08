@@ -107,7 +107,7 @@ function OverridesTab() {
   return (
     <section className="card overflow-hidden" aria-labelledby="ov-title">
       <CardTitle id="ov-title" title="Individual overrides" note="For one person, from a date you choose. Earlier months keep the numbers they had at the time." action={<Button size="sm" onClick={() => { setF({ who: PEOPLE[0].name, what: "Weekly hours", to: "", effective: null, why: "" }); setOpen(true); }}><Plus /> Add override</Button>} />
-      <ScrollX label="Individual overrides">
+      <ScrollX label="Individual overrides table">
         <table className="w-full min-w-[42rem] text-sm"><thead><tr className="border-b border-border"><th scope="col" className={TH}>Person</th><th scope="col" className={TH}>What changes</th><th scope="col" className={TH_NUM}>From</th><th scope="col" className={TH_NUM}>To</th><th scope="col" className={TH}>Effective from</th><th scope="col" className={TH}>Why</th></tr></thead>
           <tbody>{rows.map((r) => <tr key={r.id} className="border-b border-border last:border-0"><th scope="row" className="whitespace-nowrap px-3 py-2.5 text-left font-medium">{r.who}</th><td className="px-3 py-2.5">{r.what}</td><td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{r.from}</td><td className="px-3 py-2.5 text-right font-semibold tabular-nums">{r.to}</td><td className="whitespace-nowrap px-3 py-2.5 tabular-nums">{date(r.effective)}</td><td className="px-3 py-2.5 text-muted-foreground">{r.why}</td></tr>)}</tbody></table>
       </ScrollX>
@@ -171,9 +171,9 @@ function PacksTab() {
 }
 
 /* ---------- §6, §7: leave handling ---------- */
-const DAY_LOOK: Record<DayType, { cls: string; word: string; mark: string }> = {
-  work: { cls: "border-border bg-card hover:border-input", word: "working day", mark: "" }, leave: { cls: "border-info/40 bg-info-soft text-info-text", word: "leave", mark: "Leave" }, training: { cls: "border-primary/40 bg-primary-soft text-primary-text", word: "training", mark: "Training" },
-  holiday: { cls: "border-border bg-muted text-muted-foreground", word: "team holiday", mark: "Holiday" }, off: { cls: "border-transparent bg-transparent text-subtle-foreground", word: "weekly off", mark: "" },
+const DAY_LOOK: Record<DayType, { cls: string; word: string; mark: string; icon: typeof Umbrella | null }> = {
+  work: { cls: "border-border bg-card hover:border-input", word: "working day", mark: "", icon: null }, leave: { cls: "border-info/40 bg-info-soft text-info-text", word: "leave", mark: "Leave", icon: Umbrella }, training: { cls: "border-primary/40 bg-primary-soft text-primary-text", word: "training", mark: "Training", icon: GraduationCap },
+  holiday: { cls: "border-border bg-muted text-muted-foreground", word: "team holiday", mark: "Holiday", icon: CalendarOff }, off: { cls: "border-transparent bg-transparent text-muted-foreground", word: "weekly off", mark: "", icon: null },
 };
 const DOW = ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"];
 
@@ -191,7 +191,7 @@ function LeaveTab() {
   const before = composite(p.role, a, t), after = composite(p.role, a, t, factor);
   const cycle = (d: number) => { const c = mine[d] ?? "work"; const next: DayType = c === "work" ? "leave" : c === "leave" ? "training" : "work"; const copy = { ...mine }; if (next === "work") delete copy[d]; else copy[d] = next; setMarks({ ...marks, [who]: copy }); };
   const blanks = (OCT_FIRST_DOW - 6 + 7) % 7;
-  const show = (key: (typeof METRICS)[number]["key"], v: number) => (key === "revenue" ? money(v, { compact: true, currency: CURRENCY }) : num(v, 1));
+  const show = (key: (typeof METRICS)[number]["key"], v: number) => (key === "revenue" ? money(v, { compact: true, currency: null }) : num(v, 1));
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <section className="card p-5" aria-labelledby="leave-cal-title">
@@ -201,8 +201,8 @@ function LeaveTab() {
           {DOW.map((d) => <div key={d} className="pb-1 text-center text-xs font-medium text-muted-foreground" aria-hidden>{d}</div>)}
           {Array.from({ length: blanks }, (_, i) => <div key={`b${i}`} />)}
           {days.map((d) => {
-            const k = typeOf(d), look = DAY_LOOK[k], fixed = k === "off" || k === "holiday";
-            return <button key={d} type="button" disabled={fixed} onClick={() => cycle(d)} aria-label={`${d} October, ${look.word}`} className={cn("flex min-h-12 flex-col items-center justify-center rounded-lg border p-0.5 text-sm tabular-nums transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden", look.cls, fixed && "cursor-default")}>{d}{look.mark && <span className="max-w-full truncate text-[9px] leading-tight sm:text-[10px]">{look.mark}</span>}</button>;
+            const k = typeOf(d), look = DAY_LOOK[k], fixed = k === "off" || k === "holiday", Mark = look.icon;
+            return <button key={d} type="button" disabled={fixed} onClick={() => cycle(d)} aria-label={`${d} October, ${look.word}`} className={cn("flex min-h-12 flex-col items-center justify-center rounded-lg border p-0.5 text-sm tabular-nums transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden", look.cls, fixed && "cursor-default")}>{d}{Mark && <span className="flex items-center gap-0.5 text-[10px] leading-tight"><Mark className="size-3 shrink-0" aria-hidden /><span className="hidden xl:inline">{look.mark}</span></span>}</button>;
           })}
         </div>
         <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><li className="flex items-center gap-1"><Umbrella className="size-3.5" aria-hidden />Leave</li><li className="flex items-center gap-1"><GraduationCap className="size-3.5" aria-hidden />Training</li><li className="flex items-center gap-1"><CalendarOff className="size-3.5" aria-hidden />Team holiday, set in Team setup</li></ul>
@@ -210,11 +210,11 @@ function LeaveTab() {
       <section className="card overflow-hidden" aria-labelledby="prorate-title">
         <CardTitle id="prorate-title" title={`${p.name}'s targets`} note={<span data-excluded>{excluded} of {normal} working days excluded, so targets are {pctOf(factor)} of normal.</span>} />
         <ScrollX label="Prorated targets">
-          <table className="w-full min-w-[26rem] text-sm"><thead><tr className="border-b border-border"><th scope="col" className={TH}>Metric</th><th scope="col" className={TH_NUM}>Actual</th><th scope="col" className={TH_NUM}>Normal target</th><th scope="col" className={TH_NUM}>With days off</th></tr></thead>
-            <tbody className="tabular-nums">{METRICS.filter((m) => t[m.key]).map((m) => <tr key={m.key} className="border-b border-border last:border-0"><th scope="row" className="px-3 py-2 text-left font-medium">{m.label}</th><td className="px-3 py-2 text-right">{show(m.key, a[m.key])}</td><td className="px-3 py-2 text-right text-muted-foreground">{show(m.key, t[m.key])}</td><td className="px-3 py-2 text-right font-semibold">{show(m.key, t[m.key] * factor)}</td></tr>)}</tbody></table>
+          <table className="w-full text-sm"><thead><tr className="border-b border-border"><th scope="col" className={TH}>Metric</th><th scope="col" className={TH_NUM}>Actual</th><th scope="col" className={cn(TH_NUM, "whitespace-normal")}>Normal target</th><th scope="col" className={cn(TH_NUM, "whitespace-normal")}>With days off</th></tr></thead>
+            <tbody className="tabular-nums">{METRICS.filter((m) => t[m.key]).map((m) => <tr key={m.key} className="border-b border-border last:border-0"><th scope="row" className="px-3 py-2 text-left font-medium">{m.key === "revenue" ? `Revenue (${CURRENCY})` : m.label}</th><td className="px-3 py-2 text-right">{show(m.key, a[m.key])}</td><td className="px-3 py-2 text-right text-muted-foreground">{show(m.key, t[m.key])}</td><td className="px-3 py-2 text-right font-semibold">{show(m.key, t[m.key] * factor)}</td></tr>)}</tbody></table>
         </ScrollX>
         <div className="border-t border-border p-5">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2"><div><div className="text-xs text-muted-foreground">Score without this</div><div className="text-xl font-semibold tabular-nums" data-before>{pctOf(before)}</div></div><div><div className="text-xs text-muted-foreground">Score with days off taken out</div><div className="flex items-center gap-2 text-xl font-semibold tabular-nums"><span data-after>{pctOf(after)}</span><ScorePill ratio={after} /></div></div></div>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2"><div><div className="text-xs text-muted-foreground">Against the normal targets</div><div className="text-xl font-semibold tabular-nums" data-before>{pctOf(before)}</div></div><div><div className="text-xs text-muted-foreground">With days off taken out</div><div className="flex items-center gap-2 text-xl font-semibold tabular-nums"><span data-after>{pctOf(after)}</span><ScorePill ratio={after} /></div></div></div>
           <ul className="mt-3 space-y-1 text-sm text-muted-foreground"><li>Excluded days aren't counted against anyone, and they don't lower adherence.</li><li>Leave and holidays never break a streak.</li><li>The same sum applies to someone who joins part-way through a month.</li></ul>
         </div>
       </section>

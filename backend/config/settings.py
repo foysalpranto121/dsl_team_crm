@@ -99,7 +99,8 @@ else:
             "PASSWORD": env("DB_PASSWORD"),
             "HOST": env("DB_HOST", "localhost"),
             "PORT": env("DB_PORT", "5432"),
-            "CONN_MAX_AGE": 60,
+            # 0, as above: `runserver` uses a new thread per request, so kept-open connections pile up until Postgres refuses more ("too many clients").
+            "CONN_MAX_AGE": int(env("DB_CONN_MAX_AGE", "0")),
         }
     }
 

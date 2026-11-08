@@ -77,7 +77,7 @@ export const NAV: NavSection[] = [
   },
   // Sample-data screens, only in `npm run dev`.
   ...(import.meta.env.DEV ? [{
-    id: "preview", title: "Preview", roles: ["admin"] as Role[], items: [
+    id: "preview", title: "Sample data", roles: ["admin"] as Role[], items: [
       { to: "/preview", label: "Preview", icon: FlaskConical, description: "New screens on sample data, to check before they're connected", keywords: "sample mock onboarding role dashboards reports notifications phone app configuration leave" },
     ],
   }] : []),

@@ -1,4 +1,4 @@
-import { AlarmClock, BadgeCheck, Bell, BellOff, Briefcase, CalendarClock, CalendarDays, CheckCircle2, CloudOff, Download, House, ListTodo, MoreHorizontal, NotebookPen, Plus, RefreshCw, Smartphone, TimerOff, Trophy, UserPlus, Wifi, WifiOff, X, type LucideIcon } from "lucide-react";
+import { AlarmClock, BadgeCheck, BellOff, Briefcase, CalendarClock, CalendarDays, CheckCircle2, CloudOff, Download, House, Info, ListTodo, MoreHorizontal, NotebookPen, Plus, RefreshCw, Smartphone, TimerOff, Trophy, UserPlus, Wifi, WifiOff, X, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Badge, StatusPill } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,7 +51,7 @@ function NotificationsTab() {
   const [prefs, setPrefs] = useState(START);
   const [read, setRead] = useState<string[]>([]);
   const [only, setOnly] = useState<"all" | "unread">("all");
-  const list = NOTICES.filter((n) => n.forWho === who);
+  const list = NOTICES.filter((n) => n.forWho === who).sort((a, b) => b.at.localeCompare(a.at));   // newest first
   const kinds = NOTICE_KINDS.filter((k) => k.who === who || k.who === "both");
   const fate = useMemo(() => deliver(list, prefs), [list, prefs]);
   const counts = list.reduce((c, n) => { c[fate[n.id].how] += 1; return c; }, { now: 0, held: 0, digest: 0, off: 0 } as Record<Delivery["how"], number>);
@@ -82,7 +82,7 @@ function NotificationsTab() {
         {unread > 0 && <div className="border-t border-border px-5 py-2"><Button size="sm" variant="ghost" onClick={() => setRead(list.map((n) => n.id))}>Mark all as read</Button></div>}
       </section>
       <section className="card overflow-hidden" aria-labelledby="prefs-title">
-        <CardTitle id="prefs-title" title="My notification settings" note="Each person chooses for themselves." />
+        <CardTitle id="prefs-title" title="My notification settings" note="Each person chooses for themselves. Home stays the main place to look." />
         <ScrollX label="Which alerts go where">
           <table className="w-full min-w-[24rem] text-sm">
             <thead><tr className="border-b border-border"><th scope="col" className={TH}>Alert</th><th scope="col" className={cn(TH, "text-center")}>In-app</th><th scope="col" className={cn(TH, "text-center")}>Phone</th><th scope="col" className={cn(TH, "text-center")}>Email</th><th scope="col" className={cn(TH, "text-center")}>WhatsApp</th></tr></thead>
@@ -127,7 +127,7 @@ function PhoneTab() {
   const [activity, setActivity] = useState<string | null>(null);
   const [notDone, setNotDone] = useState(false);
   const [taps, setTaps] = useState(0);
-  const [last, setLast] = useState<{ taps: number; text: string } | null>(null);
+  const [last, setLast] = useState<{ taps: number; text: string; before: PhoneSlot } | null>(null);
   const [plus, setPlus] = useState(false);
   const [install, setInstall] = useState(true);
   const queued = slots.filter((s) => s.queued).length;
@@ -146,7 +146,7 @@ function PhoneTab() {
     if (!picked) return;
     const act = activity ?? picked.activity;
     setSlots(slots.map((s) => (s.id === picked.id ? { ...s, activity: act, state: "done", how, queued: !online } : s)));
-    setLast({ taps: used, text: `${picked.id} logged as ${how?.toLowerCase()}` }); setPicked(null); setTaps(0);
+    setLast({ taps: used, text: `${picked.id} logged as ${how?.toLowerCase()}`, before: picked }); setPicked(null); setTaps(0);
   };
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
@@ -167,10 +167,11 @@ function PhoneTab() {
                 const fixed = s.state === "done" || s.state === "deviation";
                 return (
                   <li key={s.id}>
-                    <button type="button" disabled={fixed} onClick={() => pick(s)} aria-label={`${s.id}, ${s.activity ?? "not planned"}, ${s.queued ? "waiting to sync" : s.state === "done" ? "logged" : s.state === "deviation" ? "waiting for a decision" : "log this hour"}`}
+                    <button type="button" disabled={fixed} onClick={() => pick(s)} aria-label={`${s.id}, ${s.activity ?? "not planned"}, ${s.how ? `logged as ${s.how.toLowerCase()}` : s.state === "done" ? "logged" : s.state === "deviation" ? "waiting for a decision" : "log this hour"}${s.queued ? ", waiting to sync" : ""}`}
                       className={cn("flex min-h-11 w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden", picked?.id === s.id ? "border-primary ring-2 ring-primary" : "border-border", fixed ? "bg-muted/60" : "bg-card")}>
                       <span className="w-9 shrink-0 text-xs font-semibold tabular-nums text-muted-foreground">{s.id}</span><span className="min-w-0 flex-1 truncate">{s.activity ?? <span className="text-muted-foreground">Not planned</span>}</span>
-                      {s.queued ? <CloudOff className="size-4 shrink-0 text-warning-text" aria-hidden /> : s.state === "done" ? <CheckCircle2 className="size-4 shrink-0 text-success-text" aria-hidden /> : s.state === "deviation" ? <span className="text-[11px] text-warning-text">Waiting</span> : null}
+                      {s.queued && <CloudOff className="size-4 shrink-0 text-warning-text" aria-hidden />}
+                      {s.how === "Partly" || s.how === "Not done" ? <span className="shrink-0 text-[11px] font-medium">{s.how}</span> : s.state === "done" && !s.queued ? <CheckCircle2 className="size-4 shrink-0 text-success-text" aria-hidden /> : s.state === "deviation" ? <span className="text-[11px] text-warning-text">Waiting</span> : null}
                     </button>
                   </li>);
               })}</ul>
@@ -191,6 +192,11 @@ function PhoneTab() {
               <div className="absolute inset-x-0 bottom-14 z-10 rounded-t-2xl border-t border-border bg-card p-3 shadow-lg" aria-label="New">
                 <div className="mb-1 flex items-center justify-between"><span className="text-sm font-semibold">New</span><Button size="icon-sm" variant="ghost" aria-label="Close" onClick={() => setPlus(false)}><X /></Button></div>
                 <ul>{NEW_ITEMS.map((i) => <li key={i.label}><button type="button" onClick={() => { setPlus(false); sample(`This opens ${i.label}`); }} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2 text-sm hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"><i.icon className="size-4 text-muted-foreground" aria-hidden />{i.label}</button></li>)}</ul>
+              </div>)}
+            {last && !picked && !plus && (
+              <div className="mx-2 mb-2 flex shrink-0 items-center justify-between gap-2 rounded-lg bg-foreground px-3 py-1.5 text-sm text-background shadow-lg" role="status">
+                <span className="min-w-0 truncate">{last.text}</span>
+                <button type="button" className="min-h-9 shrink-0 rounded-md px-2 font-semibold underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden" onClick={() => { setSlots(slots.map((s) => (s.id === last.before.id ? last.before : s))); setLast(null); }}>Undo</button>
               </div>)}
             <nav aria-label="Phone tabs" className="grid h-14 grid-cols-5 items-center border-t border-border bg-card">
               {([["Home", House, true], ["My Day", CalendarClock, false]] as const).map(([name, Icon, on]) => <span key={name} className={cn("flex flex-col items-center gap-0.5 text-[10px]", on ? "font-semibold text-primary-text" : "text-muted-foreground")}><Icon className="size-5" aria-hidden />{name}</span>)}
@@ -220,7 +226,7 @@ function PhoneTab() {
           </ul>
         </section>
         <section className="card p-5" aria-labelledby="real-title">
-          <h2 id="real-title" className="flex items-center gap-2 text-sm font-semibold"><Bell className="size-4 text-muted-foreground" aria-hidden />What this preview doesn't do yet</h2>
+          <h2 id="real-title" className="flex items-center gap-2 text-sm font-semibold"><Info className="size-4 text-muted-foreground" aria-hidden />What this preview doesn't do yet</h2>
           <p className="mt-1 text-sm text-muted-foreground">This shows how it looks and flows. The real install, offline storage and sync get built once you're happy with it.</p>
         </section>
       </div>

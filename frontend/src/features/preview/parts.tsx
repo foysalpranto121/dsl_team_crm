@@ -102,7 +102,7 @@ export function ScorePill({ ratio, thresholds = DEFAULT_THRESHOLDS }: { ratio: n
 
 /** A wide table scrolls by itself on a phone, and the keyboard can reach it. */
 export function ScrollX({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
-  return <div role="region" aria-label={label} tabIndex={0} className={cn("overflow-x-auto focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:outline-hidden", className)}>{children}</div>;
+  return <div role="region" aria-label={label} tabIndex={0} className={cn("relative overflow-x-auto focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:outline-hidden", className)}>{children}</div>;
 }
 
 export function CardTitle({ id, title, note, action }: { id: string; title: string; note?: ReactNode; action?: ReactNode }) {
@@ -126,7 +126,7 @@ export function SlotChips({ slots, onPick, picked, className }: { slots: Slot[];
     <ul className={cn("grid grid-cols-2 gap-2 sm:grid-cols-5", className)}>
       {slots.map((s) => {
         const look = SLOT_LOOK[s.state];
-        const inner = (<><span className="block text-xs font-semibold">{s.id}</span><span className="mt-0.5 block truncate text-xs">{s.activity ?? "Not planned"}</span><span className="block text-[11px] opacity-90">{look.word}</span></>);
+        const inner = (<><span className="block text-xs font-semibold">{s.id}</span><span className="mt-0.5 block truncate text-xs">{s.activity ?? "Not planned"}</span><span className="block text-[11px]">{look.word}</span></>);
         const cls = cn("block w-full rounded-lg border px-2.5 py-2 text-left", look.cls, picked === s.id && "ring-2 ring-primary");
         return <li key={s.id} className="min-w-0">{onPick ? <button type="button" onClick={() => onPick(s)} className={cn(cls, "transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden")}>{inner}</button> : <div className={cls}>{inner}</div>}</li>;
       })}
