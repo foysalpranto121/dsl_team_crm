@@ -63,6 +63,12 @@ class TeamSettings(models.Model):
     kpi_mode = models.CharField(max_length=8, choices=KpiMode.choices, default=KpiMode.DERIVED)
     kpi_from = models.DateField(null=True, blank=True, help_text="Weeks starting before this keep the numbers typed in. Empty = every week.")
     lost_reasons = models.JSONField(default=default_lost_reasons, blank=True)
+    # Calendar and load handling (SRS v0.5 FR-C2, FR-SF5, FR-SF6, D6)
+    holidays = models.JSONField(default=list, blank=True, help_text="Dates (YYYY-MM-DD) nobody works: framework steps skip them.")
+    overload_items = models.PositiveSmallIntegerField(default=10, validators=[MinValueValidator(1), MaxValueValidator(500)],
+                                                      help_text="A member is Overloaded with more open overdue items than this.")
+    overload_days = models.PositiveSmallIntegerField(default=5, validators=[MinValueValidator(1), MaxValueValidator(60)],
+                                                     help_text="Or when the oldest overdue item waited more working days than this.")
     currency = models.CharField(max_length=8, default="BDT")
     updated_at = models.DateTimeField(auto_now=True)
 

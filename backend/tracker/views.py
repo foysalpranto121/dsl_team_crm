@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.permissions import IsAdminOrReadOnly, IsTeamAdmin
+from frameworks.models import Framework
 from core import audit
 from team.models import TeamSettings
 from team.services import Locked, parse_day
@@ -231,6 +232,8 @@ class ConfigView(APIView):
             "kpi_types": KpiTypeSerializer(KpiType.objects.select_related("stage"), many=True).data,
             "lost_reasons": st.lost_reasons or [], "currency": st.currency, "kpi_mode": st.kpi_mode, "kpi_from": st.kpi_from,
             "log_types": [{"key": k, "label": label} for k, label in ClientLogEntry.Type.choices if k != ClientLogEntry.Type.STAGE],
+            "framework_defaults": [{"stage": f.stage.key, "segment": f.segment, "name": f.name, "steps": f.n}
+                                   for f in Framework.objects.filter(active=True, is_default=True).select_related("stage").annotate(n=Count("steps")) if f.n],
         })
 
 
@@ -259,7 +262,7 @@ class StageViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, s):
         if Prospect.objects.filter(stage=s.key).exists() or StageEvent.objects.filter(Q(to_stage=s.key) | Q(from_stage=s.key)).exists() \
-                or KpiType.objects.filter(stage=s).exists():
+                or KpiType.objects.filter(stage=s).exists() or Framework.objects.filter(stage=s).exists():
             raise ValidationError({"detail": "This stage is in use. Switch it off instead."})
         audit.log(self.request.user, "pipeline.stage_delete", s.name, flagged=True)
         s.delete()

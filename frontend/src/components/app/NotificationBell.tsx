@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlarmClock, BadgeCheck, Bell, CalendarClock, CalendarSync, CalendarX2, CheckCircle2, LayoutGrid, ShieldCheck, type LucideIcon } from "lucide-react";
+import { AlarmClock, BadgeCheck, Bell, CalendarClock, CalendarSync, CalendarX2, CheckCircle2, LayoutGrid, ShieldCheck, UserRoundCog, type LucideIcon } from "lucide-react";
 import { Link } from "react-router";
 import { pendingUsersQuery, plansMineQuery, renewalsDueQuery, todayQuery, trackerSummaryQuery } from "@/api/queries";
 import { useFeatures } from "@/lib/features";
 import { useAuth } from "@/auth/AuthContext";
 import { api } from "@/api/client";
+import { teamLoadQuery } from "@/features/frameworks/api";
 import type { Reviews } from "@/features/pipeline/api";
 import { duration } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,8 @@ export function NotificationBell() {
   // SRS v0.5 FR-K2: wins whose work order needs verifying and backward stage moves, for supervisors and admins
   const reviews = useQuery({ queryKey: ["pipeline-reviews"], queryFn: async () => (await api.get<Reviews>("/tracker/reviews/")).data, staleTime: 2 * 60_000,
     enabled: user?.role === "admin" || user?.role === "supervisor" });
+  // SRS v0.5 FR-SF6: members flagged Overloaded (their new framework steps wait), for supervisors and admins
+  const load = useQuery({ ...teamLoadQuery, enabled: user?.role === "admin" || user?.role === "supervisor" });
 
   const items: Item[] = [];
   const t = today.data;
@@ -52,10 +55,17 @@ export function NotificationBell() {
       body: "Plans, deviations and unplanned hours, on the Team Board.", to: "/team-board" });
   }
   const rv = reviews.data;
-  if (rv && (rv.wins.length || rv.moves.length)) {
-    const parts = [rv.wins.length && `${rv.wins.length} ${rv.wins.length === 1 ? "win" : "wins"} to verify`, rv.moves.length && `${rv.moves.length} backward ${rv.moves.length === 1 ? "move" : "moves"}`].filter(Boolean);
+  const flaggedStages = rv?.stages?.length ?? 0;
+  if (rv && (rv.wins.length || rv.moves.length || flaggedStages)) {
+    const parts = [rv.wins.length && `${rv.wins.length} ${rv.wins.length === 1 ? "win" : "wins"} to verify`, rv.moves.length && `${rv.moves.length} backward ${rv.moves.length === 1 ? "move" : "moves"}`,
+      flaggedStages && `${flaggedStages} stage ${flaggedStages === 1 ? "review" : "reviews"}`].filter(Boolean);
     items.push({ id: "pipeline-reviews", tone: "primary", icon: BadgeCheck, title: `Pipeline: ${parts.join(", ")}`,
       body: "A win counts as a client and revenue once you verify the work order.", to: "/kpi" });
+  }
+  const over = (load.data?.people ?? []).filter((p) => p.flag && !p.flag.overridden);
+  if (over.length) {
+    items.push({ id: "overload", tone: "warning", icon: UserRoundCog, title: `${over.length} ${over.length === 1 ? "member is" : "members are"} overloaded`,
+      body: `${over.slice(0, 3).map((p) => p.name).join(", ")}: new framework steps are waiting until they catch up.`, to: "/frameworks" });
   }
   if (pm?.this_week?.rejected) {
     items.push({ id: "rejected", tone: "danger", icon: CalendarX2, title: `${pm.this_week.rejected} planned ${pm.this_week.rejected === 1 ? "hour was" : "hours were"} sent back`,

@@ -234,6 +234,9 @@ def log_details(user, work, day, slots, sent, entry, st):
             m["qty"] = int(m_in["qty"])
         if m_in.get("ref"):
             m["ref"] = str(m_in["ref"]).strip()[:200]
+        step_id = m_in.get("step") or (wm.get("step") if s == was else None)
+        if step_id:                                # logged from a framework step (SRS v0.5 FR-SF2)
+            m["step"] = int(step_id)
         task_id = m_in.get("task") or (wm.get("task") if s == was else None)
         if task_id:                                # logged from My Tasks (FR-MT5)
             from mytasks.services import assigned_review

@@ -54,10 +54,11 @@ def is_backward(old, new):
 
 
 @transaction.atomic
-def move(p, to, by, on=None, initial=False, baseline=False, refresh=True):
-    """Put a saved record into stage `to`: a StageEvent (backward moves are flagged for review), a Client Log line, and the
+def move(p, to, by, on=None, initial=False, baseline=False, refresh=True, old_steps="keep"):
+    """Put a saved record into stage `to`: a StageEvent (backward moves are flagged for review), a Client Log line, the stage's
+    framework steps (SRS v0.5 FR-SF5; the old framework's unfinished steps are kept or dropped, as old_steps says), and the
     owner's weekly KPIs worked out again. initial: the record was just added there; baseline: it was imported there, so the
-    stages up to it count as reached without counting as this week's KPIs."""
+    stages up to it count as reached without counting as this week's KPIs, and it gets no framework steps."""
     stages = stage_map()
     new = stages.get(to)
     if new is None or not new.active:
@@ -77,6 +78,8 @@ def move(p, to, by, on=None, initial=False, baseline=False, refresh=True):
     p.save()
     note = f"Imported at {new.name}" if baseline else f"Added at {new.name}" if initial else f"{old.name if old else p.stage} → {new.name}" + (" · moved back, flagged for review" if back else "")
     ClientLogEntry.objects.create(record=p, type=ClientLogEntry.Type.STAGE, day=on, by=by, note=note)
+    from frameworks import services as frameworks
+    frameworks.on_stage_change(p, to, by, on, old_steps, baseline)
     if refresh:
         from . import kpis
         kpis.refresh(p.owner_id)
@@ -166,7 +169,9 @@ def reviews():
     wins = Prospect.objects.filter(stage__in=won, won_verified_at__isnull=True).select_related("owner").order_by("-stage_since")[:200]
     stages = stage_map()
     name = lambda k: stages[k].name if k in stages else k  # noqa: E731
+    from frameworks.services import stage_reviews
     return {
+        "stages": stage_reviews(),
         "moves": [{"id": e.id, "record": e.record_id, "company": e.record.company, "person": e.owner.name or e.owner.email, "owner": e.owner_id,
                    "from": name(e.from_stage), "to": name(e.to_stage), "day": e.day} for e in events],
         "wins": [{"id": p.id, "company": p.company, "person": p.owner.name or p.owner.email, "owner": p.owner_id, "requirement": p.requirement,

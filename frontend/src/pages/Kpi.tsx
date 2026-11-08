@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDownLeft, BadgeCheck, CalendarCheck2, Check, ChevronLeft, ChevronRight, CircleAlert, Info, Lock, PencilLine, Workflow } from "lucide-react";
+import { ArrowDownLeft, BadgeCheck, CalendarCheck2, Check, ChevronLeft, ChevronRight, CircleAlert, Flag, Info, Lock, PencilLine, Workflow } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { api, errorText } from "../api/client";
@@ -165,17 +165,19 @@ function ReviewPanel() {
   const [rejecting, setRejecting] = useState<{ id: number; company: string } | null>(null);
   const [note, setNote] = useState("");
   const act = useMutation({
-    mutationFn: async (a: { kind: "move" | "win"; id: number; verified?: boolean; note?: string }) =>
-      api.post(a.kind === "move" ? `/tracker/reviews/moves/${a.id}/` : `/tracker/reviews/wins/${a.id}/`, { verified: a.verified, note: a.note ?? "" }),
+    mutationFn: async (a: { kind: "move" | "win" | "stage"; id: number; verified?: boolean; note?: string }) =>
+      api.post(a.kind === "move" ? `/tracker/reviews/moves/${a.id}/` : a.kind === "stage" ? `/frameworks/reviews/${a.id}/` : `/tracker/reviews/wins/${a.id}/`,
+        { verified: a.verified, note: a.note ?? "" }),
     onSuccess: (_, a) => { invalidate(qc); setRejecting(null); setNote("");
-      toast.success(a.kind === "move" ? "Marked as reviewed" : a.verified ? "Win verified" : "Sent back", { description: a.kind === "win" && a.verified ? "It now counts as a client and as revenue." : undefined }); },
+      if (a.kind === "stage") qc.invalidateQueries({ queryKey: ["frameworks"] });
+      toast.success(a.kind !== "win" ? "Marked as reviewed" : a.verified ? "Win verified" : "Sent back", { description: a.kind === "win" && a.verified ? "It now counts as a client and as revenue." : undefined }); },
     onError: (e) => toast.error("Couldn't save that", { description: errorText(e) }),
   });
-  if (!q.data || (q.data.moves.length === 0 && q.data.wins.length === 0)) return null;
-  const d = q.data;
+  if (!q.data || (q.data.moves.length === 0 && q.data.wins.length === 0 && !q.data.stages?.length)) return null;
+  const d = q.data, flagged = d.stages ?? [];
   return (
     <section className="card overflow-hidden" aria-labelledby="reviews-title">
-      <h2 id="reviews-title" className="border-b border-border px-5 py-3 text-sm font-semibold">Needs your review <span className="font-normal text-muted-foreground">· {d.wins.length + d.moves.length}</span></h2>
+      <h2 id="reviews-title" className="border-b border-border px-5 py-3 text-sm font-semibold">Needs your review <span className="font-normal text-muted-foreground">· {d.wins.length + d.moves.length + flagged.length}</span></h2>
       <ul className="divide-y divide-border">
         {d.wins.map((w) => (
           <li key={`w${w.id}`} className="flex flex-wrap items-center gap-3 px-5 py-3 text-sm">
@@ -192,6 +194,14 @@ function ReviewPanel() {
             <div className="min-w-0 flex-1"><div className="font-medium">{m.company} moved back <span className="font-normal text-muted-foreground">· {m.person}</span></div>
               <div className="text-xs text-muted-foreground">{m.from} → {m.to} on {date(m.day, "short")}. Counts don't change; check it's right.</div></div>
             <Button size="sm" variant="secondary" onClick={() => act.mutate({ kind: "move", id: m.id, note: "Reviewed" })}>Mark reviewed</Button>
+          </li>
+        ))}
+        {flagged.map((s) => (
+          <li key={`s${s.id}`} className="flex flex-wrap items-center gap-3 px-5 py-3 text-sm">
+            <Flag className="size-4 shrink-0 text-warning-text" aria-hidden />
+            <div className="min-w-0 flex-1"><div className="font-medium">{s.company}: stage review <span className="font-normal text-muted-foreground">· {s.person}</span></div>
+              <div className="text-xs text-muted-foreground">{s.note} ({s.framework}). Check the record is still at the right stage.</div></div>
+            <Button size="sm" variant="secondary" onClick={() => act.mutate({ kind: "stage", id: s.id, note: "Reviewed" })}>Mark reviewed</Button>
           </li>
         ))}
       </ul>

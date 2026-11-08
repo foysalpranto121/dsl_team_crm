@@ -1,6 +1,6 @@
 import {
   Activity, BarChart3, Briefcase, CalendarCheck2, CalendarClock, CalendarSync, ClipboardList, LayoutDashboard, LayoutGrid, ListTodo, Network, Newspaper,
-  Settings, ShieldCheck, Sunrise, Tv, UserRound, Users, type LucideIcon,
+  Settings, ShieldCheck, Sunrise, Tv, UserRound, Users, Workflow, type LucideIcon,
 } from "lucide-react";
 import type { Feature, Role } from "../api/types";
 import type { Features } from "./features";
@@ -48,6 +48,8 @@ export const NAV: NavSection[] = [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Team hours, points and results at a glance", keywords: "home overview" },
       { to: "/team-board", label: "Team Board", icon: LayoutGrid, description: "Approve plans, deviations and unplanned hours", roles: ["admin", "supervisor"],
         keywords: "approve approvals plans board supervisor deviations" },
+      { to: "/frameworks", label: "Frameworks", icon: Workflow, description: "Framework Studio: dated follow-up steps for each pipeline stage", roles: ["admin", "supervisor"],
+        keywords: "framework studio steps follow-up cadence stage default overloaded template pack" },
       { to: "/huddle", label: "Morning huddle", icon: Sunrise, description: "Yesterday, today's plan, what needs attention, one focus", feature: "huddle",
         keywords: "meeting standup daily focus" },
       { to: "/kpi", label: "Weekly KPI", icon: CalendarCheck2, description: "Leads, opportunities, clients and revenue per week", keywords: "results" },

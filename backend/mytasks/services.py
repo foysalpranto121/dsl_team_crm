@@ -138,7 +138,7 @@ def log_as_hour(user, task, hour):
     slots[hour] = task.activity_id
     meta = [(e.meta_at(i) if e else {}) for i in range(SLOTS)]
     meta[hour] = {"status": "done", "task": task.id}
-    team.save_entry(user, work, today, slots, e.remarks if e else "", [{k: m.get(k) for k in ("status", "qty", "ref", "reason", "task") if m.get(k) is not None} or None for m in meta])
+    team.save_entry(user, work, today, slots, e.remarks if e else "", [{k: m.get(k) for k in ("status", "qty", "ref", "reason", "task", "step") if m.get(k) is not None} or None for m in meta])
     task.logged_day, task.logged_hour = today, hour
     task.save(update_fields=["logged_day", "logged_hour", "updated_at"])
     return today, hour

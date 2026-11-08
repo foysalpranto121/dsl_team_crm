@@ -16,7 +16,7 @@ class TeamSettingsSerializer(serializers.ModelSerializer):
         model = TeamSettings
         fields = ["name", "timezone", "lock_days", "week_start_dow", "weekend_days", "count_weekend", "currency", "unplanned_mode", "plan_cutoff",
                   "feature_tv", "feature_huddle", "feature_digest", "feature_renewals", "kpi_mode", "kpi_from", "lost_reasons",
-                  "today", "seconds_to_lock", "updated_at"]
+                  "holidays", "overload_items", "overload_days", "today", "seconds_to_lock", "updated_at"]
         read_only_fields = ["updated_at"]
 
     def get_today(self, obj):
@@ -41,6 +41,18 @@ class TeamSettingsSerializer(serializers.ModelSerializer):
         if not out:
             raise serializers.ValidationError("Keep at least one lost reason.")
         return out[:30]
+
+    def validate_holidays(self, v):
+        from datetime import date
+        if not isinstance(v, list) or len(v) > 400:
+            raise serializers.ValidationError("Holidays must be a list of dates.")
+        out = set()
+        for x in v:
+            try:
+                out.add(date.fromisoformat(str(x)).isoformat())
+            except ValueError:
+                raise serializers.ValidationError(f"{x} isn't a date (use YYYY-MM-DD).")
+        return sorted(out)
 
     def validate(self, attrs):
         week_start = attrs.get("week_start_dow", self.instance.week_start_dow if self.instance else 6)

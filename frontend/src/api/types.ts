@@ -120,6 +120,8 @@ export interface HourMeta {
   /** logged from this My Tasks task; assigned ones are pre-approved */
   task?: number;
   assigned?: boolean;
+  /** logged from this framework step (SRS v0.5 FR-SF2) */
+  step?: number;
 }
 
 export interface Entry {
@@ -191,6 +193,10 @@ export interface TeamSettings {
   kpi_mode: "derived" | "manual";
   kpi_from: string | null;
   lost_reasons: string[];
+  /** SRS v0.5 FR-C2, FR-SF6: holidays (framework steps skip them) and the Overloaded limits */
+  holidays: string[];
+  overload_items: number;
+  overload_days: number;
   today: string;
   seconds_to_lock: number;
 }

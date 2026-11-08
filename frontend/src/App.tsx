@@ -24,6 +24,7 @@ const UiKit = import.meta.env.DEV ? lazy(() => import("./pages/UiKit")) : null;
 const MyDay = lazy(() => import("./features/myday/MyDay"));
 const MyTasks = lazy(() => import("./features/mytasks/MyTasks"));
 const TeamBoard = lazy(() => import("./features/board/TeamBoard"));
+const FrameworkStudio = lazy(() => import("./features/frameworks/FrameworkStudio"));
 
 /** The page was called Sheets, then Daily log; old links and bookmarks still work (SRS v0.5 FR-G5: My Day). */
 function ToMyDay() {
@@ -94,6 +95,7 @@ export default function App() {
           <Route path="/sheets" element={<ToMyDay />} />
           <Route element={<RequireApprover />}>
             <Route path="/team-board" element={<Suspense fallback={<PageSkeleton />}><TeamBoard /></Suspense>} />
+            <Route path="/frameworks" element={<Suspense fallback={<PageSkeleton />}><FrameworkStudio /></Suspense>} />
           </Route>
           <Route path="/kpi" element={<KpiPage />} />
           <Route path="/performance" element={<Performance />} />

@@ -5,6 +5,7 @@ import { api, downloadFile, errorText } from "../api/client";
 import type { Backup, JobRole, Sheet, TeamSettings, User } from "../api/types";
 import ImportWorkbook from "../components/ImportWorkbook";
 import TasksRoles from "../components/TasksRoles";
+import { CalendarAndLoad } from "../features/setup/CalendarAndLoad";
 import { PolicyAndFeatures } from "../features/setup/PolicyAndFeatures";
 import { SalesProcess } from "../features/setup/SalesProcess";
 import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select, Spinner } from "../components/ui";
@@ -244,6 +245,7 @@ export default function TeamSetup() {
 
       <div className="mb-6"><RulesCard st={st.data!} /></div>
       <div className="mb-6"><PolicyAndFeatures st={st.data!} /></div>
+      <div className="mb-6"><CalendarAndLoad st={st.data!} /></div>
       <div className="mb-6"><SalesProcess st={st.data!} /></div>
 
       <TasksRoles />

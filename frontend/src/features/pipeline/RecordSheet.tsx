@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, AlertTriangle, ArrowRightLeft, BadgeCheck, CheckCircle2, Clock, Mail, MapPin, MessageCircle, Phone, StickyNote, Trash2, Users } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { api, errorText } from "@/api/client";
+import { todayQuery } from "@/api/queries";
 import { Timeline } from "@/components/data/steps";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import { toast } from "@/components/ui/toaster";
 import { date, money } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { logQuery, orderedStages, refreshPipeline, type Health, type PipelineConfig, type PipelineRecord, type Stage } from "./api";
+import { NextStepCard, StepsPanel } from "../frameworks/StepsPanel";
 import { fieldErrors } from "./dialogs";
 
 const LOG_ICON: Record<string, ReactNode> = { call: <Phone />, email: <Mail />, whatsapp: <MessageCircle />, visit: <MapPin />, meeting: <Users />, note: <StickyNote />,
@@ -119,7 +121,11 @@ function Details({ record, config, onDeleted }: { record: PipelineRecord; config
   const open = record.stage_kind === "open";
   return (
     <form id="record-form" className="space-y-6" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
-      {open && <Section title="Next step">
+      {open && record.framework?.next && <Section title="Next step">
+        <p className="text-sm">{record.framework.next.title} <span className="text-muted-foreground">· {date(record.framework.next.due_date, "short")}</span></p>
+        <p className="text-xs text-muted-foreground">Set by the {record.framework.framework ? `“${record.framework.framework}”` : "stage's"} framework. Complete, move or drop it under Steps.</p>
+      </Section>}
+      {open && !record.framework?.next && <Section title="Next step">
         <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
           {text("next_action", "What you'll do", { required: true })}
           <Field label="When" required error={err.next_follow_up}><DatePicker value={f.next_follow_up} onChange={(v) => setF({ ...f, next_follow_up: v })} aria-label="Next step date" /></Field>
@@ -178,6 +184,8 @@ export function RecordSheet({ record, config, onClose, onMove }: {
   useEffect(() => setTab("details"), [record?.id]);
   const stages = orderedStages(config.stages).filter((s) => s.active || s.key === record?.stage);
   const h = record?.health;
+  const today = useQuery(todayQuery).data?.today ?? "";
+  const steps = (record?.framework?.open ?? 0) + (record?.framework?.waiting ?? 0);
   return (
     <Sheet open={!!record} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="sm:max-w-2xl">
@@ -203,9 +211,11 @@ export function RecordSheet({ record, config, onClose, onMove }: {
                 <H.Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
                 <div><div className="font-medium">{h.label}</div>{h.fix && <div className="text-foreground/80">{h.fix}</div>}</div>
               </div>); })()}
+            <NextStepCard recordId={record.id} open={record.stage_kind === "open"} today={today} onShowAll={() => setTab("steps")} />
             <Tabs value={tab} onValueChange={setTab}>
-              <TabsList><TabsTrigger value="details">Details</TabsTrigger><TabsTrigger value="log">Client Log</TabsTrigger></TabsList>
+              <TabsList><TabsTrigger value="details">Details</TabsTrigger><TabsTrigger value="steps">Steps{steps ? ` · ${steps}` : ""}</TabsTrigger><TabsTrigger value="log">Client Log</TabsTrigger></TabsList>
               <TabsContent value="details" className="pt-4"><Details record={record} config={config} onDeleted={onClose} /></TabsContent>
+              <TabsContent value="steps" className="pt-4"><StepsPanel recordId={record.id} open={record.stage_kind === "open"} today={today} /></TabsContent>
               <TabsContent value="log" className="pt-4"><ClientLog record={record} config={config} /></TabsContent>
             </Tabs>
           </SheetBody>

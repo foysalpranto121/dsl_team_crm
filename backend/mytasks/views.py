@@ -39,6 +39,12 @@ class TaskViewSet(viewsets.ModelViewSet):
     def get_serializer_context(self):
         return {**super().get_serializer_context(), **context_for(self.request)}
 
+    def finalize_response(self, request, response, *args, **kwargs):
+        if request.method not in ("GET", "HEAD", "OPTIONS") and getattr(response, "status_code", 500) < 400 and request.user.is_authenticated:
+            from frameworks.services import check
+            check(request.user.pk)         # the overdue count moved: the Overloaded flag follows it (SRS v0.5 FR-SF6)
+        return super().finalize_response(request, response, *args, **kwargs)
+
     @extend_schema(parameters=[OpenApiParameter("view", str, enum=VIEWS)])
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)

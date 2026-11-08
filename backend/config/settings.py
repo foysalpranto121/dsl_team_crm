@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "ops",
     "renewals",
     "mytasks",
+    "frameworks",
 ]
 
 MIDDLEWARE = [

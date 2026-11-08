@@ -57,7 +57,7 @@ export default function PipelineView({ openId, clearOpen }: { openId?: number | 
   });
   const requestMove = (r: PipelineRecord, to: Stage) => {
     if (r.stage === to.key) return;
-    if (missingFor(to, r).length) setMoving({ r, to });
+    if (missingFor(to, r, config.data).length) setMoving({ r, to });
     else move.mutate({ r, to });
   };
   const imp = useMutation({
@@ -155,7 +155,11 @@ export default function PipelineView({ openId, clearOpen }: { openId?: number | 
                       <KanbanCard key={r.id} title={r.company} subtitle={r.requirement || r.next_action} onClick={() => setOpenRec(r.id)}
                         onDragStart={(e) => { e.dataTransfer.setData("text/record", String(r.id)); e.dataTransfer.effectAllowed = "move"; }}
                         value={r.value != null ? money(+r.value, { compact: true, currency: null }) : undefined} due={d.text} dueTone={d.tone}
-                        healthState={r.health?.state} tags={r.stage_kind === "won" && !r.verified ? <Badge tone="warning">Awaiting verification</Badge> : undefined} />
+                        healthState={r.health?.state} tags={(r.stage_kind === "won" && !r.verified) || r.framework?.flagged || r.framework?.waiting ? <>
+                          {r.stage_kind === "won" && !r.verified && <Badge tone="warning">Awaiting verification</Badge>}
+                          {r.framework?.flagged && <Badge tone="warning">Stage review</Badge>}
+                          {!!r.framework?.waiting && <Badge tone="neutral">Steps waiting</Badge>}
+                        </> : undefined} />
                     );
                   })}
                   {!cards.length && <p className="px-2 py-6 text-center text-xs text-subtle-foreground">{s.kind === "open" ? "Drop a record here" : "None yet"}</p>}

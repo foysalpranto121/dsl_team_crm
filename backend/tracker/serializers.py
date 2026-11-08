@@ -73,6 +73,9 @@ class ProspectSerializer(serializers.ModelSerializer):
     days_in_stage = serializers.SerializerMethodField()
     health = serializers.SerializerMethodField()
     verified = serializers.SerializerMethodField()
+    framework = serializers.SerializerMethodField()
+    old_steps = serializers.ChoiceField(choices=["keep", "drop"], write_only=True, required=False,
+                                        help_text="On a stage change: keep the old framework's unfinished steps, or drop them (FR-SF5).")
 
     class Meta:
         model = Prospect
@@ -103,6 +106,14 @@ class ProspectSerializer(serializers.ModelSerializer):
     def get_verified(self, p):
         return bool(p.won_verified_at)
 
+    def get_framework(self, p):
+        """The running framework and the next step (SRS v0.5 §5.7), loaded once per request for a list."""
+        from frameworks.services import summaries
+        cache = self.context.setdefault("_fw", {})
+        if p.owner_id not in cache:
+            cache[p.owner_id] = summaries(p.owner_id)
+        return cache[p.owner_id].get(p.id)
+
     def validate_company(self, v):
         if not v.strip():
             raise serializers.ValidationError("Give the company a name.")
@@ -130,11 +141,13 @@ class ProspectSerializer(serializers.ModelSerializer):
         if stage is not None:
             if stage.value_required and get("value") is None:
                 errors["value"] = f"{stage.name} needs an expected value."
+            entering = "stage" in attrs and (inst is None or attrs["stage"] != inst.stage)
             if stage.kind == K.OPEN:
-                if not (get("next_action") or "").strip():
-                    errors["next_action"] = "An open record always needs a next step: what you'll do next."
-                if not get("next_follow_up"):
-                    errors["next_follow_up"] = "And when you'll do it."
+                if not self._framework_next(inst, stage, get("segment"), entering):
+                    if not (get("next_action") or "").strip():
+                        errors["next_action"] = "An open record always needs a next step: what you'll do next."
+                    if not get("next_follow_up"):
+                        errors["next_follow_up"] = "And when you'll do it."
             else:
                 if not (get("win_loss_why") or "").strip():
                     errors["win_loss_why"] = "Say why it was won." if stage.kind == K.WON else "Say why it was lost."
@@ -150,8 +163,17 @@ class ProspectSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(errors)
         return attrs
 
+    @staticmethod
+    def _framework_next(inst, stage, segment, entering):
+        """FR-CL3: an open record has a next framework step (or gets one on entering the stage), or a dated next action."""
+        from frameworks import services as frameworks
+        if entering or inst is None:
+            return frameworks.covers(stage.key, segment or "")
+        return inst.steps.filter(status__in=frameworks.WAITING).exists()
+
     @transaction.atomic
     def create(self, data):
+        data.pop("old_steps", None)
         user = self.context["request"].user
         p = Prospect(owner=user, **data)
         p.save()
@@ -161,11 +183,12 @@ class ProspectSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def update(self, p, data):
         stage = data.pop("stage", None)
+        old_steps = data.pop("old_steps", "keep")
         for k, v in data.items():
             setattr(p, k, v)
         p.save()
         if stage and stage != p.stage:
-            pipeline.move(p, stage, self.context["request"].user)
+            pipeline.move(p, stage, self.context["request"].user, old_steps=old_steps)
         elif "value" in data:
             kpis.refresh(p.owner_id)   # a verified win's value is revenue
         return p
