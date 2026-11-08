@@ -1,5 +1,5 @@
 import {
-  Activity, BarChart3, Briefcase, CalendarCheck2, CalendarClock, CalendarSync, ClipboardList, House, LayoutDashboard, LayoutGrid, ListTodo, Network, Newspaper,
+  Activity, BarChart3, Briefcase, CalendarCheck2, CalendarClock, CalendarSync, ClipboardList, FlaskConical, House, LayoutDashboard, LayoutGrid, ListTodo, Network, Newspaper,
   ListChecks, Settings, ShieldCheck, Sunrise, TrendingUp, Trophy, Tv, UserRound, Users, Workflow, type LucideIcon,
 } from "lucide-react";
 import type { Feature, Role } from "../api/types";
@@ -75,6 +75,12 @@ export const NAV: NavSection[] = [
       { to: "/admin/activity", label: "Activity log", icon: ClipboardList, description: "Every change, who made it and when", keywords: "audit history" },
     ],
   },
+  // Sample-data screens, only in `npm run dev`.
+  ...(import.meta.env.DEV ? [{
+    id: "preview", title: "Preview", roles: ["admin"] as Role[], items: [
+      { to: "/preview", label: "Preview", icon: FlaskConical, description: "New screens on sample data, to check before they're connected", keywords: "sample mock onboarding role dashboards reports notifications phone app configuration leave" },
+    ],
+  }] : []),
 ];
 
 /** Pages reached from the user menu rather than the sidebar. */

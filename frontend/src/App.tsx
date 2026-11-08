@@ -21,6 +21,15 @@ import Tracker from "./pages/Tracker";
 // and Office TV mode (SRS v0.3 §14.5) — the public TV page and its admin settings.
 // The component showcase is a developer tool: only in `npm run dev`, never in the built site.
 const UiKit = import.meta.env.DEV ? lazy(() => import("./pages/UiKit")) : null;
+// Screens on sample data, for checking the output and the look before they're connected. Also never in the built site.
+const PREVIEW = import.meta.env.DEV ? [
+  { path: "/preview", Page: lazy(() => import("./features/preview/PreviewHub")) },
+  { path: "/preview/onboarding", Page: lazy(() => import("./features/preview/Onboarding")) },
+  { path: "/preview/role-dashboards", Page: lazy(() => import("./features/preview/RoleDashboards")) },
+  { path: "/preview/reports", Page: lazy(() => import("./features/preview/Reports")) },
+  { path: "/preview/notifications", Page: lazy(() => import("./features/preview/NotificationsAndPhone")) },
+  { path: "/preview/configuration", Page: lazy(() => import("./features/preview/ConfigAndLeave")) },
+] : [];
 const MyDay = lazy(() => import("./features/myday/MyDay"));
 const MyTasks = lazy(() => import("./features/mytasks/MyTasks"));
 const TeamBoard = lazy(() => import("./features/board/TeamBoard"));
@@ -126,6 +135,7 @@ export default function App() {
             <Route path="/admin/tv" element={<Suspense fallback={<PageSkeleton />}><TvScreens /></Suspense>} />
             <Route path="/admin/digest" element={<Suspense fallback={<PageSkeleton />}><WeeklyDigest /></Suspense>} />
             {UiKit && <Route path="/ui" element={<Suspense fallback={<PageSkeleton />}><UiKit /></Suspense>} />}
+            {PREVIEW.map(({ path, Page }) => <Route key={path} path={path} element={<Suspense fallback={<PageSkeleton />}><Page /></Suspense>} />)}
           </Route>
         </Route>
       </Route>
